@@ -38,28 +38,6 @@ struct android_usb_product {
 	char **functions;
 };
 
-/*< updata QC2030 USB yanzhijun 20101105 begin */
-#ifdef CONFIG_USB_AUTO_INSTALL
-struct android_usb_product_hw {
-  __u16 adb_product_id;
-  int adb_num_functions;
-  char **adb_functions;
-  
-  /* Default product ID. */
-  __u16 product_id;
-
-  /* List of function names associated with this product.
-   * This is used to compute the USB product ID dynamically
-   * based on which functions are enabled.
-   */
-  int num_functions;
-  char **functions;
-  int nluns;
-  int cdrom_index;
-};
-#endif
-/* updata QC2030 USB yanzhijun 20101105 end >*/
-
 struct android_usb_platform_data {
 	/* USB device descriptor fields */
 	__u16 vendor_id;
@@ -80,13 +58,7 @@ struct android_usb_platform_data {
 	 * we use the default product ID
 	 */
 	int num_products;
-/*< updata QC2030 USB yanzhijun 20101105 begin */
-#ifndef CONFIG_USB_AUTO_INSTALL
 	struct android_usb_product *products;
-#else
-	struct android_usb_product_hw *products;
-#endif
-/* updata QC2030 USB yanzhijun 20101105 end >*/
 
 	/* List of all supported USB functions.
 	 * This list is used to define the order in which
@@ -119,7 +91,7 @@ struct usb_ether_platform_data {
 
 extern void android_register_function(struct android_usb_function *f);
 
-extern void android_enable_function(struct usb_function *f, int enable);
+extern int android_enable_function(struct usb_function *f, int enable);
 
 
 #endif	/* __LINUX_USB_ANDROID_H */

@@ -158,7 +158,9 @@ struct mt9e013_i2c_reg_conf recommend_settings[] = {
 	{0x3EDA, 0xCFC6},
 	{0x3EDC, 0x4FE4},
 	{0x3EE0, 0x2424},
-	{0x3EE2, 0x9797},
+	/*< DTS2012041904823   songxiaoming 20120419 begin */
+	//{0x3EE2, 0x9797}, //for AF
+	/* DTS2012041904823  songxiaoming 20120419 end > */
 	{0x3EE4, 0xC100},
 	{0x3EE6, 0x0540}
 };

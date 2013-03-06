@@ -95,14 +95,29 @@
 #define FW_MODE						1 
 
 #define PN544_I2C_ADDR				0x28
+/* < DTS2012030501764 songchuan 20120305 begin */
+#ifdef CONFIG_ARCH_MSM7X30
 /* < DTS2011051001634 caomingxing 20110510 begin */
 #define GPIO_NFC_INT				49
 #define GPIO_NFC_VEN				130
+#define GPIO_NFC_LOAD 				181
 /* DTS2011051001634 caomingxing 20110510 end > */
-/* < DTS2011091905981  sunyue 20110929 begin */
-#define PN544_DOWNLOAD_GPIO		169
-#define PN544_CLK_REQ			131
-/* DTS2011091905981  sunyue 20110929 end > */
+#else
+#define GPIO_NFC_INT				114    
+#define GPIO_NFC_VEN				113       
+#define GPIO_NFC_LOAD 				115
+#endif
+
+#define PN544_MAGIC	0xE9
+
+/*
+ * PN544 power control via ioctl
+ * PN544_SET_PWR(0): power off
+ * PN544_SET_PWR(1): power on
+ * PN544_SET_PWR(2): reset and power on with firmware download enabled
+ */
+#define PN544_SET_PWR	_IOW(PN544_MAGIC, 0x01, unsigned int)
+/* DTS2012030501764 songchuan 20120305 end > */
 
 #define PN544_DRIVER_NAME			"pn544"
 #define PN544_DRIVER_DESC 			"NFC driver for PN544 on huawei mobile"
@@ -115,9 +130,9 @@
 #define PN544_NODATA				((PN544_I2C_ADDR << 1) + 1)
 #define PN544_RESET_SEND_SIZE 		6
 #define PN544_RESET_RECEIVE_SIZE 	4
-/* < DTS2011091905981  sunyue 20110929 begin */
+/* < DTS2012030501764 songchuan 20120305 begin */
 #define PN544_MAX_PACK_LEN			512
-/* DTS2011091905981  sunyue 20110929 end > */
+/* DTS2012030501764 songchuan 20120305 end > */
 /* < DTS2011012604950 genghua 20110126 begin */
 #define PN544_DEBUG_ON				1
 #define PN544_DEBUG_OFF				0
@@ -154,19 +169,28 @@ struct pn544_info {
 	struct mutex mutex_mmi;				/* Serialize info struct access */ 
 	u8 *buf; 
 	unsigned int buflen; 
+	/* < DTS2012033007603 songchuan 20120330 begin */
+	bool				irq_enabled;
+	/* DTS2012033007603 songchuan 20120330 end > */
 	/* < DTS2011021601598 yuezenglong 20110216 begin */
 	spinlock_t	irq_enabled_lock;       /* irq spinlock */ 
 	/* DTS2011021601598 yuezenglong 20110216 end > */
 };
 
-/* < DTS2011091905981  sunyue 20110929 begin */
+/* < DTS2012030501764 songchuan 20120305 begin */
 struct pn544_nfc_platform_data {
 	int (*pn544_ven_reset)(void);
 	int (*pn544_interrupt_gpio_config)(void);
 	int (*pn544_fw_download_pull_high)(void);
-	int (*pn544_fw_download_pull_down)(void);
+	int (*pn544_fw_download_pull_down)(void);	
+#ifdef CONFIG_ARCH_MSM7X30
+	/* no other func */
+#else	
+    int (*pn544_clock_output_ctrl)(int);
+    int (*pn544_clock_output_mode_ctrl)(void);
+#endif	
 };
-/* DTS2011091905981  sunyue 20110929 end > */
+/* DTS2012030501764 songchuan 20120305 end > */
 
 /* the following functions are used for huawei MMI_TEST */ 
 

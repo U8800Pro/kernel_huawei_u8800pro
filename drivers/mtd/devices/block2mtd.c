@@ -91,7 +91,6 @@ static int block2mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 	} else
 		instr->state = MTD_ERASE_DONE;
 
-	instr->state = MTD_ERASE_DONE;
 	mtd_erase_callback(instr);
 	return err;
 }
@@ -205,6 +204,15 @@ static int block2mtd_write(struct mtd_info *mtd, loff_t to, size_t len,
 	return err;
 }
 
+/* <DTS2012021001488 yuanjintao 20120210 begin */
+/* for support the unification of emmc and nand */ 
+#ifdef CONFIG_HUAWEI_APANIC
+static int block2mtd_isbad(struct mtd_info *mtd, loff_t ofs)
+{
+    return 0;
+}
+#endif	
+/* DTS2012021001488 yuanjintao 20120210 end> */
 
 /* sync the device - wait until the write queue is empty */
 static void block2mtd_sync(struct mtd_info *mtd)
@@ -225,7 +233,7 @@ static void block2mtd_free_device(struct block2mtd_dev *dev)
 	if (dev->blkdev) {
 		invalidate_mapping_pages(dev->blkdev->bd_inode->i_mapping,
 					0, -1);
-		close_bdev_exclusive(dev->blkdev, FMODE_READ|FMODE_WRITE);
+		blkdev_put(dev->blkdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
 	}
 
 	kfree(dev);
@@ -235,6 +243,7 @@ static void block2mtd_free_device(struct block2mtd_dev *dev)
 /* FIXME: ensure that mtd->size % erase_size == 0 */
 static struct block2mtd_dev *add_device(char *devname, int erase_size)
 {
+	const fmode_t mode = FMODE_READ | FMODE_WRITE | FMODE_EXCL;
 	struct block_device *bdev;
 	struct block2mtd_dev *dev;
 	char *name;
@@ -247,7 +256,7 @@ static struct block2mtd_dev *add_device(char *devname, int erase_size)
 		return NULL;
 
 	/* Get a handle on the device */
-	bdev = open_bdev_exclusive(devname, FMODE_READ|FMODE_WRITE, NULL);
+	bdev = blkdev_get_by_path(devname, mode, dev);
 #ifndef MODULE
 	if (IS_ERR(bdev)) {
 
@@ -255,9 +264,8 @@ static struct block2mtd_dev *add_device(char *devname, int erase_size)
 		   to resolve the device name by other means. */
 
 		dev_t devt = name_to_dev_t(devname);
-		if (devt) {
-			bdev = open_by_devnum(devt, FMODE_WRITE | FMODE_READ);
-		}
+		if (devt)
+			bdev = blkdev_get_by_dev(devt, mode, dev);
 	}
 #endif
 
@@ -276,7 +284,15 @@ static struct block2mtd_dev *add_device(char *devname, int erase_size)
 
 	/* Setup the MTD structure */
 	/* make the name contain the block device in */
+
+    /* <DTS2012021001488 yuanjintao 20120210 begin */
+	/* for support the unification of emmc and nand */ 
+    #ifndef CONFIG_HUAWEI_APANIC
 	name = kasprintf(GFP_KERNEL, "block2mtd: %s", devname);
+    #else
+	name = kasprintf(GFP_KERNEL, "MTD-Crash");
+    #endif	
+    /* DTS2012021001488 yuanjintao 20120210 end> */
 	if (!name)
 		goto devinit_err;
 
@@ -284,33 +300,31 @@ static struct block2mtd_dev *add_device(char *devname, int erase_size)
 
 	dev->mtd.size = dev->blkdev->bd_inode->i_size & PAGE_MASK;
 	dev->mtd.erasesize = erase_size;
-    /*< DTS2011090300255 genghua 20110903 begin */
-	/* we change writesize to 2048 to raise the performance of 
-	 * getting the apanic log, according to the orignal code, 
-	 * we use a number directly and not use a macro, and the 2048 
-	 * comes from the page size we used on nand flash.
-	 */
-    #ifdef CONFIG_HUAWEI_APANIC
-	dev->mtd.writesize = 2048;
+    /* <DTS2012021001488 yuanjintao 20120210 begin */
+    #ifndef CONFIG_HUAWEI_APANIC
+	dev->mtd.writesize = 1;
+    #else
+	dev->mtd.writesize = PAGE_SIZE/2 ;
     #endif	
-    /* DTS2011090300255 genghua 20110903 end >*/
+    /* DTS2011090503385 yanzhijun 20110905 end >*/
 	dev->mtd.type = MTD_RAM;
 	dev->mtd.flags = MTD_CAP_RAM;
 	dev->mtd.erase = block2mtd_erase;
 	dev->mtd.write = block2mtd_write;
-    /*< DTS2011090300255 genghua 20110903 begin */
+    /*< DTS2011090503385 yanzhijun 20110905 begin */ 
     #ifdef CONFIG_HUAWEI_APANIC
-	dev->mtd.panic_write= block2mtd_write;
+	dev->mtd.panic_write = block2mtd_write;
+    dev->mtd.block_isbad = block2mtd_isbad;
     #endif	
-    /* DTS2011090300255 genghua 20110903 end >*/
+    /* DTS2012021001488 yuanjintao 20120210 end> */
 	dev->mtd.writev = default_mtd_writev;
 	dev->mtd.sync = block2mtd_sync;
 	dev->mtd.read = block2mtd_read;
 	dev->mtd.priv = dev;
 	dev->mtd.owner = THIS_MODULE;
 
-	if (add_mtd_device(&dev->mtd)) {
-		/* Device didnt get added, so free the entry */
+	if (mtd_device_register(&dev->mtd, NULL, 0)) {
+		/* Device didn't get added, so free the entry */
 		goto devinit_err;
 	}
 	list_add(&dev->list, &blkmtd_device_list);
@@ -480,7 +494,7 @@ static void __devexit block2mtd_exit(void)
 	list_for_each_safe(pos, next, &blkmtd_device_list) {
 		struct block2mtd_dev *dev = list_entry(pos, typeof(*dev), list);
 		block2mtd_sync(&dev->mtd);
-		del_mtd_device(&dev->mtd);
+		mtd_device_unregister(&dev->mtd);
 		INFO("mtd%d: [%s] removed", dev->mtd.index,
 				dev->mtd.name + strlen("block2mtd: "));
 		list_del(&dev->list);

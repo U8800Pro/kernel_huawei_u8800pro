@@ -239,7 +239,7 @@ static int bma150_smbus_read_byte_block(struct i2c_client *client,
 static int bma150_set_mode(struct i2c_client *client, unsigned char Mode)
 {
 	int comres = 0;
-	unsigned char data1, data2;
+	unsigned char data1 = 0, data2 = 0;
 	struct bma150_data *bma150 = i2c_get_clientdata(client);
 
 	if (client == NULL) {
@@ -275,7 +275,7 @@ static int bma150_set_mode(struct i2c_client *client, unsigned char Mode)
 static int bma150_set_range(struct i2c_client *client, unsigned char Range)
 {
 	int comres = 0;
-	unsigned char data;
+	unsigned char data = 0;
 
 	if (client == NULL) {
 		comres = -1;
@@ -319,7 +319,7 @@ static int bma150_get_range(struct i2c_client *client, unsigned char *Range)
 static int bma150_set_bandwidth(struct i2c_client *client, unsigned char BW)
 {
 	int comres = 0;
-	unsigned char data;
+	unsigned char data = 0;
 
 	if (client == NULL) {
 		comres = -1;
@@ -715,12 +715,18 @@ static int bma150_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	bma150_set_mode(client, BMA150_MODE_SLEEP);
 
+	if ((data->platform_data) && (data->platform_data->power_off))
+		data->platform_data->power_off();
+
 	return 0;
 }
 
 static int bma150_resume(struct i2c_client *client)
 {
 	struct bma150_data *data = i2c_get_clientdata(client);
+
+	if ((data->platform_data) && (data->platform_data->power_on))
+		data->platform_data->power_on();
 
 	bma150_set_mode(client, BMA150_MODE_NORMAL);
 

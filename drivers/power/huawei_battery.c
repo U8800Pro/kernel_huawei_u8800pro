@@ -42,6 +42,9 @@
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_battery.h>
 
+/*< DTS2012020908162 xushunhai 20120209 begin */
+#include <linux/hardware_self_adapt.h>
+/* DTS2012020908162 xushunhai 20120209 end>*/
 #define BATTERY_RPC_PROG	0x30000089
 #define BATTERY_RPC_VER_1_1	0x00010001
 #define BATTERY_RPC_VER_2_1	0x00020001
@@ -64,8 +67,9 @@
 #define PM_LIB_RPC_PROG					0x30000061
 #define PM_LIB_RPC_VERS					0x00030005 /* 0x00030005 */
 
-/* RPC precedure number for consume notify */
-#define PM_CURRENT_CONSUME_NOTIFY_PROC  200
+/*< DTS2012021306187 xushunhai 20120215 begin */
+/* dele the rpc id ,set it at  hardware_self_adapt.h  */
+/* DTS2012021306187 xushunhai 20120215 end>*/
 #endif
 /* DTS2010071902252 shenjinming 20100719 end >*/
 /* DTS2010081400556 shenjinming 20100814 end> */
@@ -78,7 +82,9 @@
 #define BATTERY_ENABLE_DISABLE_FILTER_PROC 		14
 /*< DTS2010071503578 shenjinming 20100716 begin */
 #ifdef CONFIG_HUAWEI_KERNEL 
-#define BATTERY_SET_BATT_DELTA_PROC 		    17
+/*< DTS2012020908162 xushunhai 20120209 begin */
+/* delete for the 7x27a and  8x55  use the same code in  hardware_self_adapt.h   */
+/* DTS2012020908162 xushunhai 20120209 end>*/
 
 /* the battery delta to determine when to *
  * notify app to update battery status    */
@@ -120,7 +126,9 @@
 
 
 /* <DTS2011022101555 sibingsong 20110221 begin */
-#define BATTERY_GET_CHARGE_STAET_PROC   121
+/*< DTS2012020908162 xushunhai 20120209 begin */
+/*  delete for the 7x27a and  8x55  use the same code in  hardware_self_adapt.h*/
+/* DTS2012020908162 xushunhai 20120209 end>*/
 static int batt_debug_mask = 0;
 module_param_named(debug_mask, batt_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
@@ -147,7 +155,9 @@ static int msm_batt_set_delta(u32 batt_delta);
 /*DTS2010073002434 sibingsong 20100729 end>*/
 /*<DTS2010080302590 sibingsong 20100805 begin*/
 /*get battery level rpc function id*/
-#define BATTERY_LEVEL_PROC 19
+/*< DTS2012020908162 xushunhai 20120209 begin */
+/*  delete for the 7x27a and  8x55  use the same code in  hardware_self_adapt.h  */
+/* DTS2012020908162 xushunhai 20120209 end>*/
 /*DTS2010080302590 sibingsong 20100805 end>*/
 /*<DTS2010080302590 sibingsong 20100806 begin*/
 /*delete some lines*/
@@ -484,10 +494,47 @@ struct msm_batt_get_battery_level_ret_data {
 /* delete func msm_batt_get_battery_level_ret_func */
 /* DTS2011052801418 shenjinming 20110528 end > */
 
+/*< DTS2012020908162 xushunhai 20120209 begin */
+/* the RPC function to get the battery level from modem side for MSM7X27A  */
+struct msm_batt_get_level_ret_data {
+	u32 battery_level;
+};
+
+static int msm_batt_get_level_ret_func(struct msm_rpc_client *batt_client,
+				       void *buf, void *data)
+{
+	struct msm_batt_get_level_ret_data *data_ptr, *buf_ptr;
+
+	data_ptr = (struct msm_batt_get_level_ret_data *)data;
+	buf_ptr = (struct msm_batt_get_level_ret_data *)buf;
+
+	data_ptr->battery_level = be32_to_cpu(buf_ptr->battery_level);
+
+	return 0;
+}
+
+/* DTS2012020908162 xushunhai 20120209 end>*/
 static u32 msm_batt_get_battery_level(void)
 {
 	int rc;
+/*< DTS2012020908162 xushunhai 20120209 begin */
+#ifdef CONFIG_ARCH_MSM7X27A
+	struct msm_batt_get_level_ret_data rep;
 
+	rc = msm_rpc_client_req(msm_batt_info.batt_client,
+			BATTERY_LEVEL_PROC,
+			NULL, NULL,
+			msm_batt_get_level_ret_func, &rep,
+			msecs_to_jiffies(BATT_RPC_TIMEOUT));
+
+	if (rc < 0) {
+		pr_err("%s: FAIL: vbatt get volt. rc=%d\n", __func__, rc);
+		return 0;
+	}
+
+	return rep.battery_level;
+
+#else
     /* < DTS2011052801418 shenjinming 20110528 begin */
     /* get battery level by rpc */
 	struct set_vib_on_off_req {
@@ -517,6 +564,8 @@ static u32 msm_batt_get_battery_level(void)
     /* DTS2010091503525 shenjinming 20100917 end> */ 
 
 	return rep.battery_level;
+#endif
+/* DTS2012020908162 xushunhai 20120209 end>*/
 }
 #endif
 /*DTS2010080302590 sibingsong 20100805 end>*/
@@ -530,6 +579,30 @@ static u32 msm_batt_get_battery_level(void)
 /* notify modem sides to calculate consume */
 int huawei_rpc_current_consuem_notify(device_current_consume_type device_event, __u32 device_state)
 {
+/*< DTS2012021306187 xushunhai 20120215 begin */
+/* for 7x27a, the rpc call modem is different */
+#ifdef CONFIG_ARCH_MSM7X27A
+	struct set_consume_notify_req {
+		struct rpc_request_hdr hdr;
+		uint32_t device_event;
+		uint32_t device_state;
+	} req;
+
+  int rc = 0;
+  req.device_event = cpu_to_be32(device_event);
+  req.device_state = cpu_to_be32(device_state);
+  
+  rc = msm_rpc_call(msm_batt_info.chg_ep, PM_CURRENT_CONSUME_NOTIFY_PROC,
+                    &req, sizeof(req), 5 * HZ);
+
+	if (rc < 0) {
+		pr_err("%s: FAIL: msm_rpc_write. proc=0x%08x, rc=%d\n",
+		       __func__, PM_CURRENT_CONSUME_NOTIFY_PROC, rc);
+		return rc;
+	}
+
+	return rc;
+#else
 	struct set_consume_notify_req {
 		struct rpc_request_hdr hdr;
 		uint32_t device_event;
@@ -550,6 +623,8 @@ int huawei_rpc_current_consuem_notify(device_current_consume_type device_event, 
     return msm_rpc_call(pm_lib_endpoint, PM_CURRENT_CONSUME_NOTIFY_PROC,
 			    &req, sizeof(req), HZ/10);
     /*DTS2010091901699 sibingsong 20100919 end>*/
+#endif
+/* DTS2012021306187 xushunhai 20120215 end>*/
 }
 
 #endif
@@ -962,17 +1037,27 @@ static void msm_batt_update_psy_status(void)
 	msm_batt_info.charger_type 	= charger_type;
 	msm_batt_info.battery_status 	= battery_status;
 	msm_batt_info.battery_level 	= battery_level;
-	msm_batt_info.battery_temp 	= battery_temp;
+    /*< DTS2012051901274 chengkai 20120522 begin*/
+    /*delete one line*/
 
 	/* <DTS2010091503525 shenjinming 20100917 begin */
     /* update capacity */
-    msm_batt_info.batt_capacity = battery_capacity;
+    /*delete one line*/
     
-	if (msm_batt_info.battery_voltage != battery_voltage) {
-		msm_batt_info.battery_voltage  	= battery_voltage;
+    /* DTS2012051901274 chengkai 20120522 end >*/
+    /*< DTS2012051901274 chengkai 20120522 begin*/
+    /*when temperature or capacity changed,update battery status */
+    if ((msm_batt_info.battery_voltage != battery_voltage)
+        ||(msm_batt_info.battery_temp != battery_temp)
+        ||(msm_batt_info.batt_capacity != battery_capacity))
+    {
+            msm_batt_info.battery_voltage  	= battery_voltage;
+            msm_batt_info.battery_temp = battery_temp;
+            msm_batt_info.batt_capacity = battery_capacity;
 		if (!supp)
 			supp = msm_batt_info.current_ps;
 	}
+    /* DTS2012051901274 chengkai 20120522 end >*/
     /* <DTS2010082101079 shenjinming 20100918 begin */
     /* when charging, synchronization capacity and batt_status */
     if( POWER_SUPPLY_STATUS_CHARGING == msm_batt_info.batt_status )
@@ -2025,6 +2110,9 @@ static int __devinit msm_batt_init_rpc(void)
 /* <DTS2010081400556 shenjinming 20100814 begin */
 /*< DTS2010071902252 shenjinming 20100719 begin */
 #ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION 
+/*< DTS2012021306187 xushunhai 20120215 begin */
+/* for 7x27a  must close  */
+#ifndef CONFIG_ARCH_MSM7X27A
     /* connect to RPC service pm_lib */
 	pm_lib_endpoint = msm_rpc_connect(PM_LIB_RPC_PROG, PM_LIB_RPC_VERS, 0);
 	if (IS_ERR(pm_lib_endpoint)) {
@@ -2032,6 +2120,8 @@ static int __devinit msm_batt_init_rpc(void)
 		       __FUNCTION__, PTR_ERR(pm_lib_endpoint));
 		return rc;
 	}
+#endif
+/* DTS2012021306187 xushunhai 20120215 end>*/
 #endif
 /* DTS2010071902252 shenjinming 20100719 end >*/
 /* DTS2010081400556 shenjinming 20100814 end> */

@@ -2,17 +2,14 @@
  *
  * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
  *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- *
- * See the GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, you can find it at http://www.fsf.org.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/slab.h>
@@ -65,6 +62,10 @@
 #define HS_PROCESS_CMD_PROC 0x02
 #define HS_SUBSCRIBE_SRVC_PROC 0x03
 #define HS_REPORT_EVNT_PROC    0x05
+/* < DTS2012011305204 libeibei 20120120 begin */
+#define OEMINFO_FINISH_PROC   0x06
+#define OEMINFO_READY_PROC    0x07
+/* DTS2012011305204 libeibei 20120120 end > */
 #define HS_EVENT_CB_PROC	1
 #define HS_EVENT_DATA_VER	1
 
@@ -102,6 +103,47 @@
 
 #define KEY(hs_key, input_key) ((hs_key << 24) | input_key)
 
+/* < DTS2012011305204 libeibei 20120120 begin */
+enum mschine_type{
+    HW_MACHINE_8X55 = 0,
+    HW_MACHINE_7X2725A,
+};
+static int get_current_machine(void);
+/* creates /sys/module/rpc_server_handset/parameters/oeminfo_rpc_debug_mask file */
+static int oeminfo_rpc_debug_mask = 0;
+module_param(oeminfo_rpc_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
+
+#define OEMINFO_RPC_DEBUG(x...)		  \
+	do {						  \
+		if (oeminfo_rpc_debug_mask)	  \
+			printk(KERN_ERR x);	  \
+	} while (0)
+static int get_current_machine()
+{
+    if( (machine_is_msm8255_u8800_pro())
+		|| (machine_is_msm8255_u8860()) 
+		|| (machine_is_msm8255_c8860()) 
+		|| (machine_is_msm8255_u8860lp())
+        /* < DTS2012022905490 ganfan 20120301 begin */
+        || machine_is_msm8255_u8860_r()
+        /* DTS2012022905490 ganfan 20120301 end > */
+		|| (machine_is_msm8255_u8860_92())            
+		|| (machine_is_msm8255_u8860_51())
+		|| (machine_is_msm8255_u8680()) 
+	    || (machine_is_msm8255_u8730()))
+    {
+        OEMINFO_RPC_DEBUG("8x55 oeminfo. \n");
+        return HW_MACHINE_8X55;
+    }
+    else
+    {
+        OEMINFO_RPC_DEBUG("27a25a oeminfo. \n");
+        return HW_MACHINE_7X2725A;
+    }
+}
+
+/* DTS2012011305204 libeibei 20120120 end > */
+		
 enum hs_event {
 	HS_EVNT_EXT_PWR = 0,	/* External Power status        */
 	HS_EVNT_HSD,		/* Headset Detection            */
@@ -445,7 +487,9 @@ static int rmt_oeminfo_server_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	pr_info("%s: Remote oeminfo RPC server initialized\n", __func__);
+    /* < DTS2012011305204 libeibei 20120120 begin */
+	OEMINFO_RPC_DEBUG("%s: Remote oeminfo RPC server initialized\n", __func__);
+    /* DTS2012011305204 libeibei 20120120 end > */
 	_rms = rms;
 	return 0;
 }
@@ -513,8 +557,10 @@ static void print_oeminfo_data(void * data)
   
     strncat(all_log_string,sub_string,sizeof(sub_string));
   }
-  
-  pr_err("%s\n",all_log_string);
+
+  /* < DTS2012011305204 libeibei 20120120 begin */
+  OEMINFO_RPC_DEBUG("%s\n",all_log_string);
+  /* DTS2012011305204 libeibei 20120120 end > */
 }
 
 
@@ -525,9 +571,11 @@ static int rmt_oeminfo_handle_key(uint32_t key_parm)
   struct rmt_oeminfo_kevent *kevent;
   struct rmt_oeminfo_kdata  *kdata;
   struct oeminfo_type * share_ptr = NULL;
-  
-  pr_err("emmc_oeminfo: %s(),enter. key_parm is 0x%x. \n", 
-         __func__, key_parm);
+
+  /* < DTS2012011305204 libeibei 20120120 begin */
+  OEMINFO_RPC_DEBUG("emmc_oeminfo: %s(),enter. key_parm is 0x%x. \n", 
+			 __func__, key_parm);
+  /* DTS2012011305204 libeibei 20120120 end > */
   
   kevent = kmalloc(sizeof(struct rmt_oeminfo_kevent), GFP_KERNEL);
   if (!kevent) {
@@ -537,7 +585,9 @@ static int rmt_oeminfo_handle_key(uint32_t key_parm)
   }
   else
   {
-    pr_err("emmc_oeminfo: %s(). malloc kevent OK. \n",__func__);
+	/* < DTS2012011305204 libeibei 20120120 begin */
+	OEMINFO_RPC_DEBUG("emmc_oeminfo: %s(). malloc kevent OK. \n",__func__);
+	/* DTS2012011305204 libeibei 20120120 end > */
   }
   
   kdata = kmalloc(sizeof(struct rmt_oeminfo_kdata), GFP_KERNEL);
@@ -549,14 +599,19 @@ static int rmt_oeminfo_handle_key(uint32_t key_parm)
   }
   else
   {
-    pr_err("emmc_oeminfo: %s(). malloc kdata OK. \n",__func__);
+	/* < DTS2012011305204 libeibei 20120120 begin */
+	OEMINFO_RPC_DEBUG("emmc_oeminfo: %s(). malloc kdata OK. \n",__func__);
+	/* DTS2012011305204 libeibei 20120120 end > */
   }
 
   // share_ptr = (void *)be32_to_cpu(key_parm);
 /* <DTS2010060900262, liyuping 20100805 begin */
   share_ptr = smem_alloc(SMEM_LCD_CUR_PANEL, sizeof(struct oeminfo_type));
 /* DTS2010060900262 liyuping 20100805 end > */
-  pr_err("emmc_oeminfo: share_ptr is 0x%x. \n",(int)share_ptr);
+  /* < DTS2012011305204 libeibei 20120120 begin */
+  OEMINFO_RPC_DEBUG("emmc_oeminfo: share_ptr is 0x%x. \n",(int)share_ptr);
+  /* DTS2012011305204 libeibei 20120120 end > */
+  
   print_oeminfo_data(share_ptr);
   
   // memcpy(&kevent->event, share_ptr , sizeof(struct oeminfo_type));
@@ -564,15 +619,19 @@ static int rmt_oeminfo_handle_key(uint32_t key_parm)
 
   msm_rpc_server_get_requesting_client(&kdata->cinfo);
   kdata->data = share_ptr;
-  
-  pr_err("emmc_oeminfo: put event ok!\n");
+
+  /* < DTS2012011305204 libeibei 20120120 begin */
+  OEMINFO_RPC_DEBUG("emmc_oeminfo: put event ok!\n");
+  /* DTS2012011305204 libeibei 20120120 end > */
   
   oeminfo_put_event(rms, kevent);
   oeminfo_put_data(rms, kdata);
   atomic_inc(&rms->total_events);
   wake_up(&rms->event_q);
-  
-  pr_err("emmc_oeminfo: %s(), end. \n",__func__);
+
+  /* < DTS2012011305204 libeibei 20120120 begin */
+  OEMINFO_RPC_DEBUG("emmc_oeminfo: %s(), end. \n",__func__);
+  /* DTS2012011305204 libeibei 20120120 end > */
 
   return 1;
 }
@@ -582,17 +641,42 @@ static long rmt_oeminfo_ioctl(struct file *fp, unsigned int cmd,
 			    unsigned long arg)
 {
 	int ret = 0;
+	/* < DTS2012011305204 libeibei 20120120 begin */
+	int rc = -1;
+	/* notify modem to run tmc_huawei_init only once, on boot */
+	static bool firstboot = true;
+	/* DTS2012011305204 libeibei 20120120 end > */
 	struct rmt_oeminfo_server_info *rms = _rms;
 	struct rmt_oeminfo_kevent *kevent;
     struct rmt_oeminfo_kdata *kdata;
     struct oeminfo_type * share_ptr = NULL;
-	
-    pr_err("emmc_oeminfo: %s(),enter. cmd is 0x%x. \n",__func__, cmd);
 
+	/* < DTS2012011305204 libeibei 20120120 begin */
+	OEMINFO_RPC_DEBUG("emmc_oeminfo: %s: wait for request ioctl\n", __func__);
+	/* DTS2012011305204 libeibei 20120120 end > */
+	
 	switch (cmd) {
 
 	case RMT_OEMINFO_WAIT_FOR_REQ:
-		pr_info("emmc_oeminfo: %s: wait for request ioctl\n", __func__);
+		/* < DTS2012011305204 libeibei 20120120 begin */
+		if (HW_MACHINE_7X2725A == get_current_machine())
+		{
+			if (firstboot == true)
+			{
+				firstboot = false;
+				/* use rpc to set sig TMC_KERNEL_READY_SIG */
+				rc = msm_rpc_client_req(rpc_client, OEMINFO_READY_PROC,
+					NULL, NULL,
+					NULL, NULL, -1);
+				if (rc)
+				{
+					firstboot = true;
+					pr_err("%s: couldn't send rpc client request OEMINFO_READY_PROC\n", __func__);
+				}
+			}
+		}
+		OEMINFO_RPC_DEBUG("emmc_oeminfo: %s: wait for request ioctl\n", __func__);
+        /* DTS2012011305204 libeibei 20120120 end > */
 		if (atomic_read(&rms->total_events) == 0) {
 			ret = wait_event_interruptible(rms->event_q,
 				atomic_read(&rms->total_events) != 0);
@@ -602,7 +686,9 @@ static long rmt_oeminfo_ioctl(struct file *fp, unsigned int cmd,
 		atomic_dec(&rms->total_events);
 
 		kevent = oeminfo_get_event(rms);
-        pr_err("emmc_oeminfo: call copy_to_user().\n");
+		/* < DTS2012011305204 libeibei 20120120 begin */
+		OEMINFO_RPC_DEBUG("emmc_oeminfo: call copy_to_user().\n");
+		/* DTS2012011305204 libeibei 20120120 end > */
         
 		WARN_ON(kevent == NULL);
 		if (copy_to_user((void __user *)arg, kevent->event,sizeof(struct oeminfo_type)))
@@ -614,7 +700,9 @@ static long rmt_oeminfo_ioctl(struct file *fp, unsigned int cmd,
 		break;
 
 	case RMT_OEMINFO_SEND_STATUS:
-		pr_info("%s: send callback ioctl\n", __func__);
+		/* < DTS2012011305204 libeibei 20120120 begin */
+		OEMINFO_RPC_DEBUG("%s: send callback ioctl\n", __func__);
+		/* DTS2012011305204 libeibei 20120120 end > */
         kdata = oeminfo_get_data(rms);
 /* <DTS2010060900262, liyuping 20100805 begin */
         share_ptr = smem_alloc(SMEM_LCD_CUR_PANEL, sizeof(struct oeminfo_type));
@@ -630,14 +718,28 @@ static long rmt_oeminfo_ioctl(struct file *fp, unsigned int cmd,
 			break;
 		}
 
-        pr_info("%s:kernel memory data: \n", __func__);
+		/* < DTS2012011305204 libeibei 20120120 begin */
+		if (HW_MACHINE_7X2725A == get_current_machine())
+		{
+			rc = msm_rpc_client_req(rpc_client, OEMINFO_FINISH_PROC,
+						NULL, NULL,
+						NULL, NULL, -1);
+            if (rc)
+			    pr_err("%s: couldn't send rpc client request\n", __func__);
+		}
+		OEMINFO_RPC_DEBUG("%s:kernel memory data: \n", __func__);
+		/* DTS2012011305204 libeibei 20120120 end > */
         print_oeminfo_data(kdata->data);
 
-        pr_info("%s:share memory data: \n", __func__);
+		/* < DTS2012011305204 libeibei 20120120 begin */
+		OEMINFO_RPC_DEBUG("%s:share memory data: \n", __func__);
+		/* DTS2012011305204 libeibei 20120120 end > */
         print_oeminfo_data(share_ptr);
 
-#if 0
-        pr_info("%s: call msm_rpc_server_cb_req().\n", __func__);
+#if 0 
+		/* < DTS2012011305204 libeibei 20120120 begin */
+		OEMINFO_RPC_DEBUG("%s: call msm_rpc_server_cb_req().\n", __func__);
+		/* DTS2012011305204 libeibei 20120120 end > */
 		ret = msm_rpc_server_cb_req(&hs_rpc_server, &kdata->cinfo,
 			RMT_OEMINFO_EVENT_FUNC_PTR_TYPE_PROC, NULL, NULL,NULL, NULL, -1);
         
@@ -655,8 +757,10 @@ static long rmt_oeminfo_ioctl(struct file *fp, unsigned int cmd,
 		ret = -EINVAL;
 		break;
 	}
-    
-    pr_err("emmc_oeminfo: %s(),end.\n",__func__);
+
+	/* < DTS2012011305204 libeibei 20120120 begin */
+	OEMINFO_RPC_DEBUG("emmc_oeminfo: %s(),end.\n",__func__);
+	/* DTS2012011305204 libeibei 20120120 end > */
 
 	return ret;
 }
@@ -799,13 +903,13 @@ static void report_hs_key(uint32_t key_code, uint32_t key_parm)
 #ifdef CONFIG_HUAWEI_KERNEL
         printk(KERN_ERR "%s: SW_HEADPHONE_INSERT: key_code = %d\n",__func__, key_code);
 
-        /* < DTS2011102902297 zhangpeng 20111109 begin */
-        //delete
-        /* add 2s wake lock here to fix issue that time of swtiching audio-output 
-         * is not enough when headset unpluging during incall */
-        wake_lock_timeout(&headset_unplug_wake_lock, HEADSET_WAKE_DURING*HZ);
-        //delete
-        /* DTS2011102902297 zhangpeng 20111109 end > */
+		/* < DTS2011110401958  zhangpeng 20111114 begin */
+		//delete
+            /* add 2s wake lock here to fix issue that time of swtiching audio-output 
+             * is not enough when headset unpluging during incall */
+            wake_lock_timeout(&headset_unplug_wake_lock, HEADSET_WAKE_DURING*HZ);
+		//delete
+		/* DTS2011110401958  zhangpeng 20111114 end > */
 #endif
 /* DTS2011072800743 dongchen 20110803 end >*/
 		hs->mic_on = hs->hs_on = (key_code != HS_REL_K) ? 1 : 0;
@@ -871,10 +975,12 @@ static int handle_hs_rpc_call(struct msm_rpc_server *server,
         
         /* <BU5D08126 duangan 2010-4-22 begin */
 		#ifdef CONFIG_HUAWEI_FEATURE_OEMINFO
-        pr_err("emmc_oeminfo: ori key_code is %d, ori key_parm is %d.\n", 
-                args->key_code,args->key_parm);
-        pr_err("emmc_oeminfo: key_code is %d, key_parm is %d.\n", 
-                args->key_code,args->key_parm);
+		/* < DTS2012011305204 libeibei 20120120 begin */
+		OEMINFO_RPC_DEBUG("emmc_oeminfo: ori key_code is %d, ori key_parm is %d.\n", 
+				args->key_code,args->key_parm);
+		OEMINFO_RPC_DEBUG("emmc_oeminfo: key_code is %d, key_parm is %d.\n", 
+				args->key_code,args->key_parm);
+		/* DTS2012011305204 libeibei 20120120 end > */
 		#endif
         /* BU5D08126 duangan 2010-4-22 end> */
 
@@ -910,8 +1016,10 @@ static int process_subs_srvc_callback(struct hs_event_cb_recv *recv)
     /* <BU5D08126 duangan 2010-4-22 begin */
 	#ifdef CONFIG_HUAWEI_FEATURE_OEMINFO
     int recv_key;
-    
-    pr_err("emmc_oeminfo: %s(),enter.\n", __func__);
+
+	/* < DTS2012011305204 libeibei 20120120 begin */
+	OEMINFO_RPC_DEBUG("emmc_oeminfo: %s(),enter.\n", __func__);
+	/* DTS2012011305204 libeibei 20120120 end > */
 	#endif
     /* BU5D08126 duangan 2010-4-22 end> */
     
@@ -924,7 +1032,9 @@ static int process_subs_srvc_callback(struct hs_event_cb_recv *recv)
     
     if(HS_OEMINFO_K == recv_key)
     {
-      pr_err("emmc_oeminfo: oeminfo key transfered.\n");
+	  /* < DTS2012011305204 libeibei 20120120 begin */
+	  OEMINFO_RPC_DEBUG("emmc_oeminfo: oeminfo key transfered.\n");
+	  /* DTS2012011305204 libeibei 20120120 end > */
       rmt_oeminfo_handle_key(be32_to_cpu(recv->key.ver));
       return 0;
     }

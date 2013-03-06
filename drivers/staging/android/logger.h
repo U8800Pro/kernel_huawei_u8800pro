@@ -1,5 +1,3 @@
-/*< DTS2011092603497 mazhenhua 20110928 begin */
-/*update this driver to 404020 baseline*/
 /* include/linux/logger.h
  *
  * Copyright (C) 2007-2008 Google, Inc.
@@ -49,4 +47,3 @@ struct logger_entry {
 #define LOGGER_FLUSH_LOG		_IO(__LOGGERIO, 4) /* flush log */
 
 #endif /* _LINUX_LOGGER_H */
-/*DTS2011092603497 mazhenhua 20110928 end >*/

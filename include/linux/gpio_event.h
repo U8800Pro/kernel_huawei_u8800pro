@@ -83,10 +83,10 @@ struct gpio_event_matrix_info {
 	unsigned int ninputs;
 	unsigned int noutputs;
 	/* time to wait before reading inputs after driving each output */
-	ktime_t settle_time;
+	struct timespec settle_time;
 	/* time to wait before scanning the keypad a second time */
-	ktime_t debounce_delay;
-	ktime_t poll_time;
+	struct timespec debounce_delay;
+	struct timespec poll_time;
 	unsigned flags;
 };
 
@@ -98,6 +98,7 @@ enum gpio_event_direct_flags {
 /*	GPIOEDF_USE_IRQ             = (1U << 2) | GPIOIDF_USE_DOWN_IRQ, */
 	GPIOEDF_PRINT_KEYS          = 1U << 8,
 	GPIOEDF_PRINT_KEY_DEBOUNCE  = 1U << 9,
+	GPIOEDF_PRINT_KEY_UNSTABLE  = 1U << 10,
 };
 
 struct gpio_event_direct_entry {
@@ -135,8 +136,10 @@ struct gpio_event_output_info {
 	const struct gpio_event_direct_entry *keymap;
 	size_t keymap_size;
 };
-
-
+/* < DTS2012022000736 zhangmin 20120220 begin */
+/*return slide status*/
+int get_slide_pressed(void);
+/* DTS2012022000736 zhangmin 20120220 end > */ 
 /* axes */
 
 enum gpio_event_axis_flags {

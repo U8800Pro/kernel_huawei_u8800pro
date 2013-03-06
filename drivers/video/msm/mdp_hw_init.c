@@ -9,15 +9,16 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- *
  */
 
 #include "mdp.h"
 
+/* <DTS2011121202745 sunkai 20111213 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+extern unsigned long mdp_timer_duration;
+extern boolean mdp_continues_display;
+#endif
+/* DTS2011121202745 sunkai 20111213 end> */
 /* mdp primary csc limit vector */
 uint32 mdp_plv[] = { 0x10, 0xeb, 0x10, 0xf0 };
 
@@ -635,13 +636,29 @@ void mdp_hw_init(void)
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x01dc, 0);
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x01e0, 0);
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x01e4, 0);
-
+/* <DTS2011121202745 sunkai 20111213 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+	if (mdp_continues_display) {
+	mdp_timer_duration = (100 * HZ);   /* 100 sec */
+	}
+#endif
+/* DTS2011121202745 sunkai 20111213 end> */
 #ifndef CONFIG_FB_MSM_MDP22
+/* <DTS2011121202745 sunkai 20111213 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+if (!mdp_continues_display) {
 	MDP_OUTP(MDP_BASE + 0xE0000, 0);
 	MDP_OUTP(MDP_BASE + 0x100, 0xffffffff);
 	MDP_OUTP(MDP_BASE + 0x90070, 0);
 	MDP_OUTP(MDP_BASE + 0x94010, 1);
 	MDP_OUTP(MDP_BASE + 0x9401c, 2);
+}
+#else
+	MDP_OUTP(MDP_BASE + 0xE0000, 0);
+	MDP_OUTP(MDP_BASE + 0x100, 0xffffffff);
+	MDP_OUTP(MDP_BASE + 0x90070, 0);
+#endif
+/* DTS2011121202745 sunkai 20111213 end> */
 #endif
 
 	/*
@@ -716,7 +733,6 @@ void mdp_hw_init(void)
 		 ((16 << 6) << 16) | (16) << 6);
 #endif
 
-	wmb();
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 }

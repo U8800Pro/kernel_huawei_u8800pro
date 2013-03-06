@@ -1,5 +1,6 @@
+/*< DTS2012020400396 zhangyu 20120206 begin */
+/*< DTS2011092106898   yuguangcai 20110924 begin */
 
-/* < DTS2011090701903 zhangyu 20110907 begin */
 /* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -80,5 +81,5 @@ struct mt9p017_reg
 };
 
 #endif /* MT9P017_H */
-/* DTS2011090701903 zhangyu 20110907 end > */ 
-
+/* DTS2011092106898   yuguangcai 20110924 end > */
+/* DTS2012020400396 zhangyu 20120206 end > */

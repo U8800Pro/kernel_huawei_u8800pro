@@ -2,6 +2,7 @@
  *
  * Copyright (C) 2008 HTC Corporation.
  * Copyright (C) 2007 Google, Inc.
+ * Copyright (c) 2011 Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -17,8 +18,9 @@
 #include <linux/platform_device.h>
 #include <linux/err.h>
 #include <linux/hrtimer.h>
-#include <../../../drivers/staging/android/timed_output.h>
 #include <linux/sched.h>
+#include "pmic.h"
+#include "timed_output.h"
 
 #include <mach/msm_rpcrouter.h>
 
@@ -43,9 +45,13 @@
 #define PM_LIBVERS      0x10001
 #endif
 #else
-/*< penghai modify for BSP2030 20101108 begin */
+/*< DTS2012020306500 lijianzhao 20120204 begin */
+#ifdef CONFIG_ARCH_MSM7X27
+#define PM_LIBVERS  0x60001
+#else
 #define PM_LIBVERS	0x00030005
-/* penghai modify for BSP2030 20101108 end >*/
+#endif
+/* DTS2012020306500 lijianzhao 20120204 end >*/
 #endif
 /*<BU5D08979 sibingsong 20100429 begin*/
 #ifndef CONFIG_HUAWEI_FEATURE_VIBRATOR
@@ -69,6 +75,9 @@ static int time_value = 0;
 static void set_pmic_vibrator(int on)
 {
 	static struct msm_rpc_endpoint *vib_endpoint;
+    /* < DTS2012041806002 houming 20120504 begin*/	
+	int ret=0;
+	/*  DTS2012041806002 houming 20120504 end > */
 	struct set_vib_on_off_req {
 		struct rpc_request_hdr hdr;
 /* < DTS2010080500080 luojianhong 201000817 begin*/
@@ -117,8 +126,15 @@ static void set_pmic_vibrator(int on)
 		sizeof(req), 5 * HZ);
 /*<BU5D07918, sibingsong 20100416 begin*/
 #else
-	msm_rpc_call(vib_endpoint, HW_PROCEDURE_SET_VIB_ON_OFF, &req,
+    /* < DTS2012041806002 houming 20120504 begin*/
+	/* Add return value to determine */
+	ret=msm_rpc_call(vib_endpoint, HW_PROCEDURE_SET_VIB_ON_OFF, &req,
 		sizeof(req), 5 * HZ);
+	if(ret)
+	{
+		printk("%s:msm_rpc_call fail,ret=%d\n",__func__,ret);
+	}
+	/*  DTS2012041806002 houming 20120504 end > */
 #endif
 /*BU5D07918, sibingsong 20100416 end>*/
 }
@@ -168,8 +184,9 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 static void vibrator_enable(struct timed_output_dev *dev, int value)
 {
 	time_value = value;//save this value as vibratting time
-	hrtimer_cancel(&vibe_timer);
-
+    /* < DTS2012041806002 houming 20120504 begin*/
+    /* detele */
+    /*  DTS2012041806002 houming 20120504 end > */
 	if (value == 0)
 	{
 		mdelay(VIBRATOR_DELAY);
@@ -182,9 +199,9 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 
 		//timed_vibrator_on(dev);
 		pmic_vibrator_on(NULL);//use this function instead of timed_vibrator_on.
-		hrtimer_start(&vibe_timer,
-			      ktime_set(value / 1000, (value % 1000) * 1000000),
-			      HRTIMER_MODE_REL);
+    /* < DTS2012041806002 houming 20120504 begin*/
+    /* detele */
+    /*  DTS2012041806002 houming 20120504 end > */
 	}
 }
 #endif
@@ -194,9 +211,10 @@ static int vibrator_get_time(struct timed_output_dev *dev)
 {
 	if (hrtimer_active(&vibe_timer)) {
 		ktime_t r = hrtimer_get_remaining(&vibe_timer);
-		return r.tv.sec * 1000 + r.tv.nsec / 1000000;
-	} else
-		return 0;
+		struct timeval t = ktime_to_timeval(r);
+		return t.tv_sec * 1000 + t.tv_usec / 1000;
+	}
+	return 0;
 }
 
 static enum hrtimer_restart vibrator_timer_func(struct hrtimer *timer)

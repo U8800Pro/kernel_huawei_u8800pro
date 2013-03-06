@@ -1,4 +1,4 @@
-/* < DTS2011042801270 yuezenglong 20110428 begin */
+/* < DTS2011082001050  liujinggang 20110822 begin */
 /* drivers/i2c/gyroscope/l3g4200d.c
  *
  * Copyright (C) 2007-2010  Huawei.
@@ -57,6 +57,10 @@
 #define GYRO_ENABLE 1   
 #define GYRO_DISABLE  -1
 /* DTS2011071600271 yuezenglong 20110716 end > */
+/* < DTS2011111102443  liujinggang 20111111 begin */
+#define MAX_VALUE  2147483647
+#define MIN_VALUE  -2147483647
+/* DTS2011111102443  liujinggang 20111111 end > */
 
 static int gyro_debug_mask = 0;
 module_param_named(gyro_debug, gyro_debug_mask, int,
@@ -100,7 +104,9 @@ static struct l3g4200d_data *gyro;
 static short userdata[3];
 static int fusiondata[10];
 static atomic_t a_flag;
-
+/* < DTS2012052505397 zhangmin 20120531 begin */
+int hasGyro = 0;
+/* DTS2012052505397 zhangmin 20120531 end > */
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void gy_early_suspend(struct early_suspend *h);
 static void gy_late_resume(struct early_suspend *h);
@@ -415,7 +421,7 @@ static int l3g4200d_close(struct inode *inode, struct file *file)
 
 
 /*  ioctl command for l3g4200d device file */
-static int l3g4200d_ioctl(struct inode *inode, struct file *file,
+static long l3g4200d_ioctl(struct file *file,
 			       unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
@@ -621,7 +627,7 @@ static const struct file_operations l3g4200d_fops = {
 	.write = l3g4200d_write,
 	.open = l3g4200d_open,
 	.release = l3g4200d_close,
-	.ioctl = l3g4200d_ioctl,
+	.unlocked_ioctl = l3g4200d_ioctl,
 };
 static struct miscdevice gysensor_device = {
 	.minor = MISC_DYNAMIC_MINOR,
@@ -727,23 +733,26 @@ static int l3g4200d_probe(struct i2c_client *client,
 	set_bit(REL_RZ, data->input_dev->absbit);
 	#endif
 	set_bit(EV_ABS,data->input_dev->evbit);
-	set_bit(ABS_X, data->input_dev->absbit);
-	set_bit(ABS_Y, data->input_dev->absbit);
-	set_bit(ABS_Z, data->input_dev->absbit);
+	/* < DTS2011111102443  liujinggang 20111111 begin */
+	/* modify the func of init */
+	input_set_abs_params(data->input_dev, ABS_RX, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_RY, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_RZ, MIN_VALUE, MAX_VALUE, 0, 0);
 	/* < DTS2011051102358 yuezenglong 20110511 begin */
-	set_bit(ABS_RX, data->input_dev->absbit);
-	set_bit(ABS_RY, data->input_dev->absbit);
-	set_bit(ABS_RZ, data->input_dev->absbit);
+	input_set_abs_params(data->input_dev, ABS_X, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_Y, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_Z, MIN_VALUE, MAX_VALUE, 0, 0);
 	
-	set_bit(ABS_THROTTLE, data->input_dev->absbit);
-	set_bit(ABS_RUDDER, data->input_dev->absbit);
-	set_bit(ABS_WHEEL, data->input_dev->absbit);
+	input_set_abs_params(data->input_dev, ABS_THROTTLE, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_RUDDER, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_WHEEL, MIN_VALUE, MAX_VALUE, 0, 0);
 	
-	set_bit(ABS_GAS, data->input_dev->absbit);
-	set_bit(ABS_BRAKE, data->input_dev->absbit);
-	set_bit(ABS_HAT0X, data->input_dev->absbit);	
-	set_bit(ABS_HAT0Y, data->input_dev->absbit);
+	input_set_abs_params(data->input_dev, ABS_GAS, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_HAT0X, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_HAT0Y, MIN_VALUE, MAX_VALUE, 0, 0);
+	input_set_abs_params(data->input_dev, ABS_BRAKE, MIN_VALUE, MAX_VALUE, 0, 0);
 	/* DTS2011051102358 yuezenglong 20110511 end > */
+	/* DTS2011111102443  liujinggang 20111111 end > */
 	set_bit(EV_SYN,data->input_dev->evbit);
 	data->input_dev->id.bustype = BUS_I2C;
 	input_set_drvdata(data->input_dev, data);
@@ -774,7 +783,9 @@ static int l3g4200d_probe(struct i2c_client *client,
 	gy_wq = create_singlethread_workqueue("gy_wq");
 	if (!gy_wq)
 		return -ENOMEM;
-
+	/* < DTS2012052505397 zhangmin 20120531 begin */
+	hasGyro = 1 ;
+	/* DTS2012052505397 zhangmin 20120531 end > */
 	gyro = data;
 //	hrtimer_start(&this_gs_data->timer, ktime_set(0, 500000000), HRTIMER_MODE_REL);
 
@@ -784,6 +795,7 @@ static int l3g4200d_probe(struct i2c_client *client,
     set_hw_dev_flag(DEV_I2C_GYROSCOPE);
     #endif
     /* DTS2011052803160 shenjinming 201106011 end > */
+	printk(KERN_DEBUG "l3g4200d_probe   successful");
 
 	return 0;
 err_misc_device_register_failed:

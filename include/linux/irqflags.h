@@ -12,13 +12,14 @@
 #define _LINUX_TRACE_IRQFLAGS_H
 
 #include <linux/typecheck.h>
+#include <asm/irqflags.h>
 
-/*< DTS2011082200901 genghua 20110822 begin*/
+/* <DTS2012021001488 yuanjintao 20120210 begin */
 /* merge qcom DEBUG_CODE for RPC crashes */
 #ifdef CONFIG_HUAWEI_RPC_CRASH_DEBUG
-extern int htc_debug_irq_disabled;
+extern int hw_debug_irq_disabled;
 #endif
-/* DTS2011082200901 genghua 20110822 end >*/
+/* DTS2012021001488 yuanjintao 20120210 end> */
 
 #ifdef CONFIG_TRACE_IRQFLAGS
   extern void trace_softirqs_on(unsigned long ip);
@@ -59,11 +60,40 @@ extern int htc_debug_irq_disabled;
 # define start_critical_timings() do { } while (0)
 #endif
 
+/*
+ * Wrap the arch provided IRQ routines to provide appropriate checks.
+ */
+#define raw_local_irq_disable()		arch_local_irq_disable()
+#define raw_local_irq_enable()		arch_local_irq_enable()
+#define raw_local_irq_save(flags)			\
+	do {						\
+		typecheck(unsigned long, flags);	\
+		flags = arch_local_irq_save();		\
+	} while (0)
+#define raw_local_irq_restore(flags)			\
+	do {						\
+		typecheck(unsigned long, flags);	\
+		arch_local_irq_restore(flags);		\
+	} while (0)
+#define raw_local_save_flags(flags)			\
+	do {						\
+		typecheck(unsigned long, flags);	\
+		flags = arch_local_save_flags();	\
+	} while (0)
+#define raw_irqs_disabled_flags(flags)			\
+	({						\
+		typecheck(unsigned long, flags);	\
+		arch_irqs_disabled_flags(flags);	\
+	})
+#define raw_irqs_disabled()		(arch_irqs_disabled())
+#define raw_safe_halt()			arch_safe_halt()
+
+/*
+ * The local_irq_*() APIs are equal to the raw_local_irq*()
+ * if !TRACE_IRQFLAGS.
+ */
 #ifdef CONFIG_TRACE_IRQFLAGS_SUPPORT
-
-#include <asm/irqflags.h>
-
-/*< DTS2011082200901 genghua 20110822 begin*/
+/* <DTS2012021001488 yuanjintao 20120210 begin */
 /* merge qcom DEBUG_CODE for RPC crashes */
 #ifndef CONFIG_HUAWEI_RPC_CRASH_DEBUG
 #define local_irq_enable() \
@@ -71,7 +101,7 @@ extern int htc_debug_irq_disabled;
 #else
 #define local_irq_enable() \
 	do { \
-		htc_debug_irq_disabled = 0; \
+		hw_debug_irq_disabled = 0; \
 		trace_hardirqs_on(); \
 		raw_local_irq_enable(); \
 		} while (0)
@@ -83,17 +113,15 @@ extern int htc_debug_irq_disabled;
 #else
 #define local_irq_disable() \
 	do { \
-		htc_debug_irq_disabled = 1; \
+		hw_debug_irq_disabled = 1; \
 		raw_local_irq_disable(); \
 		trace_hardirqs_off(); \
 		} while (0)
 #endif
-/* DTS2011082200901 genghua 20110822 end >*/
-
+/* DTS2012021001488 yuanjintao 20120210 end> */
 
 #define local_irq_save(flags)				\
 	do {						\
-		typecheck(unsigned long, flags);	\
 		raw_local_irq_save(flags);		\
 		trace_hardirqs_off();			\
 	} while (0)
@@ -101,7 +129,6 @@ extern int htc_debug_irq_disabled;
 
 #define local_irq_restore(flags)			\
 	do {						\
-		typecheck(unsigned long, flags);	\
 		if (raw_irqs_disabled_flags(flags)) {	\
 			raw_local_irq_restore(flags);	\
 			trace_hardirqs_off();		\
@@ -110,51 +137,44 @@ extern int htc_debug_irq_disabled;
 			raw_local_irq_restore(flags);	\
 		}					\
 	} while (0)
-#else /* !CONFIG_TRACE_IRQFLAGS_SUPPORT */
-/*
- * The local_irq_*() APIs are equal to the raw_local_irq*()
- * if !TRACE_IRQFLAGS.
- */
-# define raw_local_irq_disable()	local_irq_disable()
-# define raw_local_irq_enable()		local_irq_enable()
-# define raw_local_irq_save(flags)			\
-	do {						\
-		typecheck(unsigned long, flags);	\
-		local_irq_save(flags);			\
-	} while (0)
-# define raw_local_irq_restore(flags)			\
-	do {						\
-		typecheck(unsigned long, flags);	\
-		local_irq_restore(flags);		\
-	} while (0)
-#endif /* CONFIG_TRACE_IRQFLAGS_SUPPORT */
-
-#ifdef CONFIG_TRACE_IRQFLAGS_SUPPORT
-#define safe_halt()						\
-	do {							\
-		trace_hardirqs_on();				\
-		raw_safe_halt();				\
-	} while (0)
-
 #define local_save_flags(flags)				\
 	do {						\
-		typecheck(unsigned long, flags);	\
 		raw_local_save_flags(flags);		\
 	} while (0)
 
-#define irqs_disabled()						\
-({								\
-	unsigned long _flags;					\
-								\
-	raw_local_save_flags(_flags);				\
-	raw_irqs_disabled_flags(_flags);			\
-})
+#define irqs_disabled_flags(flags)			\
+	({						\
+		raw_irqs_disabled_flags(flags);		\
+	})
 
-#define irqs_disabled_flags(flags)		\
-({						\
-	typecheck(unsigned long, flags);	\
-	raw_irqs_disabled_flags(flags);		\
-})
+#define irqs_disabled()					\
+	({						\
+		unsigned long _flags;			\
+		raw_local_save_flags(_flags);		\
+		raw_irqs_disabled_flags(_flags);	\
+	})
+
+#define safe_halt()				\
+	do {					\
+		trace_hardirqs_on();		\
+		raw_safe_halt();		\
+	} while (0)
+
+
+#else /* !CONFIG_TRACE_IRQFLAGS_SUPPORT */
+
+#define local_irq_enable()	do { raw_local_irq_enable(); } while (0)
+#define local_irq_disable()	do { raw_local_irq_disable(); } while (0)
+#define local_irq_save(flags)					\
+	do {							\
+		raw_local_irq_save(flags);			\
+	} while (0)
+#define local_irq_restore(flags) do { raw_local_irq_restore(flags); } while (0)
+#define local_save_flags(flags)	do { raw_local_save_flags(flags); } while (0)
+#define irqs_disabled()		(raw_irqs_disabled())
+#define irqs_disabled_flags(flags) (raw_irqs_disabled_flags(flags))
+#define safe_halt()		do { raw_safe_halt(); } while (0)
+
 #endif /* CONFIG_TRACE_IRQFLAGS_SUPPORT */
 
 #endif

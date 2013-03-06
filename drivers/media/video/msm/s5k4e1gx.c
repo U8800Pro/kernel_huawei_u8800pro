@@ -512,16 +512,9 @@ static int32_t s5k4e1gx_i2c_read_w(unsigned short saddr, unsigned short raddr,
 static int s5k4e1gx_probe_init_done(const struct msm_camera_sensor_info *data)
 {
     CDBG("s5k4e1gx_probe_init_done start\n");
-    /*<  DTS2011101302587   yuguangcai 20111013 begin */
     gpio_direction_output(data->sensor_reset, 0);
-    /*pull down the vcm_pwd*/
-    /*<  DTS2011101403259   yuguangcai 20111022 begin */
-    //delete some lines
-    /* DTS2011101403259   yuguangcai 20111022 end > */
-    msleep(20);
     gpio_free(data->sensor_reset);
-
-    /* DTS2011101302587   yuguangcai 20111013 end > */
+    gpio_free(data->sensor_pwd);
     /* < DTS2011090701903 zhangyu 20110907 begin */
     gpio_free(data->vcm_pwd);
     /* DTS2011090701903 zhangyu 20110907 end > */ 
@@ -529,7 +522,9 @@ static int s5k4e1gx_probe_init_done(const struct msm_camera_sensor_info *data)
     /*probe finish ,power down camera*/
     if (data->vreg_disable_func)
     {
-        data->vreg_disable_func(data->sensor_vreg, data->vreg_num);
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        data->vreg_disable_func(0);
+        /* DTS2012020400396 zhangyu 20120206 end > */
     }
 
     return 0;
@@ -541,13 +536,23 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
     uint16_t chipid;
 
     CDBG("s5k4e1gx_probe_init_sensor\n");
-    /*<  DTS2011101302587   yuguangcai 20111013 begin */
-    /*delete some lines*/
-    /* DTS2011101302587   yuguangcai 20111013 end > */
+
+    rc = gpio_request(data->sensor_pwd, "s5k4e1gx");
+    if (!rc)
+    {
+        gpio_direction_output(data->sensor_pwd, 1);
+    }
+    else
+    {
+        CDBG("gpio_request(data->sensor_pwd, s5k4e1g) Failed \n");
+        goto init_probe_done;
+    }
 
     if (data->vreg_enable_func)
     {
-        data->vreg_enable_func(data->sensor_vreg, data->vreg_num);
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        data->vreg_enable_func(1);
+        /* DTS2012020400396 zhangyu 20120206 end > */
     }
 
     rc = gpio_request(data->sensor_reset, "s5k4e1gx");
@@ -866,8 +871,9 @@ static int32_t s5k4e1gx_power_down(void)
 
     if (s5k4e1gx_ctrl->sensordata->vreg_disable_func)
     {
-        rc = s5k4e1gx_ctrl->sensordata->vreg_disable_func(s5k4e1gx_ctrl->sensordata->sensor_vreg,
-                                                          s5k4e1gx_ctrl->sensordata->vreg_num);
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        s5k4e1gx_ctrl->sensordata->vreg_disable_func(0);
+        /* DTS2012020400396 zhangyu 20120206 end > */
     }
 
     return rc;
@@ -879,16 +885,10 @@ static int s5k4e1gx_sensor_release(void)
 
     mutex_lock(&s5k4e1gx_mutex);
 
-    /*<  DTS2011101302587   yuguangcai 20111013 begin */
-    gpio_direction_output(s5k4e1gx_ctrl->sensordata->sensor_reset, 0);
-    /*pull down the vcm_pwd*/
-    /*<  DTS2011101403259   yuguangcai 20111022 begin */
-    //delete some lines
-    /* DTS2011101403259   yuguangcai 20111022 end > */
-    msleep(20);
+    gpio_direction_output(s5k4e1gx_ctrl->sensordata->sensor_reset,
+                          0);
     gpio_free(s5k4e1gx_ctrl->sensordata->sensor_reset);
-    gpio_free(s5k4e1gx_ctrl->sensordata->vcm_pwd);
-    /* DTS2011101302587   yuguangcai 20111013 end > */
+    gpio_free(s5k4e1gx_ctrl->sensordata->sensor_pwd);
     rc = s5k4e1gx_power_down();
 
     kfree(s5k4e1gx_ctrl);
@@ -998,97 +998,6 @@ set_fps_done:
     return rc;
 }
 
-/*< DTS2011101300920 zhangyu 20111112 begin */
-#ifdef CONFIG_HUAWEI_CAMERA
- /*optimize AF default pos*/
-static int32_t s5k4e1gx_write_exp_gain(uint16_t gain, uint32_t line)
-{
-     int32_t rc = 0;
- 
-     uint16_t max_legal_gain = 0x0200;
-     uint16_t min_line = 4;
-     uint32_t ll_pck, fl_lines;
-     uint16_t offset = 12;
-     uint32_t  gain_msb, gain_lsb;
-     uint32_t  intg_t_msb, intg_t_lsb;
- 
-     
-     struct s5k4e1gx_i2c_reg_conf tbl[3];
-     CDBG("Line:%d s5k4e1gx_write_exp_gain \n", __LINE__);
-     CDBG("Gain is %d, Line count is %d\n",gain,line);
-     if (s5k4e1gx_ctrl->sensormode == SENSOR_PREVIEW_MODE) {
- 
-         s5k4e1gx_ctrl->my_reg_gain = gain;
-         s5k4e1gx_ctrl->my_reg_line_count = (uint16_t)line;
- 
-         fl_lines = s5k4e1gx_reg_pat[S_RES_PREVIEW].size_h +
-             s5k4e1gx_reg_pat[S_RES_PREVIEW].blk_l;
- 
-         ll_pck = s5k4e1gx_reg_pat[S_RES_PREVIEW].size_w +
-             s5k4e1gx_reg_pat[S_RES_PREVIEW].blk_p;
- 
-     } else {
- 
-         fl_lines = s5k4e1gx_reg_pat[S_RES_CAPTURE].size_h +
-             s5k4e1gx_reg_pat[S_RES_CAPTURE].blk_l;
- 
-         ll_pck = s5k4e1gx_reg_pat[S_RES_CAPTURE].size_w +
-             s5k4e1gx_reg_pat[S_RES_CAPTURE].blk_p;
-     }
- 
-     if (gain > max_legal_gain)
-         gain = max_legal_gain;
-     if (line < min_line)
-     {
-     line = min_line;
-     }
-     if (line > (fl_lines -offset))
-     {
-     fl_lines = line +offset;
-     }
-     /* update gain registers */
-     gain_msb = (gain & 0xFF00) >> 8;
-     gain_lsb = gain & 0x00FF;
-     tbl[0].waddr = S5K4E1GX_REG_GROUP_PARAMETER_HOLD;
-     tbl[0].bdata = S5K4E1GX_GROUP_PARAMETER_HOLD;
-     tbl[1].waddr = REG_ANALOGUE_GAIN_CODE_GLOBAL_MSB;
-     tbl[1].bdata = gain_msb;
-     tbl[2].waddr = REG_ANALOGUE_GAIN_CODE_GLOBAL_LSB;
-     tbl[2].bdata = gain_lsb;
-     rc = s5k4e1gx_i2c_write_table(&tbl[0], ARRAY_SIZE(tbl));
-     if (rc < 0)
-         goto write_gain_done;
- 
-     rc = s5k4e1gx_i2c_write_b(s5k4e1gx_client->addr,
-         REG_FRAME_LENGTH_LINES_MSB,
-         (fl_lines & 0xFF00) >> 8);
-     if (rc < 0)
-         goto write_gain_done;
- 
-     rc = s5k4e1gx_i2c_write_b(s5k4e1gx_client->addr,
-         REG_FRAME_LENGTH_LINES_LSB,
-         (fl_lines & 0x00FF));
-     if (rc < 0)
-         goto write_gain_done;
-     
- 
-     intg_t_msb = (line & 0xFF00) >> 8;
-     intg_t_lsb = (line & 0x00FF);
-     tbl[0].waddr = REG_COARSE_INTEGRATION_TIME;
-     tbl[0].bdata = intg_t_msb;
-     tbl[1].waddr = REG_COARSE_INTEGRATION_TIME_LSB;
-     tbl[1].bdata = intg_t_lsb;
-     tbl[2].waddr = S5K4E1GX_REG_GROUP_PARAMETER_HOLD;
-     tbl[2].bdata = S5K4E1GX_GROUP_PARAMETER_UNHOLD;
-     rc = s5k4e1gx_i2c_write_table(&tbl[0], ARRAY_SIZE(tbl));
- 
- 
- 
- write_gain_done:
-     return rc;
-}
- 
-#else
 /*optimize AF default pos*/
 static int32_t s5k4e1gx_write_exp_gain(uint16_t gain, uint32_t line)
 {
@@ -1209,9 +1118,7 @@ static int32_t s5k4e1gx_write_exp_gain(uint16_t gain, uint32_t line)
 write_gain_done:
     return rc;
 }
-#endif
-/* DTS2011101300920 zhangyu 20111112 end > */
- 
+
 static int32_t s5k4e1gx_set_pict_exp_gain(uint16_t gain, uint32_t line)
 {
     int32_t rc = 0;
@@ -1626,11 +1533,17 @@ static int s5k4e1gx_sensor_probe(const struct msm_camera_sensor_info *info,
     s->s_release = s5k4e1gx_sensor_release;
     s->s_config = s5k4e1gx_sensor_config;
     s->s_camera_type = BACK_CAMERA_2D;
-    /*< DTS2011101300920 zhangyu 20111112 begin */
-    /* Rollback modification DTS2011091605514 */
-    s->s_mount_angle = 0;
-
-    /* DTS2011101300920 zhangyu 20111112 end > */
+	/* < DTS2011091605514 liwei 20110916 begin */
+	/* if machine is U8680, rotate the camera with 180 degree */
+	if (machine_is_msm8255_u8680())
+	{
+        s->s_mount_angle = 180;
+	}
+	else
+	{
+        s->s_mount_angle = 0;
+	}
+	/* DTS2011091605514 liwei 20110916 end > */
     s5k4e1gx_probe_init_done(info);
     CDBG("Line:%d  s5k4e1gx_probe_init_done \n", __LINE__);
 

@@ -27,7 +27,11 @@
 #include <linux/workqueue.h>
 #include <linux/freezer.h>
 #include <linux/akm8973.h>
-
+/* <DTS2012030804064 sunwenyong 20120308 begin */
+#ifdef CONFIG_HUAWEI_HW_DEV_DCT
+#include <linux/hw_dev_dec.h>
+#endif
+/* DTS2012030804064 sunwenyong 20120308 end> */
 #define DEBUG 0
 #define MAX_FAILURE_COUNT 3
 
@@ -335,8 +339,8 @@ static int akm_aot_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-akm_aot_ioctl(struct inode *inode, struct file *file,
+static long
+akm_aot_ioctl(struct file *file,
 	      unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
@@ -433,8 +437,8 @@ static int akmd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long
+akmd_ioctl(struct file *file, unsigned int cmd,
 	   unsigned long arg)
 {
 
@@ -572,14 +576,14 @@ static struct file_operations akmd_fops = {
 	.owner = THIS_MODULE,
 	.open = akmd_open,
 	.release = akmd_release,
-	.ioctl = akmd_ioctl,
+	.unlocked_ioctl = akmd_ioctl,
 };
 
 static struct file_operations akm_aot_fops = {
 	.owner = THIS_MODULE,
 	.open = akm_aot_open,
 	.release = akm_aot_release,
-	.ioctl = akm_aot_ioctl,
+	.unlocked_ioctl = akm_aot_ioctl,
 };
 
 
@@ -697,7 +701,12 @@ int akm8973_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		       "AKM8973 akm8973_probe: akm_aot_device register failed\n");
 		goto exit_misc_device_register_failed;
 	}
-
+/* <DTS2012030804064 sunwenyong 20120308 begin */
+/* detect current device successful, set the flag as present */
+#ifdef CONFIG_HUAWEI_HW_DEV_DCT
+	set_hw_dev_flag(DEV_I2C_APS);
+#endif
+/* DTS2012030804064 sunwenyong 20120308 end> */
 	mutex_init(&sense_data_mutex);
 
 	init_waitqueue_head(&data_ready_wq);

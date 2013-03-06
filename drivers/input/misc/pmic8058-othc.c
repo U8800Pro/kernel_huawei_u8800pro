@@ -8,11 +8,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
  */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
@@ -32,9 +27,9 @@
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
 
-#include <linux/mfd/pmic8058.h>
+#include <linux/mfd/pm8xxx/core.h>
 #include <linux/pmic8058-othc.h>
-#include <linux/m_adc.h>
+#include <linux/msm_adc.h>
 
 #define PM8058_OTHC_LOW_CURR_MASK	0xF0
 #define PM8058_OTHC_HIGH_CURR_MASK	0x0F
@@ -67,11 +62,13 @@ struct pm8058_othc {
 	int video_out_gpio;
 	u32 sw_key_code;
 	u32 accessories_adc_channel;
+	int ir_gpio;
 	unsigned long switch_debounce_ms;
 	unsigned long detection_delay_ms;
 	void *adc_handle;
 	void *accessory_adc_handle;
 	spinlock_t lock;
+	struct device *dev;
 	struct regulator *othc_vreg;
 	struct input_dev *othc_ipd;
 	struct switch_dev othc_sdev;
@@ -79,13 +76,55 @@ struct pm8058_othc {
 	struct othc_accessory_info *accessory_info;
 	struct hrtimer timer;
 	struct othc_n_switch_config *switch_config;
-	struct pm8058_chip *pm_chip;
 	struct work_struct switch_work;
 	struct delayed_work detect_work;
+	struct delayed_work hs_work;
 };
 
 static struct pm8058_othc *config[OTHC_MICBIAS_MAX];
 
+static void hs_worker(struct work_struct *work)
+{
+	int rc;
+	struct pm8058_othc *dd =
+		container_of(work, struct pm8058_othc, hs_work.work);
+
+	rc = gpio_get_value_cansleep(dd->ir_gpio);
+	if (rc < 0) {
+		pr_err("Unable to read IR GPIO\n");
+		enable_irq(dd->othc_irq_ir);
+		return;
+	}
+
+	dd->othc_ir_state = !rc;
+	schedule_delayed_work(&dd->detect_work,
+				msecs_to_jiffies(dd->detection_delay_ms));
+}
+
+static irqreturn_t ir_gpio_irq(int irq, void *dev_id)
+{
+	unsigned long flags;
+	struct pm8058_othc *dd = dev_id;
+
+	spin_lock_irqsave(&dd->lock, flags);
+	/* Enable the switch reject flag */
+	dd->switch_reject = true;
+	spin_unlock_irqrestore(&dd->lock, flags);
+
+	/* Start the HR timer if one is not active */
+	if (hrtimer_active(&dd->timer))
+		hrtimer_cancel(&dd->timer);
+
+	hrtimer_start(&dd->timer,
+		ktime_set((dd->switch_debounce_ms / 1000),
+		(dd->switch_debounce_ms % 1000) * 1000000), HRTIMER_MODE_REL);
+
+	/* disable irq, this gets enabled in the workqueue */
+	disable_irq_nosync(dd->othc_irq_ir);
+	schedule_delayed_work(&dd->hs_work, 0);
+
+	return IRQ_HANDLED;
+}
 /*
  * The API pm8058_micbias_enable() allows to configure
  * the MIC_BIAS. Only the lines which are not used for
@@ -110,7 +149,7 @@ int pm8058_micbias_enable(enum othc_micbias micbias,
 		return -EINVAL;
 	}
 
-	rc = pm8058_read(dd->pm_chip, dd->othc_base + 1, &reg, 1);
+	rc = pm8xxx_readb(dd->dev->parent, dd->othc_base + 1, &reg);
 	if (rc < 0) {
 		pr_err("PM8058 read failed\n");
 		return rc;
@@ -119,7 +158,7 @@ int pm8058_micbias_enable(enum othc_micbias micbias,
 	reg &= PM8058_OTHC_EN_SIG_MASK;
 	reg |= (enable << PM8058_OTHC_EN_SIG_SHIFT);
 
-	rc = pm8058_write(dd->pm_chip, dd->othc_base + 1, &reg, 1);
+	rc = pm8xxx_writeb(dd->dev->parent, dd->othc_base + 1, reg);
 	if (rc < 0) {
 		pr_err("PM8058 write failed\n");
 		return rc;
@@ -237,8 +276,11 @@ static int __devexit pm8058_othc_remove(struct platform_device *pd)
 			}
 		}
 		cancel_delayed_work_sync(&dd->detect_work);
+		cancel_delayed_work_sync(&dd->hs_work);
 		free_irq(dd->othc_irq_sw, dd);
 		free_irq(dd->othc_irq_ir, dd);
+		if (dd->ir_gpio != -1)
+			gpio_free(dd->ir_gpio);
 		input_unregister_device(dd->othc_ipd);
 	}
 	regulator_disable(dd->othc_vreg);
@@ -276,6 +318,18 @@ static void othc_report_switch(struct pm8058_othc *dd, u32 res)
 			input_sync(dd->othc_ipd);
 			return;
 		}
+	}
+
+	/*
+	 * If the switch is not present in a specified ADC range
+	 * report a default switch press.
+	 */
+	if (dd->switch_config->default_sw_en) {
+		dd->othc_sw_state = true;
+		dd->sw_key_code =
+			sw_info[dd->switch_config->default_sw_idx].key_code;
+		input_report_key(dd->othc_ipd, dd->sw_key_code, 1);
+		input_sync(dd->othc_ipd);
 	}
 }
 
@@ -390,16 +444,25 @@ static int pm8058_accessory_report(struct pm8058_othc *dd, int status)
 		return 0;
 	}
 
-	/* Check the MIC_BIAS status */
-	rc = pm8058_irq_get_rt_status(dd->pm_chip, dd->othc_irq_ir);
-	if (rc < 0) {
-		pr_err("Unable to read IR status\n");
-		goto fail_ir_accessory;
+	if (dd->ir_gpio < 0) {
+		/* Check the MIC_BIAS status */
+		rc = pm8xxx_read_irq_stat(dd->dev->parent, dd->othc_irq_ir);
+		if (rc < 0) {
+			pr_err("Unable to read IR status from PMIC\n");
+			goto fail_ir_accessory;
+		}
+		micbias_status = !!rc;
+	} else {
+		rc = gpio_get_value_cansleep(dd->ir_gpio);
+		if (rc < 0) {
+			pr_err("Unable to read IR status from GPIO\n");
+			goto fail_ir_accessory;
+		}
+		micbias_status = !rc;
 	}
-	micbias_status = !!rc;
 
 	/* Check the switch status */
-	rc = pm8058_irq_get_rt_status(dd->pm_chip, dd->othc_irq_sw);
+	rc = pm8xxx_read_irq_stat(dd->dev->parent, dd->othc_irq_sw);
 	if (rc < 0) {
 		pr_err("Unable to read SWITCH status\n");
 		goto fail_ir_accessory;
@@ -473,19 +536,11 @@ static void detect_work_f(struct work_struct *work)
 	struct pm8058_othc *dd =
 		container_of(work, struct pm8058_othc, detect_work.work);
 
-	if (dd->othc_ir_state) {
-		/* inserted */
-		rc = pm8058_accessory_report(dd, 1);
-		if (rc)
-			pr_err("Accessory could not be detected\n");
-	} else {
-		/* removed */
-		rc = pm8058_accessory_report(dd, 0);
-		if (rc)
-			pr_err("Accessory could not be detected\n");
-		/* Clear existing switch state */
-		dd->othc_sw_state = false;
-	}
+	/* Accessory has been inserted */
+	rc = pm8058_accessory_report(dd, 1);
+	if (rc)
+		pr_err("Accessory insertion could not be detected\n");
+
 	enable_irq(dd->othc_irq_ir);
 }
 
@@ -501,6 +556,10 @@ static irqreturn_t pm8058_no_sw(int irq, void *dev_id)
 	struct pm8058_othc *dd = dev_id;
 	unsigned long flags;
 
+	/* Check if headset has been inserted, else return */
+	if (!dd->othc_ir_state)
+		return IRQ_HANDLED;
+
 	spin_lock_irqsave(&dd->lock, flags);
 	if (dd->switch_reject == true) {
 		pr_debug("Rejected switch interrupt\n");
@@ -509,7 +568,7 @@ static irqreturn_t pm8058_no_sw(int irq, void *dev_id)
 	}
 	spin_unlock_irqrestore(&dd->lock, flags);
 
-	level = pm8058_irq_get_rt_status(dd->pm_chip, dd->othc_irq_sw);
+	level = pm8xxx_read_irq_stat(dd->dev->parent, dd->othc_irq_sw);
 	if (level < 0) {
 		pr_err("Unable to read IRQ status register\n");
 		return IRQ_HANDLED;
@@ -570,19 +629,29 @@ static irqreturn_t pm8058_nc_ir(int irq, void *dev_id)
 		ktime_set((dd->switch_debounce_ms / 1000),
 		(dd->switch_debounce_ms % 1000) * 1000000), HRTIMER_MODE_REL);
 
-	/* disable irq, this gets enabled in the workqueue */
-	disable_irq_nosync(dd->othc_irq_ir);
 
 	/* Check the MIC_BIAS status, to check if inserted or removed */
-	rc = pm8058_irq_get_rt_status(dd->pm_chip, dd->othc_irq_ir);
+	rc = pm8xxx_read_irq_stat(dd->dev->parent, dd->othc_irq_ir);
 	if (rc < 0) {
 		pr_err("Unable to read IR status\n");
 		goto fail_ir;
 	}
 
 	dd->othc_ir_state = rc;
-	schedule_delayed_work(&dd->detect_work,
+	if (dd->othc_ir_state) {
+		/* disable irq, this gets enabled in the workqueue */
+		disable_irq_nosync(dd->othc_irq_ir);
+		/* Accessory has been inserted, report with detection delay */
+		schedule_delayed_work(&dd->detect_work,
 				msecs_to_jiffies(dd->detection_delay_ms));
+	} else {
+		/* Accessory has been removed, report removal immediately */
+		rc = pm8058_accessory_report(dd, 0);
+		if (rc)
+			pr_err("Accessory removal could not be detected\n");
+		/* Clear existing switch state */
+		dd->othc_sw_state = false;
+	}
 
 fail_ir:
 	return IRQ_HANDLED;
@@ -599,7 +668,7 @@ static int pm8058_configure_micbias(struct pm8058_othc *dd)
 
 	/* Intialize the OTHC module */
 	/* Control Register 1*/
-	rc = pm8058_read(dd->pm_chip, base_addr, &reg, 1);
+	rc = pm8xxx_readb(dd->dev->parent, base_addr, &reg);
 	if (rc < 0) {
 		pr_err("PM8058 read failed\n");
 		return rc;
@@ -609,14 +678,14 @@ static int pm8058_configure_micbias(struct pm8058_othc *dd)
 	value = (hsed_config->othc_highcurr_thresh_uA / 100) - 2;
 	reg =  (reg & PM8058_OTHC_HIGH_CURR_MASK) | value;
 
-	rc = pm8058_write(dd->pm_chip, base_addr, &reg, 1);
+	rc = pm8xxx_writeb(dd->dev->parent, base_addr, reg);
 	if (rc < 0) {
 		pr_err("PM8058 read failed\n");
 		return rc;
 	}
 
 	/* Control register 2*/
-	rc = pm8058_read(dd->pm_chip, base_addr + 1, &reg, 1);
+	rc = pm8xxx_readb(dd->dev->parent, base_addr + 1, &reg);
 	if (rc < 0) {
 		pr_err("PM8058 read failed\n");
 		return rc;
@@ -651,14 +720,14 @@ static int pm8058_configure_micbias(struct pm8058_othc *dd)
 	}
 	reg = (reg &  PM8058_OTHC_CLK_PREDIV_MASK) | (value - 1);
 
-	rc = pm8058_write(dd->pm_chip, base_addr + 1, &reg, 1);
+	rc = pm8xxx_writeb(dd->dev->parent, base_addr + 1, reg);
 	if (rc < 0) {
 		pr_err("PM8058 read failed\n");
 		return rc;
 	}
 
 	/* Control register 3 */
-	rc = pm8058_read(dd->pm_chip, base_addr + 2 , &reg, 1);
+	rc = pm8xxx_readb(dd->dev->parent, base_addr + 2 , &reg);
 	if (rc < 0) {
 		pr_err("PM8058 read failed\n");
 		return rc;
@@ -681,7 +750,7 @@ static int pm8058_configure_micbias(struct pm8058_othc *dd)
 	}
 	reg = (reg & PM8058_OTHC_PERIOD_CLK_MASK) | value;
 
-	rc = pm8058_write(dd->pm_chip, base_addr + 2, &reg, 1);
+	rc = pm8xxx_writeb(dd->dev->parent, base_addr + 2, reg);
 	if (rc < 0) {
 		pr_err("PM8058 read failed\n");
 		return rc;
@@ -747,13 +816,13 @@ pm8058_configure_accessory(struct pm8058_othc *dd)
 							"othc_acc_gpio_", i);
 			rc = gpio_request(dd->accessory_info[i].gpio, name);
 			if (rc) {
-				pr_err("Unable to request GPIO [%d]\n",
+				pr_debug("Unable to request GPIO [%d]\n",
 						dd->accessory_info[i].gpio);
 				continue;
 			}
 			rc = gpio_direction_input(dd->accessory_info[i].gpio);
 			if (rc) {
-				pr_err("Unable to set-direction GPIO [%d]\n",
+				pr_debug("Unable to set-direction GPIO [%d]\n",
 						dd->accessory_info[i].gpio);
 				gpio_free(dd->accessory_info[i].gpio);
 				continue;
@@ -850,6 +919,7 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 	ipd->dev.parent = &pd->dev;
 
 	dd->othc_ipd = ipd;
+	dd->ir_gpio = hsed_config->ir_gpio;
 	dd->othc_sw_state = false;
 	dd->switch_debounce_ms = hsed_config->switch_debounce_ms;
 	dd->othc_support_n_switch = hsed_config->othc_support_n_switch;
@@ -899,14 +969,34 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 	dd->timer.function = pm8058_othc_timer;
 
 	/* Request the HEADSET IR interrupt */
-	rc = request_threaded_irq(dd->othc_irq_ir, NULL, pm8058_nc_ir,
+	if (dd->ir_gpio < 0) {
+		rc = request_threaded_irq(dd->othc_irq_ir, NULL, pm8058_nc_ir,
 		IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_DISABLED,
-				"pm8058_othc_ir", dd);
-	if (rc < 0) {
-		pr_err("Unable to request pm8058_othc_ir IRQ\n");
-		goto fail_ir_irq;
+					"pm8058_othc_ir", dd);
+		if (rc < 0) {
+			pr_err("Unable to request pm8058_othc_ir IRQ\n");
+			goto fail_ir_irq;
+		}
+	} else {
+		rc = gpio_request(dd->ir_gpio, "othc_ir_gpio");
+		if (rc) {
+			pr_err("Unable to request IR GPIO\n");
+			goto fail_ir_gpio_req;
+		}
+		rc = gpio_direction_input(dd->ir_gpio);
+		if (rc) {
+			pr_err("GPIO %d set_direction failed\n", dd->ir_gpio);
+			goto fail_ir_irq;
+		}
+		dd->othc_irq_ir = gpio_to_irq(dd->ir_gpio);
+		rc = request_any_context_irq(dd->othc_irq_ir, ir_gpio_irq,
+		IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+				"othc_gpio_ir_irq", dd);
+		if (rc < 0) {
+			pr_err("could not request hs irq err=%d\n", rc);
+			goto fail_ir_irq;
+		}
 	}
-
 	/* Request the  SWITCH press/release interrupt */
 	rc = request_threaded_irq(dd->othc_irq_sw, NULL, pm8058_no_sw,
 	IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_DISABLED,
@@ -917,10 +1007,19 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 	}
 
 	/* Check if the accessory is already inserted during boot up */
-	rc = pm8058_irq_get_rt_status(dd->pm_chip, dd->othc_irq_ir);
-	if (rc < 0) {
-		pr_err("Unable to get accessory status at boot\n");
-		goto fail_ir_irq;
+	if (dd->ir_gpio < 0) {
+		rc = pm8xxx_read_irq_stat(dd->dev->parent, dd->othc_irq_ir);
+		if (rc < 0) {
+			pr_err("Unable to get accessory status at boot\n");
+			goto fail_ir_status;
+		}
+	} else {
+		rc = gpio_get_value_cansleep(dd->ir_gpio);
+		if (rc < 0) {
+			pr_err("Unable to get accessory status at boot\n");
+			goto fail_ir_status;
+		}
+		rc = !rc;
 	}
 	if (rc) {
 		pr_debug("Accessory inserted during boot up\n");
@@ -935,14 +1034,22 @@ othc_configure_hsed(struct pm8058_othc *dd, struct platform_device *pd)
 
 	INIT_DELAYED_WORK(&dd->detect_work, detect_work_f);
 
+	INIT_DELAYED_WORK(&dd->hs_work, hs_worker);
+
 	if (dd->othc_support_n_switch == true)
 		INIT_WORK(&dd->switch_work, switch_work_f);
 
+
 	return 0;
 
+fail_ir_status:
+	free_irq(dd->othc_irq_sw, dd);
 fail_sw_irq:
 	free_irq(dd->othc_irq_ir, dd);
 fail_ir_irq:
+	if (dd->ir_gpio != -1)
+		gpio_free(dd->ir_gpio);
+fail_ir_gpio_req:
 	input_unregister_device(ipd);
 	dd->othc_ipd = NULL;
 fail_micbias_config:
@@ -956,21 +1063,8 @@ static int __devinit pm8058_othc_probe(struct platform_device *pd)
 {
 	int rc;
 	struct pm8058_othc *dd;
-	struct pm8058_chip *chip;
 	struct resource *res;
 	struct pmic8058_othc_config_pdata *pdata = pd->dev.platform_data;
-
-	chip = platform_get_drvdata(pd);
-	if (chip == NULL) {
-		pr_err("Invalid driver information\n");
-		return  -EINVAL;
-	}
-
-	/* Check PMIC8058 version. A0 version is not supported */
-	if (pm8058_rev(chip) == PM_8058_REV_1p0) {
-		pr_err("PMIC8058 version not supported\n");
-		return -ENODEV;
-	}
 
 	if (pdata == NULL) {
 		pr_err("Platform data not present\n");
@@ -996,8 +1090,8 @@ static int __devinit pm8058_othc_probe(struct platform_device *pd)
 		goto fail_get_res;
 	}
 
+	dd->dev = &pd->dev;
 	dd->othc_pdata = pdata;
-	dd->pm_chip = chip;
 	dd->othc_base = res->start;
 	if (pdata->micbias_regulator == NULL) {
 		pr_err("OTHC regulator not specified\n");
@@ -1046,7 +1140,7 @@ static int __devinit pm8058_othc_probe(struct platform_device *pd)
 		config[dd->othc_pdata->micbias_select] = dd;
 
 	pr_debug("Device %s:%d successfully registered\n",
-					pd->name, pd->id);
+			pd->name, pd->id);
 	return 0;
 
 fail_othc_hsed:

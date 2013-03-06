@@ -327,7 +327,7 @@ static struct i2c_client *g_client;
 
 static struct workqueue_struct *atmel_wq;
 
-static DECLARE_MUTEX(atmel_i2c_lock);
+static DEFINE_SEMAPHORE(atmel_i2c_lock);
 
 struct atmel_ts_data {
 	uint16_t addr;
@@ -2030,6 +2030,18 @@ static u32 touch_get_extra_keycode(int pos_x, int pos_y)
 #endif
 /*<BU5D09283 luojianhong 20100506 end*/
 
+/*< DTS2012070604482 fengzhiqiang 20120712 begin */
+/*add touch screen info*/
+static char touch_info[50] = {0};
+char * get_atmel_touch_info(void)
+{
+    if(g_client==NULL)
+	   return NULL;
+	sprintf(touch_info,"atmel-rmi-ts");
+	return touch_info;
+}
+/* DTS2012070604482 fengzhiqiang 20120712 end >*/
+
 static void atmel_ts_work_func(struct work_struct *work)
 {
 	u8 ins=0;
@@ -2047,8 +2059,15 @@ static void atmel_ts_work_func(struct work_struct *work)
 /* DTS2010071200025 zhangtao 20100715 end > */
 	static bool first_point_pressed = FALSE;
 	static bool second_point_pressed = FALSE;
+/* < DTS2012042401647 xiedayong 20120424 begin */
+    static int finger_press_num = 0;
+/* DTS2012042401647 xiedayong 20120424 end > */
 /* < DTS2010071200025 zhangtao 20100715 begin */
-    static bool last_is_2points = FALSE;//if it's 2 points pressed last time.
+
+/* < DTS2012070606070 fengzhiqiang 20120713 begin */
+    /*static bool last_is_2points = FALSE;//if it's 2 points pressed last time.*/
+/* DTS2012070606070 fengzhiqiang 20120713 end > */
+    
     static char first_point_id = 1; 
     static int point_1_x;
     static int point_1_y;
@@ -2301,17 +2320,29 @@ static void atmel_ts_work_func(struct work_struct *work)
 					        input_mt_sync(ts->input_dev);
                         }
                     }
-                    else if(last_is_2points)//when one point released...
+					/* < DTS2012070606070 fengzhiqiang 20120713 begin */
+                    /* else if(last_is_2points)//when one point released...
                     {
                         input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
         				input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, 0);
         				input_mt_sync(ts->input_dev);
-                    }
+                    }*/
+					/* DTS2012070606070 fengzhiqiang 20120713 end > */
+                    /* < DTS2012042401647 xiedayong 20120424 begin */
+                    /* Report if there is any fingure on the TP */
+                    /* < DTS2012061103188 xiedayong 20120611 begin */
+                    /* remove the board_id control*/
+                    finger_press_num = first_point_pressed + second_point_pressed;
+                    input_report_key(ts->input_dev, BTN_TOUCH, finger_press_num);
+                    /* DTS2012061103188 xiedayong 20120611 end > */
+                    /* DTS2012042401647 xiedayong 20120424 end > */
                     input_sync(ts->input_dev);
-                    if(first_point_pressed && second_point_pressed)
+					/* < DTS2012070606070 fengzhiqiang 20120713 begin */
+                    /*if(first_point_pressed && second_point_pressed)
                         last_is_2points = TRUE;
                     else
-                        last_is_2points = FALSE;
+                        last_is_2points = FALSE;*/
+					/* DTS2012070606070 fengzhiqiang 20120713 end > */
 /* DTS2010071200025 zhangtao 20100715 end > */
 				}
 				else

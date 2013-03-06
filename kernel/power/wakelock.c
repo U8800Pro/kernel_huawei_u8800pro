@@ -44,17 +44,20 @@ static DEFINE_SPINLOCK(list_lock);
 static LIST_HEAD(inactive_locks);
 static struct list_head active_wake_locks[WAKE_LOCK_TYPE_COUNT];
 static int current_event_num;
-/* < DTS2011080105670 fangxinyong 20110801 begin */
-/* Qualcom [PATCH] power: fix suspend_sys_sync_wait() */
 static int suspend_sys_sync_count;
 static DEFINE_SPINLOCK(suspend_sys_sync_lock);
-/* DTS2011080105670 fangxinyong 20110801 end > */
 static struct workqueue_struct *suspend_sys_sync_work_queue;
 static DECLARE_COMPLETION(suspend_sys_sync_comp);
 struct workqueue_struct *suspend_work_queue;
 struct wake_lock main_wake_lock;
 suspend_state_t requested_suspend_state = PM_SUSPEND_MEM;
 static struct wake_lock unknown_wakeup;
+static struct wake_lock suspend_backoff_lock;
+
+#define SUSPEND_BACKOFF_THRESHOLD	10
+#define SUSPEND_BACKOFF_INTERVAL	10000
+
+static unsigned suspend_short_count;
 
 #ifdef CONFIG_WAKELOCK_STAT
 static struct wake_lock deleted_wake_locks;
@@ -67,19 +70,15 @@ int get_expired_time(struct wake_lock *lock, ktime_t *expire_time)
 	struct timespec kt;
 	struct timespec tomono;
 	struct timespec delta;
-	unsigned long seq;
+	struct timespec sleep;
 	long timeout;
 
 	if (!(lock->flags & WAKE_LOCK_AUTO_EXPIRE))
 		return 0;
-	do {
-		seq = read_seqbegin(&xtime_lock);
-		timeout = lock->expires - jiffies;
-		if (timeout > 0)
-			return 0;
-		kt = current_kernel_time();
-		tomono = wall_to_monotonic;
-	} while (read_seqretry(&xtime_lock, seq));
+	get_xtime_and_monotonic_and_sleep_offset(&kt, &tomono, &sleep);
+	timeout = lock->expires - jiffies;
+	if (timeout > 0)
+		return 0;
 	jiffies_to_timespec(-timeout, &delta);
 	set_normalized_timespec(&ts, kt.tv_sec + tomono.tv_sec - delta.tv_sec,
 				kt.tv_nsec + tomono.tv_nsec - delta.tv_nsec);
@@ -140,28 +139,19 @@ static int wakelock_stats_show(struct seq_file *m, void *unused)
 		ret = print_lock_stat(m, lock);
 
 /* <DTS2010092703937 hufeng 20100927 begin */
-/* removed several lines. */
-/* DTS2010092703937 hufeng 20100927 end> */
 #ifdef CONFIG_HUAWEI_KERNEL
-/* <DTS2010092703937 hufeng 20100927 begin */
-    /*<BU5D00025, jialin, 20091223, add log information, begin */
         ret = seq_printf(m,"!\n!\n!\n");        /* for kernel32 -wanghao */
-    /*BU5D00025, jialin, 20091223, add log information, end> */
 
     for (type = 0; type < WAKE_LOCK_TYPE_COUNT; type++) {
         list_for_each_entry(lock, &active_wake_locks[type], link)
             ret = print_lock_stat(m, lock);
-    /*<BU5D00025, jialin, 20091223, add log information, * begin */
             ret = seq_printf(m,"!\n!\n!\n");    /* for kernel32 -wanghao */
-    /*BU5D00025, jialin, 20091223, add log * information, end> */
     }
 #else
-/* DTS2010092703937 hufeng 20100927 end> */
 	for (type = 0; type < WAKE_LOCK_TYPE_COUNT; type++) {
 		list_for_each_entry(lock, &active_wake_locks[type], link)
 			ret = print_lock_stat(m, lock);
 	}
-/* <DTS2010092703937 hufeng 20100927 begin */
 #endif
 /* DTS2010092703937 hufeng 20100927 end> */
 	spin_unlock_irqrestore(&list_lock, irqflags);
@@ -282,47 +272,38 @@ long has_wake_lock(int type)
 	unsigned long irqflags;
 	spin_lock_irqsave(&list_lock, irqflags);
 	ret = has_wake_lock_locked(type);
-	if (ret && (debug_mask & DEBUG_SUSPEND) && type == WAKE_LOCK_SUSPEND)
+	if (ret && (debug_mask & DEBUG_WAKEUP) && type == WAKE_LOCK_SUSPEND)
 		print_active_locks(type);
 	spin_unlock_irqrestore(&list_lock, irqflags);
 	return ret;
 }
 
-/* < DTS2011080105670 fangxinyong 20110801 begin */
-/* Qualcom [PATCH] power: fix suspend_sys_sync_wait() */
 static void suspend_sys_sync(struct work_struct *work)
 {
-	unsigned long flags;
-	
 	if (debug_mask & DEBUG_SUSPEND)
-		pr_info("PM: Syncing filesystems ... \n");
+		pr_info("PM: Syncing filesystems...\n");
 
 	sys_sync();
 
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("sync done.\n");
 
-	spin_lock_irqsave(&suspend_sys_sync_lock, flags);
+	spin_lock(&suspend_sys_sync_lock);
 	suspend_sys_sync_count--;
-	spin_unlock_irqrestore(&suspend_sys_sync_lock, flags);
+	spin_unlock(&suspend_sys_sync_lock);
 }
-/* DTS2011080105670 fangxinyong 20110801 end > */
 static DECLARE_WORK(suspend_sys_sync_work, suspend_sys_sync);
 
-/* < DTS2011080105670 fangxinyong 20110801 begin */
-/* Qualcom [PATCH] power: fix suspend_sys_sync_wait() */
 void suspend_sys_sync_queue(void)
 {
-	unsigned long flags;
 	int ret;
-	
-	spin_lock_irqsave(&suspend_sys_sync_lock, flags);
+
+	spin_lock(&suspend_sys_sync_lock);
 	ret = queue_work(suspend_sys_sync_work_queue, &suspend_sys_sync_work);
 	if (ret)
 		suspend_sys_sync_count++;
-	spin_unlock_irqrestore(&suspend_sys_sync_lock, flags);
+	spin_unlock(&suspend_sys_sync_lock);
 }
-/* DTS2011080105670 fangxinyong 20110801 end > */
 
 static bool suspend_sys_sync_abort;
 static void suspend_sys_sync_handler(unsigned long);
@@ -331,64 +312,41 @@ static DEFINE_TIMER(suspend_sys_sync_timer, suspend_sys_sync_handler, 0, 0);
  * which is currently set to 5*HZ (see drivers/input/evdev.c)
  */
 #define SUSPEND_SYS_SYNC_TIMEOUT (HZ/4)
-/* < DTS2011080105670 fangxinyong 20110801 begin */
-/* Qualcom [PATCH] power: fix suspend_sys_sync_wait() */
 static void suspend_sys_sync_handler(unsigned long arg)
 {
-	unsigned long flags;
-	bool suspend_sys_sync_done = false;
-
-	spin_lock_irqsave(&suspend_sys_sync_lock, flags);
-	if (suspend_sys_sync_count == 0)
-		suspend_sys_sync_done = true;
-	spin_unlock_irqrestore(&suspend_sys_sync_lock, flags);
-	
-	if (suspend_sys_sync_done == true) {
-		del_timer(&suspend_sys_sync_timer);
+	if (suspend_sys_sync_count == 0) {
 		complete(&suspend_sys_sync_comp);
 	} else if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
 		suspend_sys_sync_abort = true;
-		del_timer(&suspend_sys_sync_timer);
 		complete(&suspend_sys_sync_comp);
 	} else {
 		mod_timer(&suspend_sys_sync_timer, jiffies +
 				SUSPEND_SYS_SYNC_TIMEOUT);
 	}
 }
-/* DTS2011080105670 fangxinyong 20110801 end > */
 
-/* < DTS2011080105670 fangxinyong 20110801 begin */
-/* Qualcom [PATCH] power: fix suspend_sys_sync_wait() */
 int suspend_sys_sync_wait(void)
 {
-	unsigned long flags;
-	bool suspend_sys_sync_done = false;
-	
 	suspend_sys_sync_abort = false;
 
-	spin_lock_irqsave(&suspend_sys_sync_lock, flags);
-	if (suspend_sys_sync_count == 0)
-		suspend_sys_sync_done = true;
-	spin_unlock_irqrestore(&suspend_sys_sync_lock, flags);
-	
-	if (suspend_sys_sync_done == false) {
+	if (suspend_sys_sync_count != 0) {
 		mod_timer(&suspend_sys_sync_timer, jiffies +
 				SUSPEND_SYS_SYNC_TIMEOUT);
-/* < DTS2011080401640 caomingxing 20110816 begin */
+    /* < DTS2011111900783 hujun 20111119 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
-		printk("HUAWEI suspend: suspend_sys_sync_done false, need to wait\n");
+        printk("HUAWEI suspend: suspend_sys_sync_done false, need to wait\n");
 #endif
-/* DTS2011080401640 caomingxing 20110816 end > */
+    /* DTS2011111900783 hujun 20111119 end > */
 		wait_for_completion(&suspend_sys_sync_comp);
 	}
-/* < DTS2011080401640 caomingxing 20110816 begin */
+    /* < DTS2011111900783 hujun 20111119 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
     else
     {
         printk("HUAWEI suspend: suspend_sys_sync_done\n");
     }
 #endif
-/* DTS2011080401640 caomingxing 20110816 end > */
+    /* DTS2011111900783 hujun 20111119 end > */
 	if (suspend_sys_sync_abort) {
 		pr_info("suspend aborted....while waiting for sys_sync\n");
 		return -EAGAIN;
@@ -396,12 +354,19 @@ int suspend_sys_sync_wait(void)
 
 	return 0;
 }
-/* DTS2011080105670 fangxinyong 20110801 end > */
+
+static void suspend_backoff(void)
+{
+	pr_info("suspend: too many immediate wakeups, back off\n");
+	wake_lock_timeout(&suspend_backoff_lock,
+			  msecs_to_jiffies(SUSPEND_BACKOFF_INTERVAL));
+}
 
 static void suspend(struct work_struct *work)
 {
 	int ret;
 	int entry_event_num;
+	struct timespec ts_entry, ts_exit;
 
 	if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
 		if (debug_mask & DEBUG_SUSPEND)
@@ -413,17 +378,30 @@ static void suspend(struct work_struct *work)
 	suspend_sys_sync_queue();
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("suspend: enter suspend\n");
+	getnstimeofday(&ts_entry);
 	ret = pm_suspend(requested_suspend_state);
+	getnstimeofday(&ts_exit);
+
 	if (debug_mask & DEBUG_EXIT_SUSPEND) {
-		struct timespec ts;
 		struct rtc_time tm;
-		getnstimeofday(&ts);
-		rtc_time_to_tm(ts.tv_sec, &tm);
+		rtc_time_to_tm(ts_exit.tv_sec, &tm);
 		pr_info("suspend: exit suspend, ret = %d "
 			"(%d-%02d-%02d %02d:%02d:%02d.%09lu UTC)\n", ret,
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
+			tm.tm_hour, tm.tm_min, tm.tm_sec, ts_exit.tv_nsec);
 	}
+
+	if (ts_exit.tv_sec - ts_entry.tv_sec <= 1) {
+		++suspend_short_count;
+
+		if (suspend_short_count == SUSPEND_BACKOFF_THRESHOLD) {
+			suspend_backoff();
+			suspend_short_count = 0;
+		}
+	} else {
+		suspend_short_count = 0;
+	}
+
 	if (current_event_num == entry_event_num) {
 		if (debug_mask & DEBUG_SUSPEND)
 			pr_info("suspend: pm_suspend returned with no event\n");
@@ -454,7 +432,7 @@ static int power_suspend_late(struct device *dev)
 {
 	int ret = has_wake_lock(WAKE_LOCK_SUSPEND) ? -EAGAIN : 0;
 #ifdef CONFIG_WAKELOCK_STAT
-	wait_for_wakeup = 1;
+	wait_for_wakeup = !ret;
 #endif
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("power_suspend_late return %d\n", ret);
@@ -690,6 +668,8 @@ static int __init wakelocks_init(void)
 	wake_lock_init(&main_wake_lock, WAKE_LOCK_SUSPEND, "main");
 	wake_lock(&main_wake_lock);
 	wake_lock_init(&unknown_wakeup, WAKE_LOCK_SUSPEND, "unknown_wakeups");
+	wake_lock_init(&suspend_backoff_lock, WAKE_LOCK_SUSPEND,
+		       "suspend_backoff");
 
 	ret = platform_device_register(&power_device);
 	if (ret) {
@@ -722,12 +702,13 @@ static int __init wakelocks_init(void)
 
 	return 0;
 
-err_suspend_sys_sync_work_queue:
 err_suspend_work_queue:
+err_suspend_sys_sync_work_queue:
 	platform_driver_unregister(&power_driver);
 err_platform_driver_register:
 	platform_device_unregister(&power_device);
 err_platform_device_register:
+	wake_lock_destroy(&suspend_backoff_lock);
 	wake_lock_destroy(&unknown_wakeup);
 	wake_lock_destroy(&main_wake_lock);
 #ifdef CONFIG_WAKELOCK_STAT
@@ -745,6 +726,7 @@ static void  __exit wakelocks_exit(void)
 	destroy_workqueue(suspend_sys_sync_work_queue);
 	platform_driver_unregister(&power_driver);
 	platform_device_unregister(&power_device);
+	wake_lock_destroy(&suspend_backoff_lock);
 	wake_lock_destroy(&unknown_wakeup);
 	wake_lock_destroy(&main_wake_lock);
 #ifdef CONFIG_WAKELOCK_STAT

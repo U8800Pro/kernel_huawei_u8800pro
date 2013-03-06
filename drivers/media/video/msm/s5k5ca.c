@@ -1,3 +1,4 @@
+/* <DTS2012041003722 sibingsong 20120410 begin */
 /*<  DTS2011101000840   yuguangcai 20111010 begin */
 
 /*
@@ -30,11 +31,14 @@
 #include "s5k5ca.h"
 #include "linux/hardware_self_adapt.h"
 
+/* < DTS2012010906170 zhouqiwei 20120110 begin */
+#include <asm/mach-types.h>
+/* DTS2012010906170 zhouqiwei 20120110 end > */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
  #include <linux/hw_dev_dec.h>
 #endif
 
-#ifdef CONFIG_HUAWEI_SENSOR_S5K5CA
+#ifdef CONFIG_HUAWEI_CAMERA_SENSOR_S5K5CA
  #undef CDBG
  #define CDBG(fmt, args...) printk(KERN_INFO "s5k5ca.c: " fmt, ## args)
 #endif
@@ -117,29 +121,9 @@ struct s5k5ca_ctrl_t
     unsigned short imgaddr;
 };
 
-typedef enum
-{
-    CAMERA_WB_MIN_MINUS_1,
-    CAMERA_WB_AUTO = 1,/* This list must match aeecamera.h */
-    CAMERA_WB_CUSTOM,
-    CAMERA_WB_INCANDESCENT,
-    CAMERA_WB_FLUORESCENT,
-    CAMERA_WB_DAYLIGHT,
-    CAMERA_WB_CLOUDY_DAYLIGHT,
-    CAMERA_WB_TWILIGHT,
-    CAMERA_WB_SHADE,
-    CAMERA_WB_MAX_PLUS_1
-} config3a_wb_t;
-
-typedef enum
-{
-    CAMERA_ANTIBANDING_OFF,
-    CAMERA_ANTIBANDING_60HZ,
-    CAMERA_ANTIBANDING_50HZ,
-    CAMERA_ANTIBANDING_AUTO,
-    CAMERA_MAX_ANTIBANDING,
-} camera_antibanding_type;
-
+/*< DTS2011111900798 yuguangcai 20111130 begin */
+/*delete antibanding enum*/
+/* DTS2011111900798 yuguangcai 20111130 end > */
 const static char s5k5ca_supported_effect[] = "none,mono,negative,sepia,aqua";
 static bool CSI_CONFIG;
 #define MODEL_TRULY 0
@@ -147,6 +131,7 @@ static bool CSI_CONFIG;
 
 static uint16_t s5k5ca_model_id = MODEL_SUNNY;
 
+static uint8_t s5k5ca_init_flag = false;
 static struct s5k5ca_i2c_reg_conf * p_s5k5ca_init_reg_config;
 static unsigned int reg_num;
 
@@ -326,7 +311,21 @@ int32_t s5k5ca_set_pict_exp_gain(uint16_t gain, uint32_t line)
     /* camera_timed_wait(snapshot_wait*exposure_ratio); */
     return rc;
 }
+/*< DTS2012013103283   songxiaoming 20120201 begin */ 
+/* Mirror from kernel space */ 
+static int32_t s5k5ca_set_mirror_mode(void)
+{
+    int32_t rc = 0;
 
+    if (HW_MIRROR_AND_FLIP == get_hw_camera_mirror_type()) 
+    {
+        rc = s5k5ca_i2c_write_w_table(s5k5ca_regs.s5k5ca_mirror_mode_reg_config,
+                                     s5k5ca_regs.s5k5ca_mirror_mode_reg_config_size);
+    }
+
+    return rc;
+}
+/* DTS2012013103283  songxiaoming 20120201 end > */
 int32_t s5k5ca_setting(enum s5k5ca_reg_update_t rupdate,
                        enum s5k5ca_setting_t    rt)
 {
@@ -373,12 +372,17 @@ int32_t s5k5ca_setting(enum s5k5ca_reg_update_t rupdate,
                                           s5k5ca_regs.s5k5ca_snapshot_reg_config_size);
         }
 
-        mdelay(10);
+        /* < DTS2011122405731 tangying 20111224 begin */
+        //set delay time to 50ms
+        mdelay(50);
+        /* DTS2011122405731 tangying 20111224 end > */
         break;
 
     case REG_INIT:
 
-        CSI_CONFIG = 0;
+        /*< DTS2011121001804 yuguangcai 20111227 begin */
+        /*delete one line*/
+        /* DTS2011121001804 yuguangcai 20111227 end > */
         CDBG("s5k5ca  model is %d : init sensor!\n", s5k5ca_model_id);
 
         /* Write init sensor register */
@@ -388,10 +392,21 @@ int32_t s5k5ca_setting(enum s5k5ca_reg_update_t rupdate,
         mdelay(100);
 
         rc = s5k5ca_i2c_write_w_table(p_s5k5ca_init_reg_config, reg_num);
-
+        /*< DTS2011111201369 yuguangcai 20111112 begin */
+        /*add a 10ms delay between registers writing*/
+        mdelay(10);
+        rc = s5k5ca_i2c_write_w_table(s5k5ca_regs.s5k5ca_init_reg_config_sunny_2,  
+                                s5k5ca_regs.s5k5ca_init_reg_config_sunny_2_size);
+        /* DTS2011111201369 yuguangcai 20111112 end > */
         //           mdelay(100);
         CDBG("s5k5ca model is %d: init sensor done!\n", s5k5ca_model_id);
+		/*< DTS2012013103283   songxiaoming 20120201 begin */
+        if(rc >= 0)
+        {
+            rc = s5k5ca_set_mirror_mode();
+        } 
         break;
+        /* DTS2012013103283  songxiaoming 20120201 end > */
 
     default:
         rc = -EFAULT;
@@ -449,7 +464,9 @@ int32_t s5k5ca_snapshot_config(int mode)
 
     CDBG("s5k5ca_snapshot_config in\n");
     rc = s5k5ca_setting(UPDATE_PERIODIC, RES_CAPTURE);
-    mdelay(50);
+    /*< DTS2011122205086 yuguangcai 20120103 begin */
+    /*delete one line*/
+    /* DTS2011122205086 yuguangcai 20120103 end > */
     if (rc < 0)
     {
         return rc;
@@ -479,16 +496,24 @@ int32_t s5k5ca_move_focus(int direction, int32_t num_steps)
 static int s5k5ca_sensor_init_done(const struct msm_camera_sensor_info *data)
 {
     /* Set the sensor reset when camera is not initialization. */
-    gpio_direction_output(data->sensor_reset, 0);
-    gpio_free(data->sensor_reset);
+    if (false == s5k5ca_init_flag)
+    {
+        gpio_direction_output(data->sensor_reset, 0);
+        gpio_free(data->sensor_reset);
+    }
 
     gpio_direction_output(data->sensor_pwd, 1);
     gpio_free(data->sensor_pwd);
 
-    if (data->vreg_disable_func)
+    if (false == s5k5ca_init_flag)
     {
-        data->vreg_disable_func(data->sensor_vreg, data->vreg_num);
+        /*disable the power*/
+        if (data->vreg_disable_func)
+        {
+            data->vreg_disable_func(0);
+        }
     }
+    /* DTS2012012901317 yuguangcai 20120131 end > */
 
     last_rupdate = -1;
     last_rt = -1;
@@ -500,8 +525,6 @@ static int s5k5ca_probe_init_sensor(const struct msm_camera_sensor_info *data)
     int rc;
     unsigned short chipid;
 
-    CDBG("%s: start ! \n", __func__);
-
     /* pull down power down */
     rc = gpio_request(data->sensor_pwd, "s5k5ca");
     if (!rc || (rc == -EBUSY))
@@ -510,32 +533,29 @@ static int s5k5ca_probe_init_sensor(const struct msm_camera_sensor_info *data)
     }
     else
     {
-        CDBG("%s: sensor_pwd gpio request failed  1\n", __func__);
         goto init_probe_fail;
     }
 
     /* Set the sensor reset when camera is not initialization. */
-    rc = gpio_request(data->sensor_reset, "s5k5ca");
-    if (!rc)
+    if (false == s5k5ca_init_flag)
     {
-        rc = gpio_direction_output(data->sensor_reset, 0);
-    }
-    else
-    {
-        CDBG("%s: sensor_reset gpio request failed  2\n", __func__);
-        goto init_probe_fail;
-    }
-
-    mdelay(20);
-
-    if (data->vreg_enable_func)
-    {
-        rc = data->vreg_enable_func(data->sensor_vreg, data->vreg_num);
-        if (rc < 0)
+        rc = gpio_request(data->sensor_reset, "s5k5ca");
+        if (!rc)
         {
-            CDBG("%s : vreg_enable_func failed! ", __func__);
+            rc = gpio_direction_output(data->sensor_reset, 0);
+        }
+        else
+        {
             goto init_probe_fail;
         }
+        /*< DTS2012012901317 yuguangcai 20120131 begin */
+        mdelay(10);
+        /*enable the power*/
+        if (data->vreg_enable_func)
+        {
+           data->vreg_enable_func(1);
+        } 
+        /* DTS2012012901317 yuguangcai 20120131 end > */
     }
 
     mdelay(20);
@@ -544,7 +564,6 @@ static int s5k5ca_probe_init_sensor(const struct msm_camera_sensor_info *data)
         rc = gpio_direction_output(data->sensor_pwd, 0);
         if (rc < 0)
         {
-            CDBG("%s: sensor_pwd gpio output failed   3\n", __func__);
             goto init_probe_fail;
         }
 
@@ -552,129 +571,145 @@ static int s5k5ca_probe_init_sensor(const struct msm_camera_sensor_info *data)
 
         /*hardware reset*/
         /* Set the sensor reset when camera is not initialization. */
-        rc = gpio_direction_output(data->sensor_reset, 1);
-        if (rc < 0)
+        if (false == s5k5ca_init_flag)
         {
-            CDBG("%s: sensor_reset gpio request failed  4\n", __func__);
-            goto init_probe_fail;
+            rc = gpio_direction_output(data->sensor_reset, 1);
+            if (rc < 0)
+            {
+                goto init_probe_fail;
+            }
         }
 
         mdelay(20);
     }
 
     /* Set the soft reset to reset the chip and read the chip ID when camera is not initialization. */
-    rc = s5k5ca_i2c_write_w(0x0010, 0x0001);
-    if (rc < 0)
+    if (false == s5k5ca_init_flag)
     {
-        CDBG("s5k5ca_i2c_write_w 0x0010 0x0001 rc=%d", rc);
-        goto init_probe_fail;
-    }
-
-    mdelay(10);
-
-    rc = s5k5ca_i2c_write_w(0x0010, 0x0000);
-    if (rc < 0)
-    {
-        CDBG("s5k5ca_i2c_write_w 0x0010 0x0000 rc=%d", rc);
-        goto init_probe_fail;
-    }
-
-    mdelay(10);
-
-    rc = s5k5ca_i2c_write_w(0x002c, 0x0000);
-    if (rc < 0)
-    {
-        CDBG("s5k5ca_i2c_write_w 0x002c 0x0000 rc=%d", rc);
-        goto init_probe_fail;
-    }
-
-    rc = s5k5ca_i2c_write_w(0x002e, 0x0040);
-    if (rc < 0)
-    {
-        CDBG("s5k5ca_i2c_write_w 0x002e 0x0040 rc=%d", rc);
-        goto init_probe_fail;
-    }
-
-    /* 3. Read sensor Model ID: */
-    rc = s5k5ca_i2c_read_w(0x0f12, &chipid);
-    if (rc < 0)
-    {
-        CDBG("s5k5ca_i2c_read_w Model_ID failed!! rc=%d", rc);
-        goto init_probe_fail;
-    }
-
-    CDBG("s5k5ca chipid = 0x%x\n", chipid);
-
-    /* 4. Compare sensor ID to S5K5CA ID: */
-    if (chipid != S5K5CA_CHIP_ID)
-    {
-        CDBG("s5k5ca Model_ID error!!");
-        rc = -ENODEV;
-        goto init_probe_fail;
-    }
-
-    {
-        /* Change the method of reading model id to fit socket and FPC packing models
-         * Socket model : 0--3
-         * FPC model : 8--11
-         */
-        rc = s5k5ca_i2c_write_w(0xFCFC, 0xD000);
+        rc = s5k5ca_i2c_write_w(0x0010, 0x0001);
         if (rc < 0)
         {
+            CDBG("s5k5ca_i2c_write_w 0x0010 0x0001 rc=%d", rc);
             goto init_probe_fail;
         }
 
-        rc = s5k5ca_i2c_write_w(0x108E, 0x3333);
+        mdelay(10);
+
+        rc = s5k5ca_i2c_write_w(0x0010, 0x0000);
         if (rc < 0)
         {
+            CDBG("s5k5ca_i2c_write_w 0x0010 0x0000 rc=%d", rc);
             goto init_probe_fail;
         }
 
-        mdelay(2);
+        mdelay(10);
 
-        rc = s5k5ca_i2c_write_w(0x1090, 0x8888);
+        rc = s5k5ca_i2c_write_w(0x002c, 0x0000);
         if (rc < 0)
         {
+            CDBG("s5k5ca_i2c_write_w 0x002c 0x0000 rc=%d", rc);
             goto init_probe_fail;
         }
 
-        rc = s5k5ca_i2c_read_w(0x100C, &s5k5ca_model_id);
+        rc = s5k5ca_i2c_write_w(0x002e, 0x0040);
         if (rc < 0)
         {
-            CDBG("s5k5ca_i2c_read_w 0x002e rc=%d", rc);
-        }
-
-        CDBG("s5k5ca model = 0x%x\n", s5k5ca_model_id);
-
-        /* If ID out of range ,set model_id MODEL_TRULY_FPC as default */
-        if (s5k5ca_model_id > MODEL_SUNNY)
-        {
-            s5k5ca_model_id = MODEL_SUNNY;
-        }
-
-        rc = s5k5ca_i2c_write_w(0x108E, 0x0000);
-        if (rc < 0)
-        {
+            CDBG("s5k5ca_i2c_write_w 0x002e 0x0040 rc=%d", rc);
             goto init_probe_fail;
         }
 
-        switch (s5k5ca_model_id)
+        /* 3. Read sensor Model ID: */
+        rc = s5k5ca_i2c_read_w(0x0f12, &chipid);
+        if (rc < 0)
         {
-        case MODEL_TRULY:
-
-        case MODEL_SUNNY:
-            p_s5k5ca_init_reg_config = (struct s5k5ca_i2c_reg_conf *)(s5k5ca_regs.s5k5ca_init_reg_config_sunny);
-            reg_num = s5k5ca_regs.s5k5ca_init_reg_config_sunny_size;
-            CDBG("s5k5ca probe is  MODEL_SUNNY.");
-            break;
-
-        default:
+            CDBG("s5k5ca_i2c_read_w Model_ID failed!! rc=%d", rc);
             goto init_probe_fail;
-            CDBG("s5k5ca is no this sensor model.\n");
-            break;
         }
+
+        CDBG("s5k5ca chipid = 0x%x\n", chipid);
+
+        /* 4. Compare sensor ID to S5K5CA ID: */
+        if (chipid != S5K5CA_CHIP_ID)
+        {
+            CDBG("s5k5ca Model_ID error!!");
+            rc = -ENODEV;
+            goto init_probe_fail;
+        }
+
+        {
+            /* Change the method of reading model id to fit socket and FPC packing models
+             * Socket model : 0--3
+             * FPC model : 8--11
+             */
+            rc = s5k5ca_i2c_write_w(0xFCFC, 0xD000);
+            if (rc < 0)
+            {
+                goto init_probe_fail;
+            }
+
+            rc = s5k5ca_i2c_write_w(0x108E, 0x3333);
+            if (rc < 0)
+            {
+                goto init_probe_fail;
+            }
+
+            mdelay(2);
+
+            rc = s5k5ca_i2c_write_w(0x1090, 0x8888);
+            if (rc < 0)
+            {
+                goto init_probe_fail;
+            }
+
+            rc = s5k5ca_i2c_read_w(0x100C, &s5k5ca_model_id);
+            if (rc < 0)
+            {
+                CDBG("s5k5ca_i2c_read_w 0x002e rc=%d", rc);
+            }
+
+            CDBG("s5k5ca model = 0x%x\n", s5k5ca_model_id);
+
+            /* If ID out of range ,set model_id MODEL_TRULY_FPC as default */
+            if (s5k5ca_model_id > MODEL_SUNNY)
+            {
+                s5k5ca_model_id = MODEL_SUNNY;
+            }
+
+            rc = s5k5ca_i2c_write_w(0x108E, 0x0000);
+            if (rc < 0)
+            {
+                goto init_probe_fail;
+            }
+
+            switch (s5k5ca_model_id)
+            {
+            case MODEL_TRULY:
+            case MODEL_SUNNY:
+                /*< DTS2012020307372 cuixuefeng 20120326 begin */
+                /*if  machine is msm7x27a_M660,set s5k5ca_init_reg_config_sunny_M660,else s5k5ca_init_reg_config_sunny */
+                if(machine_is_msm7x27a_M660())
+                {
+                    p_s5k5ca_init_reg_config = (struct s5k5ca_i2c_reg_conf *)(s5k5ca_regs.s5k5ca_init_reg_config_sunny_M660);
+                    reg_num = s5k5ca_regs.s5k5ca_init_reg_config_sunny_M660_size;
+                }
+                else
+                {
+                    p_s5k5ca_init_reg_config = (struct s5k5ca_i2c_reg_conf *)(s5k5ca_regs.s5k5ca_init_reg_config_sunny);
+                    reg_num = s5k5ca_regs.s5k5ca_init_reg_config_sunny_size;
+                }
+                /* DTS2012020307372 cuixuefeng 20120326 end > */
+                //              strncpy((char *)data->sensor_name, "23060043SF-SAM-S", strlen("23060043SF-SAM-S"));
+                CDBG("s5k5ca probe is  MODEL_SUNNY.");
+                break;
+
+            default:
+                goto init_probe_fail;
+                CDBG("s5k5ca is no this sensor model.\n");
+                break;
+            }
+        }
+        CDBG("sensor name is %s.", data->sensor_name);
     }
-    CDBG("sensor name is %s.", data->sensor_name);
 
     goto init_probe_done;
 
@@ -720,7 +755,10 @@ int s5k5ca_sensor_open_init(const struct msm_camera_sensor_info *data)
     }
     else
     {
-        rc = s5k5ca_setting(REG_INIT, RES_PREVIEW);
+        /*< DTS2011121001804 yuguangcai 20111227 begin */
+        /*delete one line*/
+        CSI_CONFIG = 0;
+        /* DTS2011121001804 yuguangcai 20111227 end > */
         CDBG("s5k5ca init succeed!!!!! rc = %d \n", rc);
         goto init_done;
     }
@@ -810,20 +848,9 @@ static long s5k5ca_set_effect(int mode, int effect)
         num_of_items_in_table = s5k5ca_regs.s5k5ca_effect_posterize_reg_config_size;
         break;
 
-    case CAMERA_EFFECT_WHITEBOARD:
-        reg_conf_tbl = s5k5ca_regs.s5k5ca_effect_whiteboard_reg_config;
-        num_of_items_in_table = s5k5ca_regs.s5k5ca_effect_whiteboard_reg_config_size;
-        break;
-
-    case CAMERA_EFFECT_BLACKBOARD:
-        reg_conf_tbl = s5k5ca_regs.s5k5ca_effect_blackboard_reg_config;
-        num_of_items_in_table = s5k5ca_regs.s5k5ca_effect_blackboard_reg_config_size;
-        break;
-
     default:
         return 0;
     }
-
     rc = s5k5ca_i2c_write_w_table(reg_conf_tbl, num_of_items_in_table);
     return rc;
 }
@@ -842,16 +869,26 @@ static long s5k5ca_set_wb(int wb)
         num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_auto_reg_config_size;
         break;
 
+    case CAMERA_WB_INCANDESCENT:
+        /*< DTS2012020307372 cuixuefeng 20120326 begin */	
+        /*if  machine is msm7x27a_M660,set s5k5ca_wb_a_reg_config_sunny_M660,else s5k5ca_wb_a_reg_config */
+        if(machine_is_msm7x27a_M660())
+        {
+            reg_conf_tbl = s5k5ca_regs.s5k5ca_wb_a_reg_config_sunny_M660;
+            num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_a_reg_config_sunny_M660_size;
+        }
+        else
+        {
+            reg_conf_tbl = s5k5ca_regs.s5k5ca_wb_a_reg_config;
+            num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_a_reg_config_size;
+        }
+        /* DTS2012020307372 cuixuefeng 20120326 end > */
+        break;
+
     case CAMERA_WB_CUSTOM:
         reg_conf_tbl = s5k5ca_regs.s5k5ca_wb_f_reg_config;
         num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_f_reg_config_size;
         break;
-
-    case CAMERA_WB_INCANDESCENT:
-        reg_conf_tbl = s5k5ca_regs.s5k5ca_wb_a_reg_config;
-        num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_a_reg_config_size;
-        break;
-
     case CAMERA_WB_FLUORESCENT:
         reg_conf_tbl = s5k5ca_regs.s5k5ca_wb_tl84_reg_config;
         num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_tl84_reg_config_size;
@@ -878,46 +915,15 @@ static long s5k5ca_set_wb(int wb)
     default:
         return 0;
     }
-
+    /*< DTS2011111900798 yuguangcai 20111130 begin */
     rc = s5k5ca_i2c_write_w_table(reg_conf_tbl, num_of_items_in_table);
+    /* DTS2011111900798 yuguangcai 20111130 end > */
+
     return rc;
 }
-
-static long s5k5ca_set_antibanding(int antibanding)
-{
-    struct s5k5ca_i2c_reg_conf const *reg_conf_tbl = NULL;
-    int num_of_items_in_table = 0;
-    long rc = 0;
-
-    /*FF*/
-    CDBG("s5k5ca_set_antibanding FF antibanding:%d", antibanding);
-    switch (antibanding)
-    {
-    case CAMERA_ANTIBANDING_OFF:
-        reg_conf_tbl = s5k5ca_regs.s5k5ca_antibanding_off_reg_config;
-        num_of_items_in_table = s5k5ca_regs.s5k5ca_antibanding_off_reg_config_size;
-        break;
-
-    case CAMERA_ANTIBANDING_60HZ:
-        reg_conf_tbl = s5k5ca_regs.s5k5ca_antibanding_60hz_reg_config;
-        num_of_items_in_table = s5k5ca_regs.s5k5ca_antibanding_60hz_reg_config_size;
-        break;
-
-    case CAMERA_ANTIBANDING_50HZ:
-        reg_conf_tbl = s5k5ca_regs.s5k5ca_antibanding_50hz_reg_config;
-        num_of_items_in_table = s5k5ca_regs.s5k5ca_antibanding_50hz_reg_config_size;
-        break;
-
-    default:
-        return 0;
-    }
-
-    reg_conf_tbl = s5k5ca_regs.s5k5ca_antibanding_auto_reg_config;
-    num_of_items_in_table = s5k5ca_regs.s5k5ca_antibanding_auto_reg_config_size;
-
-    rc = s5k5ca_i2c_write_w_table(reg_conf_tbl, num_of_items_in_table);
-    return rc;
-}
+/*< DTS2011111900798 yuguangcai 20111130 begin */
+/*delete some lines*/
+/* DTS2011111900798 yuguangcai 20111130 end > */
 
 int s5k5ca_sensor_config(void __user *argp)
 {
@@ -1003,7 +1009,9 @@ int s5k5ca_sensor_config(void __user *argp)
         break;
 
     case CFG_SET_ANTIBANDING:
-        rc = s5k5ca_set_antibanding(cdata.cfg.effect);
+        /*< DTS2011111900798 yuguangcai 20111130 begin */
+        /*delete antibanding handling*/
+        /* DTS2011111900798 yuguangcai 20111130 end > */
         break;
 
     case CFG_MAX:
@@ -1115,8 +1123,26 @@ static int s5k5ca_sensor_probe(const struct msm_camera_sensor_info *info,
     }
     else
     {
+        /* < DTS2012031904303 zhouqiwei 20130319 begin */
+        strncpy((char *)info->sensor_name, "23060073FF-SAM-S", strlen("23060073FF-SAM-S"));
+        /* DTS2012031904303 zhouqiwei 20130319 end > */
         CDBG("s5k5ca probe succeed!!!!\n");
     }
+    /*initialize the registers to save the time of open camera*/
+    rc = s5k5ca_setting(REG_INIT, RES_PREVIEW);
+    if (rc < 0) 
+    {
+        CDBG("s5k5ca init sensor failed!!!!\n");
+        i2c_del_driver(&s5k5ca_i2c_driver);
+        goto probe_done;
+    }
+    else
+    {
+        /*we use the variable to sign reset should't be set any more*/
+        s5k5ca_init_flag = true;
+        CDBG("s5k5ca init sensor succeed!!!!\n");
+    }
+    /* DTS2011121001804 yuguangcai 20111227 end > */
 
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
     /* detect current device successful, set the flag as present */
@@ -1126,7 +1152,11 @@ static int s5k5ca_sensor_probe(const struct msm_camera_sensor_info *info,
     s->s_init = s5k5ca_sensor_open_init;
     s->s_release = s5k5ca_sensor_release;
     s->s_config = s5k5ca_sensor_config;
+#ifdef CONFIG_ARCH_MSM7X27A
+    s->s_mount_angle = info->sensor_platform_info->mount_angle;
+#else
     s->s_mount_angle = 0;
+#endif
     s5k5ca_sensor_init_done(info);
 
     /* For go to sleep mode, follow the datasheet */
@@ -1158,4 +1188,6 @@ static int __init s5k5ca_init(void)
 
 module_init(s5k5ca_init);
 
-/* DTS2011101000840   yuguangcai 20111010 end > */
+
+/* DTS2011101000840   yuguangcai 20111010 end > */
+/* DTS2012041003722 sibingsong 20120410 end> */

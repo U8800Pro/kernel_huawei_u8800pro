@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (C) 2008 HTC Corporation
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009, 2011 Code Aurora Forum. All rights reserved.
  *
  * All source code in this file is licensed under the following license except
  * where indicated.
@@ -24,6 +24,9 @@
  * along with this program; if not, you can find it at http://www.fsf.org
  */
 
+#include <asm/atomic.h>
+#include <asm/ioctls.h>
+
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -37,18 +40,22 @@
 #include <linux/earlysuspend.h>
 #include <linux/android_pmem.h>
 #include <linux/slab.h>
-#include <asm/atomic.h>
-#include <asm/ioctls.h>
-#include <mach/msm_adsp.h>
 #include <linux/msm_audio.h>
-#include "audmgr.h"
+#include <linux/memory_alloc.h>
 
+#include <mach/msm_adsp.h>
+#include <mach/iommu.h>
+#include <mach/iommu_domains.h>
+#include <mach/msm_subsystem_map.h>
 #include <mach/qdsp5/qdsp5audppcmdi.h>
 #include <mach/qdsp5/qdsp5audppmsg.h>
 #include <mach/qdsp5/qdsp5audplaycmdi.h>
 #include <mach/qdsp5/qdsp5audplaymsg.h>
 #include <mach/qdsp5/qdsp5rmtcmdi.h>
 #include <mach/debug_mm.h>
+#include <mach/msm_memtypes.h>
+
+#include "audmgr.h"
 
 #define BUFSZ 4110 /* Hold minimum 700ms voice data and 14 bytes of meta in*/
 #define DMASZ (BUFSZ * 2)
@@ -132,7 +139,8 @@ struct audio {
 	/* data allocated for various buffers */
 	char *data;
 	int32_t phys; /* physical address of write buffer */
-
+	struct msm_mapped_buffer *map_v_read;
+	struct msm_mapped_buffer *map_v_write;
 	int mfield; /* meta field embedded in data */
 	int rflush; /* Read  flush */
 	int wflush; /* Write flush */
@@ -182,8 +190,10 @@ static void audamrwb_send_data(struct audio *audio, unsigned needed);
 static void audamrwb_config_hostpcm(struct audio *audio);
 static void audamrwb_buffer_refresh(struct audio *audio);
 static void audamrwb_dsp_event(void *private, unsigned id, uint16_t *msg);
+#ifdef CONFIG_HAS_EARLYSUSPEND
 static void audamrwb_post_event(struct audio *audio, int type,
 		union msm_audio_event_payload payload);
+#endif
 
 static int rmt_put_resource(struct audio *audio)
 {
@@ -950,25 +960,29 @@ static long audamrwb_ioctl(struct file *file, unsigned int cmd,
 		if ((config.pcm_feedback) && (!audio->read_data)) {
 			MM_DBG("allocate PCM buf %d\n", config.buffer_count *
 					config.buffer_size);
-			audio->read_phys = pmem_kalloc(
+			audio->read_phys = allocate_contiguous_ebi_nomap(
 						config.buffer_size *
 						config.buffer_count,
-						PMEM_MEMTYPE_EBI1|
-						PMEM_ALIGNMENT_4K);
-			if (IS_ERR((void *)audio->read_phys)) {
+						SZ_4K);
+			if (!audio->read_phys) {
 					rc = -ENOMEM;
 					break;
 			}
-			audio->read_data = ioremap(audio->read_phys,
-							config.buffer_size *
-							config.buffer_count);
-			if (!audio->read_data) {
-				MM_ERR("no mem for read buf\n");
+			audio->map_v_read = msm_subsystem_map_buffer(
+						audio->read_phys,
+						config.buffer_size *
+						config.buffer_count,
+						MSM_SUBSYSTEM_MAP_KADDR,
+						NULL, 0);
+			if (IS_ERR(audio->map_v_read)) {
+				MM_ERR("failed to map mem for read buf\n");
 				rc = -ENOMEM;
-				pmem_kfree(audio->read_phys);
+				free_contiguous_memory_by_paddr(
+							audio->read_phys);
 			} else {
 				uint8_t index;
 				uint32_t offset = 0;
+				audio->read_data = audio->map_v_read->vaddr;
 				audio->pcm_feedback = 1;
 				audio->buf_refresh = 0;
 				audio->pcm_buf_count =
@@ -1345,11 +1359,11 @@ static int audamrwb_release(struct inode *inode, struct file *file)
 	audio->event_abort = 1;
 	wake_up(&audio->event_wait);
 	audamrwb_reset_event_queue(audio);
-	iounmap(audio->data);
-	pmem_kfree(audio->phys);
+	msm_subsystem_unmap_buffer(audio->map_v_write);
+	free_contiguous_memory_by_paddr(audio->phys);
 	if (audio->read_data) {
-		iounmap(audio->read_data);
-		pmem_kfree(audio->read_phys);
+		msm_subsystem_unmap_buffer(audio->map_v_read);
+		free_contiguous_memory_by_paddr(audio->read_phys);
 	}
 	mutex_unlock(&audio->lock);
 #ifdef CONFIG_DEBUG_FS
@@ -1360,6 +1374,7 @@ static int audamrwb_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
 static void audamrwb_post_event(struct audio *audio, int type,
 		union msm_audio_event_payload payload)
 {
@@ -1376,6 +1391,7 @@ static void audamrwb_post_event(struct audio *audio, int type,
 		e_node = kmalloc(sizeof(struct audamrwb_event), GFP_ATOMIC);
 		if (!e_node) {
 			MM_ERR("No mem to post event %d\n", type);
+			spin_unlock_irqrestore(&audio->event_queue_lock, flags);
 			return;
 		}
 	}
@@ -1388,7 +1404,6 @@ static void audamrwb_post_event(struct audio *audio, int type,
 	wake_up(&audio->event_wait);
 }
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
 static void audamrwb_suspend(struct early_suspend *h)
 {
 	struct audamrwb_suspend_ctl *ctl =
@@ -1526,8 +1541,8 @@ static int audamrwb_open(struct inode *inode, struct file *file)
 
 	audio->dec_id = decid & MSM_AUD_DECODER_MASK;
 
-	audio->phys = pmem_kalloc(DMASZ, PMEM_MEMTYPE_EBI1|PMEM_ALIGNMENT_4K);
-	if (IS_ERR((void *)audio->phys)) {
+	audio->phys = allocate_contiguous_ebi_nomap(DMASZ, SZ_4K);
+	if (!audio->phys) {
 		MM_ERR("could not allocate write buffers, freeing instance \
 				0x%08x\n", (int)audio);
 		rc = -ENOMEM;
@@ -1535,16 +1550,21 @@ static int audamrwb_open(struct inode *inode, struct file *file)
 		kfree(audio);
 		goto done;
 	} else {
-		audio->data = ioremap(audio->phys, DMASZ);
-		if (!audio->data) {
-			MM_ERR("could not allocate write buffers, freeing \
+		audio->map_v_write = msm_subsystem_map_buffer(
+						audio->phys, DMASZ,
+						MSM_SUBSYSTEM_MAP_KADDR,
+						NULL, 0);
+
+		if (IS_ERR(audio->map_v_write)) {
+			MM_ERR("could not map write buffers, freeing \
 					instance 0x%08x\n", (int)audio);
 			rc = -ENOMEM;
-			pmem_kfree(audio->phys);
+			free_contiguous_memory_by_paddr(audio->phys);
 			audpp_adec_free(audio->dec_id);
 			kfree(audio);
 			goto done;
 		}
+		audio->data = audio->map_v_write->vaddr;
 		MM_DBG("write buf: phy addr 0x%08x kernel addr 0x%08x\n",
 				audio->phys, (int)audio->data);
 	}
@@ -1637,8 +1657,8 @@ static int audamrwb_open(struct inode *inode, struct file *file)
 done:
 	return rc;
 err:
-	iounmap(audio->data);
-	pmem_kfree(audio->phys);
+	msm_subsystem_unmap_buffer(audio->map_v_write);
+	free_contiguous_memory_by_paddr(audio->phys);
 	audpp_adec_free(audio->dec_id);
 	kfree(audio);
 	return rc;

@@ -363,9 +363,9 @@ static int32_t mt9e013_write_exp_gain(uint16_t gain, uint32_t line)
 	int32_t rc = 0;
 	if (gain > max_legal_gain) {
 		CDBG("Max legal gain Line:%d\n", __LINE__);
-        /*< DTS2011083103778   yuguangcai 20110831 begin */
-		//gain = max_legal_gain;
-        /* DTS2011083103778   yuguangcai 20110831 end > */
+		/* < DTS2012033107371 wangqing 20120413 begin */
+		gain = max_legal_gain;
+		/* DTS2012033107371 wangqing 20120413 end > */
 	}
 
 	if (mt9e013_ctrl->sensormode == SENSOR_PREVIEW_MODE) {
@@ -380,9 +380,9 @@ static int32_t mt9e013_write_exp_gain(uint16_t gain, uint32_t line)
 		/* DTS2011073001656   songxiaoming 20110730 end > */
 	}
 
-    /*< DTS2011083103778   yuguangcai 20110831 begin */
-	//gain |= 0x1000;
-    /* DTS2011083103778   yuguangcai 20110831 end > */
+	/* < DTS2012033107371 wangqing 20120413 begin */
+	gain |= 0x1000;
+	/* DTS2012033107371 wangqing 20120413 end > */
 
 	mt9e013_group_hold_on();
 	rc = mt9e013_i2c_write_w_sensor(REG_GLOBAL_GAIN, gain);
@@ -910,7 +910,9 @@ static int32_t mt9e013_power_down(void)
 	/*<DTS2011042704563 penghai 20110427 begin*/
 	if (mt9e013_ctrl->sensordata->vreg_disable_func)
     {
-        mt9e013_ctrl->sensordata->vreg_disable_func(mt9e013_ctrl->sensordata->sensor_vreg, mt9e013_ctrl->sensordata->vreg_num);
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        mt9e013_ctrl->sensordata->vreg_disable_func(0);
+        /* DTS2012020400396 zhangyu 20120206 end > */
     }
 	/*DTS2011042704563 penghai 20110427 end>*/
 	return 0;
@@ -922,9 +924,11 @@ static int mt9e013_probe_init_done(const struct msm_camera_sensor_info *data)
 	gpio_free(data->sensor_reset);
 	/*<DTS2011042704563 penghai 20110427 begin*/
 	if (data->vreg_disable_func)
-    {
-        data->vreg_disable_func(data->sensor_vreg, data->vreg_num);
-    }
+	{
+		/*< DTS2012020400396 zhangyu 20120206 begin */
+		data->vreg_disable_func(0);
+		/* DTS2012020400396 zhangyu 20120206 end > */
+	}
 	/*DTS2011042704563 penghai 20110427 end>*/
 	return 0;
 }
@@ -938,11 +942,9 @@ static int mt9e013_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	/*<DTS2011042704563 penghai 20110427 begin*/
     if (data->vreg_enable_func)
     {
-        rc = data->vreg_enable_func(data->sensor_vreg, data->vreg_num);
-        if (0 != rc)
-        {
-            CDBG(" mt9e013_probe_init_sensor : vreg_enable_func  failed!! \n");
-        }
+		/*< DTS2012020400396 zhangyu 20120206 begin */
+		data->vreg_enable_func(1);
+		/* DTS2012020400396 zhangyu 20120206 end > */
     }
 	/*DTS2011042704563 penghai 20110427 end>*/
 
@@ -1314,6 +1316,12 @@ static int mt9e013_sensor_probe(const struct msm_camera_sensor_info *info,
 	else
 	{
 		CDBG("mt9e013 probe succeed!\n");
+        /* <DTS2012041003722 sibingsong 20120410 begin */
+		/* < DTS2012031904303 zhouqiwei 20130319 begin */
+		/* camera name for project menu to display */
+		strncpy((char *)info->sensor_name, "23060068FA-MT-L", strlen("23060068FA-MT-L"));
+		/* DTS2012031904303 zhouqiwei 20130319 end > */
+        /* DTS2012041003722 sibingsong 20120410 end> */
 	}
 	/* <  DTS2011070401622 lijuan 20110703 begin */
 	mt9e013_OTP_reading();

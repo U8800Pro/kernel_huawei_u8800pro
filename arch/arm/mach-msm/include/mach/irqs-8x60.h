@@ -1,28 +1,13 @@
-/* Copyright (c) 2010 Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011 Code Aurora Forum. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Code Aurora nor
- *       the names of its contributors may be used to endorse or promote
- *       products derived from this software without specific prior written
- *       permission.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
  */
 
@@ -58,19 +43,19 @@
 #define SC_SICL2IRPTREQ				(GIC_SPI_START + 1)
 #define SC_SICL2PERFMONIRPTREQ			(GIC_SPI_START + 2)
 #define NC					(GIC_SPI_START + 3)
-#define TLMM_SCSS_DIR_CONN_IRQ_0		(GIC_SPI_START + 4)
-#define TLMM_SCSS_DIR_CONN_IRQ_1		(GIC_SPI_START + 5)
-#define TLMM_SCSS_DIR_CONN_IRQ_2		(GIC_SPI_START + 6)
-#define TLMM_SCSS_DIR_CONN_IRQ_3		(GIC_SPI_START + 7)
-#define TLMM_SCSS_DIR_CONN_IRQ_4		(GIC_SPI_START + 8)
-#define TLMM_SCSS_DIR_CONN_IRQ_5		(GIC_SPI_START + 9)
-#define TLMM_SCSS_DIR_CONN_IRQ_6		(GIC_SPI_START + 10)
-#define TLMM_SCSS_DIR_CONN_IRQ_7		(GIC_SPI_START + 11)
-#define TLMM_SCSS_DIR_CONN_IRQ_8		(GIC_SPI_START + 12)
-#define TLMM_SCSS_DIR_CONN_IRQ_9		(GIC_SPI_START + 13)
+#define TLMM_MSM_DIR_CONN_IRQ_0			(GIC_SPI_START + 4)
+#define TLMM_MSM_DIR_CONN_IRQ_1			(GIC_SPI_START + 5)
+#define TLMM_MSM_DIR_CONN_IRQ_2			(GIC_SPI_START + 6)
+#define TLMM_MSM_DIR_CONN_IRQ_3			(GIC_SPI_START + 7)
+#define TLMM_MSM_DIR_CONN_IRQ_4			(GIC_SPI_START + 8)
+#define TLMM_MSM_DIR_CONN_IRQ_5			(GIC_SPI_START + 9)
+#define TLMM_MSM_DIR_CONN_IRQ_6			(GIC_SPI_START + 10)
+#define TLMM_MSM_DIR_CONN_IRQ_7			(GIC_SPI_START + 11)
+#define TLMM_MSM_DIR_CONN_IRQ_8			(GIC_SPI_START + 12)
+#define TLMM_MSM_DIR_CONN_IRQ_9			(GIC_SPI_START + 13)
 #define PM8058_SEC_IRQ_N			(GIC_SPI_START + 14)
 #define PM8901_SEC_IRQ_N			(GIC_SPI_START + 15)
-#define TLMM_SCSS_SUMMARY_IRQ			(GIC_SPI_START + 16)
+#define TLMM_MSM_SUMMARY_IRQ			(GIC_SPI_START + 16)
 #define SPDM_RT_1_IRQ				(GIC_SPI_START + 17)
 #define SPDM_DIAG_IRQ				(GIC_SPI_START + 18)
 #define RPM_SCSS_CPU0_GP_HIGH_IRQ		(GIC_SPI_START + 19)
@@ -264,13 +249,13 @@
 #define SMPSS_SPARE_6				(GIC_SPI_START + 222)
 #define SMPSS_SPARE_7				(GIC_SPI_START + 223)
 
-#define NR_TLMM_SCSS_DIR_CONN_IRQ 10
+#define NR_TLMM_MSM_DIR_CONN_IRQ 10
 #define NR_GPIO_IRQS 173
 #define NR_MSM_GPIOS NR_GPIO_IRQS
 #define NR_MSM_IRQS 256
 #define NR_PMIC8058_IRQS 256
 #define NR_PMIC8901_IRQS 72
-#define NR_GPIO_EXPANDER_IRQS 82
+#define NR_GPIO_EXPANDER_IRQS 98
 #define NR_BOARD_IRQS (NR_PMIC8058_IRQS + NR_PMIC8901_IRQS +\
 		NR_GPIO_EXPANDER_IRQS)
 

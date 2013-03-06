@@ -10,9 +10,9 @@
  */
 #ifndef HW_BACKLIGHT_H
 #define HW_BACKLIGHT_H
+#define LCD_MIN_BACKLIGHT_LEVEL 0
+#define LCD_MAX_BACKLIGHT_LEVEL	255
 void pwm_set_backlight (struct msm_fb_data_type * mfd);
-/*< DTS2011070504600  sunhonghui 20110706 begin*/
-void lcd_backlight_set(struct msm_fb_data_type * mfd);
-/* DTS2011070504600  sunhonhui 20110706 end>*/
+
 #endif
 /* DTS2010120703279 lijianzhao 20101207 end >*/

@@ -40,4 +40,12 @@ config HUAWEI_FEATURE_SENSORS_AK8975
 	  If you say yes here you get support for Asahi Kasei's 
 	  orientation sensor AK8975.
 #/* DTS2011042703449  liujinggang 20110427 end > */
+#/*< DTS2012020706029 liuyuntao 20120207 begin */
+config QWERTY_KEYPAD_ADP5587
+	tristate "Qwerty Keypad Controller Driver"
+	depends on HUAWEI_KERNEL
+	default n
+	help
+	 Driver for Qwerty Keypad Controller Driver.
+#/*DTS2012020706029 liuyuntao 20120207 end> */
 endmenu

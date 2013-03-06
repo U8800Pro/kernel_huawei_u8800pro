@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- *
  */
 #include <linux/platform_device.h>
 #include <linux/debugfs.h>
@@ -32,10 +27,6 @@
 #include <mach/qdsp5v2/mi2s.h>
 #include <mach/qdsp5v2/audio_acdb_def.h>
 
-/*< DTS2011110705477 yinzhaoyang 20111110 begin */
-#include <asm-arm/huawei/smem_vendor_huawei.h>
-#include "../smd_private.h"
-/* DTS2011110705477 yinzhaoyang 20111110 end > */
 /* define the value for BT_SCO */
 #define BT_SCO_PCM_CTL_VAL (PCM_CTL__RPCM_WIDTH__LINEAR_V |\
 				PCM_CTL__TPCM_WIDTH__LINEAR_V)
@@ -203,7 +194,7 @@ static struct adie_codec_dev_profile iearpiece_profile_u8800_51 = {
 	.settings = iearpiece_settings_u8800_51,
 	.setting_sz = ARRAY_SIZE(iearpiece_settings_u8800_51),
 };
-
+/*< DTS2012072504870 caiying 20120725 begin */
 static struct snddev_icodec_data snddev_iearpiece_data_u8800_51 = {
 	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
 	.name = "handset_rx",
@@ -217,65 +208,18 @@ static struct snddev_icodec_data snddev_iearpiece_data_u8800_51 = {
 	.pamp_on = NULL,
 	.pamp_off = NULL,
 	.property = SIDE_TONE_MASK,
-	.max_voice_rx_vol[VOC_NB_INDEX] = -200,
-	.min_voice_rx_vol[VOC_NB_INDEX] = -1700,
-	.max_voice_rx_vol[VOC_WB_INDEX] = -200,
-	.min_voice_rx_vol[VOC_WB_INDEX] = -1700
+	.max_voice_rx_vol[VOC_NB_INDEX] = 800,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -700,
+	.max_voice_rx_vol[VOC_WB_INDEX] = 800,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -700
 };
-
+/* DTS2012072504870 caiying 20120725 end >*/
 static struct platform_device msm_iearpiece_device_u8800_51 = {
 	.name = "snddev_icodec",
 	.id = 0,
 	.dev = { .platform_data = &snddev_iearpiece_data_u8800_51 },
 };
 /* U8800-51 device end >*/
-
-/*< DTS2011102903430 dongchen 20111029 begin */
-/*< U8800-pro device begin */
-static struct adie_codec_action_unit iearpiece_48KHz_osr256_actions_u8800_pro[] =
-	HANDSET_RX_48000_OSR_256_U8800_PRO;
-
-static struct adie_codec_hwsetting_entry iearpiece_settings_u8800_pro[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = iearpiece_48KHz_osr256_actions_u8800_pro,
-		.action_sz = ARRAY_SIZE(iearpiece_48KHz_osr256_actions_u8800_pro),
-	}
-};
-
-static struct adie_codec_dev_profile iearpiece_profile_u8800_pro = {
-	.path_type = ADIE_CODEC_RX,
-	.settings = iearpiece_settings_u8800_pro,
-	.setting_sz = ARRAY_SIZE(iearpiece_settings_u8800_pro),
-};
-
-static struct snddev_icodec_data snddev_iearpiece_data_u8800_pro = {
-	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
-	.name = "handset_rx",
-	.copp_id = 0,
-	.acdb_id = ACDB_ID_HANDSET_SPKR,
-	.profile = &iearpiece_profile_u8800_pro,
-	.channel_mode = 1,
-	.pmctl_id = NULL,
-	.pmctl_id_sz = 0,
-	.default_sample_rate = 48000,
-	.pamp_on = NULL,
-	.pamp_off = NULL,
-	.max_voice_rx_vol[VOC_NB_INDEX] = 600,
-	.min_voice_rx_vol[VOC_NB_INDEX] = -900,
-	.max_voice_rx_vol[VOC_WB_INDEX] = 600,
-	.min_voice_rx_vol[VOC_WB_INDEX] = -900
-};
-
-static struct platform_device msm_iearpiece_device_u8800_pro = {
-	.name = "snddev_icodec",
-	.id = 0,
-	.dev = { .platform_data = &snddev_iearpiece_data_u8800_pro },
-};
-/* U8800-pro device end >*/
-/* DTS2011102903430 dongchen 20111029 end >*/
-
 #endif
 /* DTS2011010400519 dongchen 20110104 end >*/
 
@@ -712,7 +656,7 @@ static struct adie_codec_dev_profile ihs_stereo_rx_profile_u8800_51 = {
 	.settings = ihs_stereo_rx_settings_u8800_51,
 	.setting_sz = ARRAY_SIZE(ihs_stereo_rx_settings_u8800_51),
 };
-
+/*< DTS2012072504870 caiying 20120725 begin */
 static struct snddev_icodec_data snddev_ihs_stereo_rx_data_u8800_51 = {
 	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
 	.name = "headset_stereo_rx",
@@ -723,63 +667,18 @@ static struct snddev_icodec_data snddev_ihs_stereo_rx_data_u8800_51 = {
 	.default_sample_rate = 48000,
 	.pamp_on = msm_snddev_hsed_voltage_on,
 	.pamp_off = msm_snddev_hsed_voltage_off,
-	.max_voice_rx_vol[VOC_NB_INDEX] = -300, 
-	.min_voice_rx_vol[VOC_NB_INDEX] = -1800, 
-	.max_voice_rx_vol[VOC_WB_INDEX] = -500, 
-	.min_voice_rx_vol[VOC_WB_INDEX] = -2000 
+	.max_voice_rx_vol[VOC_NB_INDEX] = 400, 
+	.min_voice_rx_vol[VOC_NB_INDEX] = -1100,
+	.max_voice_rx_vol[VOC_WB_INDEX] = 400, 
+	.min_voice_rx_vol[VOC_WB_INDEX] = -1100
 };
-
+/* DTS2012072504870 caiying 20120725 end >*/
 static struct platform_device msm_ihs_stereo_rx_device_u8800_51 = {
 	.name = "snddev_icodec",
 	.id = 2,
 	.dev = { .platform_data = &snddev_ihs_stereo_rx_data_u8800_51 },
 };
 /* U8800-51 device end >*/
-
-/*< DTS2011102903430 dongchen 20111029 begin */
-/*< U8800-pro device begin */
-static struct adie_codec_action_unit ihs_stereo_rx_48KHz_osr256_actions_u8800_pro[] =
-	HEADSET_STEREO_RX_CAPLESS_48000_OSR_256_U8800_PRO;
-
-static struct adie_codec_hwsetting_entry ihs_stereo_rx_settings_u8800_pro[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = ihs_stereo_rx_48KHz_osr256_actions_u8800_pro,
-		.action_sz = ARRAY_SIZE(ihs_stereo_rx_48KHz_osr256_actions_u8800_pro),
-	}
-};
-
-static struct adie_codec_dev_profile ihs_stereo_rx_profile_u8800_pro = {
-	.path_type = ADIE_CODEC_RX,
-	.settings = ihs_stereo_rx_settings_u8800_pro,
-	.setting_sz = ARRAY_SIZE(ihs_stereo_rx_settings_u8800_pro),
-};
-
-static struct snddev_icodec_data snddev_ihs_stereo_rx_data_u8800_pro = {
-	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
-	.name = "headset_stereo_rx",
-	.copp_id = 0,
-	.acdb_id = ACDB_ID_HEADSET_SPKR_STEREO,
-	.profile = &ihs_stereo_rx_profile_u8800_pro,
-	.channel_mode = 2,
-	.default_sample_rate = 48000,
-	.pamp_on = msm_snddev_hsed_voltage_on,
-	.pamp_off = msm_snddev_hsed_voltage_off,
-	.max_voice_rx_vol[VOC_NB_INDEX] = 0, 
-	.min_voice_rx_vol[VOC_NB_INDEX] = -1500, 
-	.max_voice_rx_vol[VOC_WB_INDEX] = -200, 
-	.min_voice_rx_vol[VOC_WB_INDEX] = -1700 
-};
-
-static struct platform_device msm_ihs_stereo_rx_device_u8800_pro = {
-	.name = "snddev_icodec",
-	.id = 2,
-	.dev = { .platform_data = &snddev_ihs_stereo_rx_data_u8800_pro },
-};
-/* U8800-pro device end >*/
-/* DTS2011102903430 dongchen 20111029 end >*/
-
 #endif
 /* DTS2011010400519 dongchen 20110104 end >*/
 /*< DTS2011010400519 dongchen 20110104 begin */
@@ -1499,7 +1398,7 @@ static struct adie_codec_dev_profile ispeaker_rx_profile_u8800_51 = {
 	.settings = ispeaker_rx_settings_u8800_51,
 	.setting_sz = ARRAY_SIZE(ispeaker_rx_settings_u8800_51),
 };
-
+/*< DTS2012072504870 caiying 20120725 begin */
 static struct snddev_icodec_data snddev_ispeaker_rx_data_u8800_51 = {
 	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
 	.name = "speaker_stereo_rx",
@@ -1512,65 +1411,18 @@ static struct snddev_icodec_data snddev_ispeaker_rx_data_u8800_51 = {
 	.default_sample_rate = 48000,
 	.pamp_on = &msm_snddev_poweramp_on,
 	.pamp_off = &msm_snddev_poweramp_off,
-	.max_voice_rx_vol[VOC_NB_INDEX] = 200, 
-	.min_voice_rx_vol[VOC_NB_INDEX] = -1300, 
-	.max_voice_rx_vol[VOC_WB_INDEX] = 200, 
-	.min_voice_rx_vol[VOC_WB_INDEX] = -1300  
+	.max_voice_rx_vol[VOC_NB_INDEX] = 500,
+	.min_voice_rx_vol[VOC_NB_INDEX] = -1000,
+	.max_voice_rx_vol[VOC_WB_INDEX] = 500,
+	.min_voice_rx_vol[VOC_WB_INDEX] = -1000 
 };
-
+/* DTS2012072504870 caiying 20120725 end >*/
 static struct platform_device msm_ispeaker_rx_device_u8800_51 = {
 	.name = "snddev_icodec",
 	.id = 8,
 	.dev = { .platform_data = &snddev_ispeaker_rx_data_u8800_51 },
 };
 /* U8800-51 device end >*/
-
-/*< DTS2011102903430 dongchen 20111029 begin */
-/*< U8800-pro device begin */
-static struct adie_codec_action_unit ispeaker_rx_48KHz_osr256_actions_u8800_pro[] =
-   SPEAKER_RX_48000_OSR_256_U8800_PRO;
-
-static struct adie_codec_hwsetting_entry ispeaker_rx_settings_u8800_pro[] = {
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = ispeaker_rx_48KHz_osr256_actions_u8800_pro,
-		.action_sz = ARRAY_SIZE(ispeaker_rx_48KHz_osr256_actions_u8800_pro),
-	}
-};
-
-static struct adie_codec_dev_profile ispeaker_rx_profile_u8800_pro = {
-	.path_type = ADIE_CODEC_RX,
-	.settings = ispeaker_rx_settings_u8800_pro,
-	.setting_sz = ARRAY_SIZE(ispeaker_rx_settings_u8800_pro),
-};
-
-static struct snddev_icodec_data snddev_ispeaker_rx_data_u8800_pro = {
-	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
-	.name = "speaker_stereo_rx",
-	.copp_id = 0,
-	.acdb_id = ACDB_ID_SPKR_PHONE_MONO, //7,
-	.profile = &ispeaker_rx_profile_u8800_pro,
-	.channel_mode = 1,//single channel for u8800_pro
-	.pmctl_id = NULL,
-	.pmctl_id_sz = 0,
-	.default_sample_rate = 48000,
-	.pamp_on = &msm_snddev_poweramp_on,
-	.pamp_off = &msm_snddev_poweramp_off,
-	.max_voice_rx_vol[VOC_NB_INDEX] = 1200, 
-	.min_voice_rx_vol[VOC_NB_INDEX] = -300, 
-	.max_voice_rx_vol[VOC_WB_INDEX] = 1200, 
-	.min_voice_rx_vol[VOC_WB_INDEX] = -300  
-};
-
-static struct platform_device msm_ispeaker_rx_device_u8800_pro = {
-	.name = "snddev_icodec",
-	.id = 8,
-	.dev = { .platform_data = &snddev_ispeaker_rx_data_u8800_pro },
-};
-/* U8800-pro device end >*/
-/* DTS2011102903430 dongchen 20111029 end >*/
-
 #endif
 /* DTS2011010400519 dongchen 20110104 end >*/
 /*< DTS2011031005289 dongchen 20110329 begin */
@@ -2367,120 +2219,6 @@ static struct platform_device msm_idual_mic_broadside_device_u8800_51 = {
 	.dev = { .platform_data = &snddev_idual_mic_broadside_data_u8800_51 },
 };
 /* U8800-51 device end >*/
-
-/*< DTS2011102903430 dongchen 20111029 begin */
-/*< U8800 pro device begin */
-static struct adie_codec_action_unit idual_mic_bs_8KHz_osr256_actions_u8800_pro[] =
-	MIC1_LEFT_AUX_IN_RIGHT_8000_OSR_256_U8800_PRO;
-
-static struct adie_codec_hwsetting_entry idual_mic_broadside_settings_u8800_pro[] = {
-	{
-		.freq_plan = 8000,
-		.osr = 256,
-		.actions = idual_mic_bs_8KHz_osr256_actions_u8800_pro,
-		.action_sz = ARRAY_SIZE(idual_mic_bs_8KHz_osr256_actions_u8800_pro),
-	}, /* 8KHz profile can be used for 16KHz */
-	{
-		.freq_plan = 16000,
-		.osr = 256,
-		.actions = idual_mic_bs_8KHz_osr256_actions_u8800_pro,
-		.action_sz = ARRAY_SIZE(idual_mic_bs_8KHz_osr256_actions_u8800_pro),
-	}, /* 8KHz profile can be used for 16KHz */
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = idual_mic_bs_8KHz_osr256_actions_u8800_pro,
-		.action_sz = ARRAY_SIZE(idual_mic_bs_8KHz_osr256_actions_u8800_pro),
-	}
-};
-
-static struct adie_codec_dev_profile idual_mic_broadside_profile_u8800_pro = {
-	.path_type = ADIE_CODEC_TX,
-	.settings = idual_mic_broadside_settings_u8800_pro,
-	.setting_sz = ARRAY_SIZE(idual_mic_broadside_settings_u8800_pro),
-};
-
-static enum hsed_controller idual_mic_broadside_pmctl_id_u8800_pro[] = {
-	PM_HSED_CONTROLLER_0, PM_HSED_CONTROLLER_2
-};
-
-static struct snddev_icodec_data snddev_idual_mic_broadside_data_u8800_pro = {
-	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
-	.name = "handset_dual_mic_broadside_tx",
-	.copp_id = 0,
-	.acdb_id = ACDB_ID_HANDSET_MIC_BROADSIDE,
-	.profile = &idual_mic_broadside_profile_u8800_pro,
-	.channel_mode = 2,
-	.default_sample_rate = 48000,
-	.pmctl_id = idual_mic_broadside_pmctl_id_u8800_pro,
-	.pmctl_id_sz = ARRAY_SIZE(idual_mic_broadside_pmctl_id_u8800_pro),
-	.pamp_on = NULL,
-	.pamp_off = NULL,
-};
-
-static struct platform_device msm_idual_mic_broadside_device_u8800_pro = {
-	.name = "snddev_icodec",
-	.id = 13,
-	.dev = { .platform_data = &snddev_idual_mic_broadside_data_u8800_pro },
-};
-/* U8800 pro device end >*/
-/* DTS2011102903430 dongchen 20111029 end >*/
-
-/*< DTS2011110705477 yinzhaoyang 20111110 begin */
-static struct adie_codec_action_unit idual_mic_bs_8KHz_osr256_actions_u8800_pro_es[] =
-	MIC1_LEFT_AUX_IN_RIGHT_8000_OSR_256_U8800_PRO_ES;
-
-static struct adie_codec_hwsetting_entry idual_mic_broadside_settings_u8800_pro_es[] = {
-	{
-		.freq_plan = 8000,
-		.osr = 256,
-		.actions = idual_mic_bs_8KHz_osr256_actions_u8800_pro_es,
-		.action_sz = ARRAY_SIZE(idual_mic_bs_8KHz_osr256_actions_u8800_pro_es),
-	}, /* 8KHz profile can be used for 16KHz */
-	{
-		.freq_plan = 16000,
-		.osr = 256,
-		.actions = idual_mic_bs_8KHz_osr256_actions_u8800_pro_es,
-		.action_sz = ARRAY_SIZE(idual_mic_bs_8KHz_osr256_actions_u8800_pro_es),
-	}, /* 8KHz profile can be used for 16KHz */
-	{
-		.freq_plan = 48000,
-		.osr = 256,
-		.actions = idual_mic_bs_8KHz_osr256_actions_u8800_pro_es,
-		.action_sz = ARRAY_SIZE(idual_mic_bs_8KHz_osr256_actions_u8800_pro_es),
-	}
-};
-
-static struct adie_codec_dev_profile idual_mic_broadside_profile_u8800_pro_es = {
-	.path_type = ADIE_CODEC_TX,
-	.settings = idual_mic_broadside_settings_u8800_pro_es,
-	.setting_sz = ARRAY_SIZE(idual_mic_broadside_settings_u8800_pro_es),
-};
-
-static enum hsed_controller idual_mic_broadside_pmctl_id_u8800_pro_es[] = {
-	PM_HSED_CONTROLLER_0, PM_HSED_CONTROLLER_2
-};
-
-static struct snddev_icodec_data snddev_idual_mic_broadside_data_u8800_pro_es = {
-	.capability = (SNDDEV_CAP_TX | SNDDEV_CAP_VOICE),
-	.name = "handset_dual_mic_broadside_tx",
-	.copp_id = 0,
-	.acdb_id = ACDB_ID_HANDSET_MIC_BROADSIDE,
-	.profile = &idual_mic_broadside_profile_u8800_pro_es,
-	.channel_mode = 2,
-	.default_sample_rate = 48000,
-	.pmctl_id = idual_mic_broadside_pmctl_id_u8800_pro_es,
-	.pmctl_id_sz = ARRAY_SIZE(idual_mic_broadside_pmctl_id_u8800_pro_es),
-	.pamp_on = NULL,
-	.pamp_off = NULL,
-};
-
-static struct platform_device msm_idual_mic_broadside_device_u8800_pro_es = {
-	.name = "snddev_icodec",
-	.id = 13,
-	.dev = { .platform_data = &snddev_idual_mic_broadside_data_u8800_pro_es },
-};
-/* DTS2011110705477 yinzhaoyang 20111110 end > */
 #endif
 /* DTS2011010400519 dongchen 20110104 end >*/
 
@@ -3205,12 +2943,11 @@ static struct adie_codec_dev_profile ihs_stereo_speaker_stereo_rx_profile_u8800_
 	.setting_sz = ARRAY_SIZE(ihs_stereo_speaker_stereo_rx_settings_u8800_51),
 };
 
-/*< DTS2011102903430 dongchen 20111029 begin */
 static struct snddev_icodec_data snddev_ihs_stereo_speaker_stereo_rx_data_u8800_51 = {
 	.capability = (SNDDEV_CAP_RX | SNDDEV_CAP_VOICE),
 	.name = "headset_stereo_speaker_stereo_rx",
 	.copp_id = 0,
-	.acdb_id = ACDB_ID_HEADSET_STEREO_PLUS_SPKR_MONO_RX,
+	.acdb_id = ACDB_ID_HEADSET_STEREO_PLUS_SPKR_STEREO_RX,
 	.profile = &ihs_stereo_speaker_stereo_rx_profile_u8800_51,
 	.channel_mode = 2,
 	.default_sample_rate = 48000,
@@ -3223,7 +2960,6 @@ static struct snddev_icodec_data snddev_ihs_stereo_speaker_stereo_rx_data_u8800_
 	.max_voice_rx_vol[VOC_WB_INDEX] = -500,
 	.min_voice_rx_vol[VOC_WB_INDEX] = -2000,
 };
-/* DTS2011102903430 dongchen 20111029 end >*/
 
 static struct platform_device msm_ihs_stereo_speaker_stereo_rx_device_u8800_51 = {
 	.name = "snddev_icodec",
@@ -3751,62 +3487,9 @@ static struct platform_device *snd_devices_u8800_51[] __initdata = {
     &msm_iearpiece_hac_device,
     /* DTS2011021900121 dongchen 20110217 end >*/
 };
-
-/*< DTS2011102903430 dongchen 20111029 begin */
-static struct platform_device *snd_devices_u8800_pro[] __initdata = {
-	&msm_iearpiece_device_u8800_pro,
-	&msm_imic_device_u8800_51,
-	&msm_ihs_stereo_rx_device_u8800_pro,
-	&msm_ihs_mono_tx_device_u8800_51,
-	&msm_bt_sco_earpiece_device_u8800_51,
-	&msm_bt_sco_mic_device,
-	&msm_ispeaker_rx_device_u8800_pro,
-	&msm_itty_hs_mono_tx_device,
-	&msm_itty_hs_mono_rx_device,
-	&msm_ispeaker_tx_device_u8800_51,
-	&msm_snddev_mi2s_fm_tx_device,
-	&msm_idual_mic_broadside_device_u8800_pro,
-	&msm_spk_idual_mic_broadside_device,    
-	&msm_handset_secondary_mic_tx_device,              
-	&msm_ihs_stereo_speaker_stereo_rx_device_u8800_51,
-    &msm_ispeaker_music_mono_rx_device_u8800_51,
-    &msm_ihs_music_stereo_rx_device_u8800_51,
-    &msm_snddev_analog_fm_speaker_device,
-    &msm_snddev_analog_fm_hs_device,
-    &msm_iearpiece_hac_device,
-};
-/* DTS2011102903430 dongchen 20111029 end >*/
-
 #endif
 /* DTS2010122004868 dongchen 20101220 end >*/
 /* DTS2011010400519 dongchen 20110104 end >*/
-/*< DTS2011110705477 yinzhaoyang 20111110 begin */
-static struct platform_device *snd_devices_u8800_pro_es[] __initdata = {
-	&msm_iearpiece_device_u8800_pro,
-	&msm_imic_device_u8800_51,
-	&msm_ihs_stereo_rx_device_u8800_pro,
-	&msm_ihs_mono_tx_device_u8800_51,
-	&msm_bt_sco_earpiece_device_u8800_51,
-	&msm_bt_sco_mic_device,
-	&msm_ifmradio_handset_device,
-	&msm_ispeaker_rx_device_u8800_pro,
-	&msm_ifmradio_speaker_device,
-	&msm_ifmradio_headset_device,
-	&msm_itty_hs_mono_tx_device,
-	&msm_itty_hs_mono_rx_device,
-	&msm_ispeaker_tx_device_u8800_51,
-	&msm_snddev_mi2s_fm_tx_device,
-	&msm_idual_mic_broadside_device_u8800_pro_es,
-	&msm_spk_idual_mic_broadside_device,    
-	&msm_handset_secondary_mic_tx_device,              
-	&msm_ihs_stereo_speaker_stereo_rx_device_u8800_51,
-    &msm_ispeaker_music_mono_rx_device_u8800_51,
-	&msm_snddev_mi2s_stereo_rx_device,
-    &msm_ihs_music_stereo_rx_device_u8800_51,
-    &msm_snddev_analog_fm_speaker_device,
-    &msm_snddev_analog_fm_hs_device,
-};
-/* DTS2011110705477 yinzhaoyang 20111110 end > */
 
 
 static struct platform_device *snd_devices_fluid[] __initdata = {
@@ -3916,11 +3599,6 @@ static const struct file_operations snddev_hsed_config_debug_fops = {
 
 void __ref msm_snddev_init(void)
 {
-    /*< DTS2011110705477 yinzhaoyang 20111110 begin */
-    smem_huawei_vender *vender_para_ptr;
-    const char *country_name = "es";
-    /* DTS2011110705477 yinzhaoyang 20111110 end > */
-    
 	if (machine_is_msm7x30_ffa() || machine_is_msm8x55_ffa() ||
 		machine_is_msm8x55_svlte_ffa()) {
 		platform_add_devices(snd_devices_ffa,
@@ -3955,30 +3633,10 @@ void __ref msm_snddev_init(void)
         platform_add_devices(snd_devices_u8800_51, ARRAY_SIZE(snd_devices_u8800_51));
     }
 	/*< DTS2011030202729  liliang 20110302  begin */
-    /*< DTS2011102903430 dongchen 20111029 begin */
     else if (machine_is_msm8255_u8800_pro())
     {
-        /*< DTS2011110705477 yinzhaoyang 20111110 begin */
-        vender_para_ptr = (smem_huawei_vender*)smem_alloc(SMEM_ID_VENDOR0, sizeof(smem_huawei_vender));
-        if (!vender_para_ptr)
-        {
-            pr_info("%s: Can't find vender parameter\n", __func__);
-            return;
-        }
-        pr_info("vendor:%s,country:%s\n", vender_para_ptr->vender_para.vender_name, vender_para_ptr->vender_para.country_name);
-
-        /* choose audio parameter table according to the vender name */
-        if(!memcmp(vender_para_ptr->vender_para.country_name, country_name, strlen(country_name)))
-        {
-            platform_add_devices(snd_devices_u8800_pro_es, ARRAY_SIZE(snd_devices_u8800_pro_es));
-        }
-        else
-        {
-            platform_add_devices(snd_devices_u8800_pro, ARRAY_SIZE(snd_devices_u8800_pro));
-        }
-        /* DTS2011110705477 yinzhaoyang 20111110 end > */
+        platform_add_devices(snd_devices_u8800_51, ARRAY_SIZE(snd_devices_u8800_51));
     }
-    /* DTS2011102903430 dongchen 20111029 end >*/
 	/* DTS2011030202729  liliang 20110302 end >*/ 	
     /*< DTS2011050601476 dongchen 20110506 begin */
     /* delete DTS2011041501614, snd_devices_u8860 is in snddev_data_timpani.c */

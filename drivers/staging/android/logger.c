@@ -1,5 +1,3 @@
-/*< DTS2011092603497 mazhenhua 20110928 begin */
-/*update this driver to 404020 baseline*/
 /*
  * drivers/misc/logger.c
  *
@@ -33,7 +31,10 @@
 
 /*< DTS2011092603497 mazhenhua user log on/off 20110927 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
-#include "../../../arch/arm/mach-msm/proc_comm.h"
+/* < DTS2012033007472  yuanjintao 20120331 begin */
+/* for logcat nv control */
+#include <mach/oem_rapi_client.h>
+/* DTS2012033007472  yuanjintao 20120331 end > */
 
 #define LOG_CTL_INFO_ITEM	   60008/*modem nv item: NV_LOG_CTL_INFO_I*/
 #define USER_LOG_ON 1
@@ -449,10 +450,7 @@ static int logger_release(struct inode *ignored, struct file *file)
 {
 	if (file->f_mode & FMODE_READ) {
 		struct logger_reader *reader = file->private_data;
-		struct logger_log *log = reader->log;
-		mutex_lock(&log->mutex);
 		list_del(&reader->list);
-		mutex_unlock(&log->mutex);
 		kfree(reader);
 	}
 
@@ -575,10 +573,20 @@ static struct logger_log VAR = { \
 	.size = SIZE, \
 };
 
+/* < DTS2012031903751 lizhigang 20120319 begin */
+/* save 0.5M memory */
+#ifndef CONFIG_HUAWEI_KERNEL
+DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 256*1024)
+DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 256*1024)
+DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 256*1024)
+DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 256*1024)
+#else
 DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 64*1024)
 DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 256*1024)
 DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 64*1024)
 DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 64*1024)
+#endif
+/* DTS2012031903751 lizhigang 20120319 end > */
 
 static struct logger_log *get_log_from_minor(int minor)
 {
@@ -613,21 +621,22 @@ static int __init init_log(struct logger_log *log)
 static int __init logger_init(void)
 {
 	int ret;
-	
-/*< DTS2011092603497 mazhenhua user log on/off 20110927 begin */
+/* < DTS2012033007472  yuanjintao 20120331 begin */
+/* for logcat control by nv */
 #ifdef CONFIG_HUAWEI_KERNEL
-	struct log_ctl ctl_info;
-	unsigned nv_log_ctl_info = LOG_CTL_INFO_ITEM;
+    u16 nv_item = LOG_CTL_INFO_ITEM;
+    struct log_ctl ctl_info;
+    int  rval = -1;
 
-	/*read log on/off flag from modem side*/
-	msm_proc_comm(PCOM_NV_READ, &nv_log_ctl_info, (unsigned*)&ctl_info) ; 
-	printk("logger.c: log on/off=%d\n", ctl_info.on_off_flag);
-	/*if log nv(NV_LOG_CTL_INFO_I) is 0 or inactive , we don't init the logger driver*/
-	if(ctl_info.on_off_flag != USER_LOG_ON)
-		return 0;
+    ctl_info.on_off_flag = -1;
+    rval = oem_rapi_read_nv(nv_item, (void*)&ctl_info, sizeof(ctl_info));
+    printk("logger open flag: on_off_flag=%d\n", ctl_info.on_off_flag);
+ 
+    /*if log nv(NV_LOG_CTL_INFO_I) is 0 or inactive , we don't init the logger driver*/
+    if((rval != 0) || (ctl_info.on_off_flag != USER_LOG_ON))
+        return 0;	
 #endif
-/*DTS2011092603497 mazhenhua user log on/off 20110927 end >*/
-
+/* DTS2012033007472  yuanjintao 20120331 end > */
 	
 	ret = init_log(&log_main);
 	if (unlikely(ret))
@@ -649,4 +658,3 @@ out:
 	return ret;
 }
 device_initcall(logger_init);
-/*DTS2011092603497 mazhenhua 20110928 end >*/

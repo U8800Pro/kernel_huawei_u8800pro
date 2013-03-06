@@ -287,7 +287,7 @@ static struct  i2c_client *himax0356_client = NULL;
 static struct himax0356_ctrl_t *himax0356_ctrl = NULL;
 
 static DECLARE_WAIT_QUEUE_HEAD(himax0356_wait_queue);
-DECLARE_MUTEX(himax0356_sem);
+DEFINE_SEMAPHORE(himax0356_sem);
 
 static int himax0356_i2c_read(unsigned short saddr,//sensor address
                            unsigned char reg, unsigned char *value)
@@ -511,7 +511,9 @@ static int himax0356_sensor_init_done(const struct msm_camera_sensor_info *data)
 /*probe finish ,power down camera*/
       if (data->vreg_disable_func)
       {  
-          data->vreg_disable_func(data->sensor_vreg, data->vreg_num); 
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+         data->vreg_disable_func(0); 
+        /* DTS2012020400396 zhangyu 20120206 end > */
       }
 /*DTS2010062300810 lijianzhao 20100624 end >*/
 	return 0;
@@ -539,7 +541,9 @@ static int himax0356_probe_init_sensor(const struct msm_camera_sensor_info *data
 
     if (data->vreg_enable_func)
     {
-        rc = data->vreg_enable_func(data->sensor_vreg, data->vreg_num);
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        rc = data->vreg_enable_func(1);
+        /* DTS2012020400396 zhangyu 20120206 end > */
         if (rc < 0)
         {
 			printk("u8800_himax0356.c-->%d\n",__LINE__);

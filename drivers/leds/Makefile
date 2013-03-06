@@ -9,6 +9,7 @@ obj-$(CONFIG_LEDS_88PM860X)		+= leds-88pm860x.o
 obj-$(CONFIG_LEDS_ATMEL_PWM)		+= leds-atmel-pwm.o
 obj-$(CONFIG_LEDS_BD2802)		+= leds-bd2802.o
 obj-$(CONFIG_LEDS_LOCOMO)		+= leds-locomo.o
+obj-$(CONFIG_LEDS_LM3530)		+= leds-lm3530.o
 obj-$(CONFIG_LEDS_MIKROTIK_RB532)	+= leds-rb532.o
 obj-$(CONFIG_LEDS_S3C24XX)		+= leds-s3c24xx.o
 obj-$(CONFIG_LEDS_AMS_DELTA)		+= leds-ams-delta.o
@@ -16,15 +17,18 @@ obj-$(CONFIG_LEDS_NET48XX)		+= leds-net48xx.o
 obj-$(CONFIG_LEDS_NET5501)		+= leds-net5501.o
 obj-$(CONFIG_LEDS_WRAP)			+= leds-wrap.o
 obj-$(CONFIG_LEDS_ALIX2)		+= leds-alix2.o
-obj-$(CONFIG_LEDS_H1940)		+= leds-h1940.o
 obj-$(CONFIG_LEDS_COBALT_QUBE)		+= leds-cobalt-qube.o
 obj-$(CONFIG_LEDS_COBALT_RAQ)		+= leds-cobalt-raq.o
 obj-$(CONFIG_LEDS_SUNFIRE)		+= leds-sunfire.o
 obj-$(CONFIG_LEDS_PCA9532)		+= leds-pca9532.o
+obj-$(CONFIG_LEDS_PM8XXX)		+= leds-pm8xxx.o
+obj-$(CONFIG_LEDS_GPIO_REGISTER)	+= leds-gpio-register.o
 obj-$(CONFIG_LEDS_GPIO)			+= leds-gpio.o
 obj-$(CONFIG_LEDS_LP3944)		+= leds-lp3944.o
-obj-$(CONFIG_LEDS_CPLD)			+= leds-cpld.o
+obj-$(CONFIG_LEDS_LP5521)		+= leds-lp5521.o
+obj-$(CONFIG_LEDS_LP5523)		+= leds-lp5523.o
 obj-$(CONFIG_LEDS_CLEVO_MAIL)		+= leds-clevo-mail.o
+obj-$(CONFIG_LEDS_CPLD)			+= leds-cpld.o
 obj-$(CONFIG_LEDS_HP6XX)		+= leds-hp6xx.o
 obj-$(CONFIG_LEDS_FSG)			+= leds-fsg.o
 obj-$(CONFIG_LEDS_PCA955X)		+= leds-pca955x.o
@@ -39,15 +43,23 @@ obj-$(CONFIG_LEDS_LT3593)		+= leds-lt3593.o
 obj-$(CONFIG_LEDS_ADP5520)		+= leds-adp5520.o
 obj-$(CONFIG_LEDS_DELL_NETBOOKS)	+= dell-led.o
 obj-$(CONFIG_LEDS_MC13783)		+= leds-mc13783.o
+obj-$(CONFIG_LEDS_NS2)			+= leds-ns2.o
+obj-$(CONFIG_LEDS_NETXBIG)		+= leds-netxbig.o
+obj-$(CONFIG_LEDS_ASIC3)		+= leds-asic3.o
 obj-$(CONFIG_LEDS_PMIC8058)		+= leds-pmic8058.o
 obj-$(CONFIG_LEDS_QCIBL)		+= leds-qci-backlight.o
+obj-$(CONFIG_LEDS_MSM_PDM)		+= leds-msm-pdm.o
 #/* < DTS2010102600914 zhangtao 20101026 begin */
 obj-$(CONFIG_HUAWEI_LEDS_PMIC)		+= leds-msm-pmic.o
 #/* DTS2010102600914 zhangtao 20101026 end > */
 
-#/*< DTS2011092601370 zhongjinrong 20110926 begin */
+#/*< DTS2012052303745 zhongjinrong 20120523 begin */
 obj-$(CONFIG_HUAWEI_KEYBOARD_LEDS)		+= leds-keyboard.o
-#/* DTS2011092601370 zhongjinrong 20119026 end >*/
+#/* DTS2012052303745 zhongjinrong 20120523 end >*/
+#/*< DTS2012020306500 lijianzhao 20120204 begin */
+obj-$(CONFIG_HUAWEI_FEATURE_PTT_KEY_LIGHT) += leds_ptt.o
+obj-$(CONFIG_HUAWEI_FEATURE_RGB_KEY_LIGHT) += leds_rgb.o
+#/* DTS2012020306500 lijianzhao 20120204 end >*/
 # LED SPI Drivers
 obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
 

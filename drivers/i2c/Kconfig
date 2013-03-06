@@ -47,6 +47,19 @@ config I2C_CHARDEV
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-dev.
 
+config I2C_MUX
+	tristate "I2C bus multiplexing support"
+	depends on EXPERIMENTAL
+	help
+	  Say Y here if you want the I2C core to support the ability to
+	  handle multiplexed I2C bus topologies, by presenting each
+	  multiplexed segment as a I2C adapter.
+
+	  This support is also available as a module.  If so, the module
+	  will be called i2c-mux.
+
+source drivers/i2c/muxes/Kconfig
+
 config I2C_HELPER_AUTO
 	bool "Autoselect pertinent helper modules"
 	default y
@@ -81,6 +94,14 @@ source drivers/i2c/gyroscope/Kconfig
 #modify for 4125 baseline
 source drivers/i2c/chips/Kconfig
 #/* DTS2011041700393 lijianzhao 20110417 end >*/
+
+#/*< DTS2012021003176 yanzhijun 20120210 begin */
+# merge DTS2011110800980 fangxinyong  
+config HUAWEI_I2C_DEBUG_TOOL
+	bool "I2C debug tools"
+	help
+	  used to debug i2c devices, example camera touch etc.. 
+#/* DTS2012021003176 yanzhijun 20120210 end >*/ 
 
 config I2C_DEBUG_CORE
 	bool "I2C Core debugging messages"

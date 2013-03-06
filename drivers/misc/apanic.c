@@ -324,10 +324,10 @@ static int apanic_proc_read(char *buffer, char **start, off_t offset,
 		count -= page_offset;
 	memcpy(buffer, ctx->bounce + page_offset, count);
 
-/* <DTS2010080901139 hufeng 20100821 begin */
-	*(int *)start = count;
-/* DTS2010080901139 hufeng 20100821 end> */
-
+    /* <DTS2012021001488 yuanjintao 20120210 begin */
+	*start = (char*)count;
+    /* DTS2012021001488 yuanjintao 20120210 end> */
+	
 	if ((offset + count) == file_length)
 		*peof = 1;
 
@@ -389,12 +389,17 @@ static void mtd_panic_erase(void)
 		schedule();
 		remove_wait_queue(&wait_q, &wait);
 	}
-/* <DTS2010091301566 hufeng 20100913 begin */
+
+    /* <DTS2012021001488 yuanjintao 20120210 begin */
     /* write the erased mtd virtual flash to the mmc panic partition */
 #ifdef CONFIG_HUAWEI_KERNEL
-    ctx->mtd->sync(ctx->mtd);
+    if (ctx->mtd->sync)
+    {
+        ctx->mtd->sync(ctx->mtd);
+    }
 #endif
-/* DTS2010091301566 hufeng 20100913 end> */
+    /* DTS2012021001488 yuanjintao 20120210 end> */
+	
 	printk(KERN_DEBUG "apanic: %s partition erased\n",
 	       CONFIG_APANIC_PLABEL);
 out:
@@ -1079,8 +1084,10 @@ static int apanic_s_show(void *p)
 	if (v->nr_pages)
 		data_end += sprintf(&data_buf[data_end]," pages=%d", v->nr_pages);
 
-	if (v->phys_addr)
-		data_end += sprintf(&data_buf[data_end]," phys=%lx", v->phys_addr);
+    /* <DTS2012021001488 yuanjintao 20120210 begin */
+    if (v->phys_addr)
+		data_end += sprintf(&data_buf[data_end]," phys=%lx", (unsigned long)v->phys_addr);
+    /* DTS2012021001488 yuanjintao 20120210 end> */
 
 	if (v->flags & VM_IOREMAP)
 		data_end += sprintf(&data_buf[data_end],"%s"," ioremap");
@@ -1351,8 +1358,12 @@ static int apanic(struct notifier_block *this, unsigned long event,
 #endif
 	touch_softlockup_watchdog();
 
-	if (!ctx->mtd)
-		goto out;
+    /* <DTS2012021001488 yuanjintao 20120210 begin */
+	if (!ctx->mtd) {
+        printk(KERN_EMERG "No mtd partition in use!\n");
+        goto out;
+    }
+    /* DTS2012021001488 yuanjintao 20120210 end> */
 
 	if (ctx->curr.magic) {
 		printk(KERN_EMERG "Crash partition in use!\n");
@@ -1449,12 +1460,15 @@ static int apanic(struct notifier_block *this, unsigned long event,
 		goto out;
 	}
 
-/* <DTS2010080901139 hufeng 20100821 begin */
+    /* <DTS2012021001488 yuanjintao 20120210 begin */
 	/*we should sync the log to mmc*/
 #ifdef CONFIG_HUAWEI_KERNEL
-	ctx->mtd->sync(ctx->mtd);
+    if (ctx->mtd->sync)
+    {
+        ctx->mtd->sync(ctx->mtd);
+    }
 #endif
-/* DTS2010080901139 hufeng 20100821 end> */
+    /* DTS2012021001488 yuanjintao 20120210 end> */
 	printk(KERN_EMERG "apanic: Panic dump sucessfully written to flash\n");
 
  out:

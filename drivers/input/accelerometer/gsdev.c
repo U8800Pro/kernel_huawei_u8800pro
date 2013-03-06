@@ -192,8 +192,8 @@ static int gs_adi_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-gs_adi_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long
+gs_adi_ioctl(struct file *file, unsigned int cmd,
 	   unsigned long arg)
 {
 
@@ -287,7 +287,7 @@ static struct file_operations gs_adi_fops = {
 	.owner = THIS_MODULE,
 	.open = gs_adi_open,
 	.release = gs_adi_release,
-	.ioctl = gs_adi_ioctl,
+	.unlocked_ioctl = gs_adi_ioctl,
 };
 
 static struct miscdevice gsensor_device = {
@@ -733,9 +733,12 @@ static int gs_probe(
 
 	set_bit(EV_ABS,gs->input_dev->evbit);
 	
-	set_bit(ABS_X, gs->input_dev->absbit);
-	set_bit(ABS_Y, gs->input_dev->absbit);
-	set_bit(ABS_Z, gs->input_dev->absbit);
+	/* < DTS20111208XXXXX  liujinggang 20111208 begin */
+	/* modify for ES-version*/
+	input_set_abs_params(gs->input_dev, ABS_X, -11520, 11520, 0, 0);
+	input_set_abs_params(gs->input_dev, ABS_Y, -11520, 11520, 0, 0);
+	input_set_abs_params(gs->input_dev, ABS_Z, -11520, 11520, 0, 0);
+	/* DTS20111208XXXXX  liujinggang 20111208 end > */
 	
 	set_bit(EV_SYN,gs->input_dev->evbit);
 

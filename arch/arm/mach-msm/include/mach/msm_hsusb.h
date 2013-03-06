@@ -1,7 +1,7 @@
 /* linux/include/mach/hsusb.h
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -19,6 +19,7 @@
 #define __ASM_ARCH_MSM_HSUSB_H
 
 #include <linux/types.h>
+#include <linux/pm_qos_params.h>
 
 #define PHY_TYPE_MASK		0x0F
 #define PHY_TYPE_MODE		0xF0
@@ -48,16 +49,17 @@
 #define PHY_ID_A		0x90
 
 #define phy_id_state(ints)	((ints) & PHY_ID_MASK)
+#define phy_id_state_gnd(ints)	(phy_id_state((ints)) == PHY_ID_GND)
 #define phy_id_state_a(ints)	(phy_id_state((ints)) == PHY_ID_A)
+/* RID_B and RID_C states does not exist with standard ACA */
+#ifdef CONFIG_USB_MSM_STANDARD_ACA
+#define phy_id_state_b(ints)	0
+#define phy_id_state_c(ints)	0
+#else
 #define phy_id_state_b(ints)	(phy_id_state((ints)) == PHY_ID_B)
 #define phy_id_state_c(ints)	(phy_id_state((ints)) == PHY_ID_C)
-#define phy_id_state_gnd(ints)	(phy_id_state((ints)) == PHY_ID_GND)
+#endif
 
-enum hsusb_phy_type {
-	UNDEFINED,
-	INTEGRATED,
-	EXTERNAL,
-};
 /* used to detect the OTG Mode */
 enum otg_mode {
 	OTG_ID = 0,   		/* ID pin detection */
@@ -70,18 +72,6 @@ enum usb_mode {
 	USB_HOST_MODE,
 	USB_PERIPHERAL_MODE,
 };
-struct usb_function_map {
-	char name[20];
-	unsigned bit_pos;
-};
-
-#ifdef CONFIG_USB_FUNCTION
-/* platform device data for msm_hsusb driver */
-struct usb_composition {
-	__u16   product_id;
-	unsigned long functions;
-};
-#endif
 
 enum chg_type {
 	USB_CHG_TYPE__SDP,
@@ -116,6 +106,8 @@ enum hs_drv_amplitude {
 	HS_DRV_AMPLITUDE_75_PERCENT = (3 << 2),
 };
 
+#define HS_DRV_SLOPE_DEFAULT	(-1)
+
 /* used to configure the analog switch to select b/w host and peripheral */
 enum usb_switch_control {
 	USB_SWITCH_PERIPHERAL = 0,	/* Configure switch in peripheral mode*/
@@ -131,36 +123,11 @@ struct msm_hsusb_gadget_platform_data {
 	int is_phy_status_timer_on;
 };
 
-struct msm_hsusb_platform_data {
-	__u16   version;
-	unsigned phy_info;
-	__u16   vendor_id;
-	char   	*product_name;
-	char   	*serial_number;
-	char   	*manufacturer_name;
-	struct usb_composition *compositions;
-	int num_compositions;
-	struct usb_function_map *function_map;
-	int num_functions;
-	/* gpio mux function used for LPM */
-	int (*config_gpio)(int config);
-	/* ROC info for AHB Mode */
-	unsigned int soc_version;
-
-	int (*phy_reset)(void __iomem *addr);
-
-	unsigned int core_clk;
-
-	int vreg5v_required;
-
-	u32 swfi_latency;
-};
-
 struct msm_otg_platform_data {
 	int (*rpc_connect)(int);
 	int (*phy_reset)(void __iomem *);
-	unsigned int core_clk;
 	int pmic_vbus_irq;
+	int pmic_id_irq;
 	/* if usb link is in sps there is no need for
 	 * usb pclk as dayatona fabric clock will be
 	 * used instead
@@ -170,16 +137,16 @@ struct msm_otg_platform_data {
 	enum cdr_auto_reset	cdr_autoreset;
 	enum hs_drv_amplitude	drv_ampl;
 	enum se1_gate_state	se1_gating;
+	int			hsdrvslope;
 	int			phy_reset_sig_inverted;
 	int			phy_can_powercollapse;
 	int			pclk_required_during_lpm;
-
+	int			bam_disable;
 	/* HSUSB core in 8660 has the capability to gate the
 	 * pclk when not being used. Though this feature is
 	 * now being disabled because of H/w issues
 	 */
 	int			pclk_is_hw_gated;
-	char			*pclk_src_name;
 
 	int (*ldo_init) (int init);
 	int (*ldo_enable) (int enable);
@@ -189,6 +156,7 @@ struct msm_otg_platform_data {
 	/* pmic notfications apis */
 	int (*pmic_vbus_notif_init) (void (*callback)(int online), int init);
 	int (*pmic_id_notif_init) (void (*callback)(int online), int init);
+	int (*phy_id_setup_init) (int init);
 	int (*pmic_register_vbus_sn) (void (*callback)(int online));
 	void (*pmic_unregister_vbus_sn) (void (*callback)(int online));
 	int (*pmic_enable_ldo) (int);
@@ -205,7 +173,7 @@ struct msm_otg_platform_data {
 	int (*config_vddcx)(int high);
 	int (*init_vddcx)(int init);
 
-	struct pm_qos_request_list *pm_qos_req_dma;
+	struct pm_qos_request_list pm_qos_req_dma;
 };
 
 struct msm_usb_host_platform_data {

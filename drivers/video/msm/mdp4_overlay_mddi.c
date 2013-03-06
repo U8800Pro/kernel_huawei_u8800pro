@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- *
  */
 
 #include <linux/module.h>
@@ -70,18 +65,13 @@ void mdp4_mddi_vsync_enable(struct msm_fb_data_type *mfd,
 	if ((mfd->use_mdp_vsync) && (mfd->ibuf.vsync_enable) &&
 		(mfd->panel_info.lcd.vsync_enable)) {
 
-	/* <DTS2011110704670 sunkai 20111117 begin */
-	/* U8800 if the conditions go. Then vsync will not calibrate */
-	#ifndef CONFIG_HUAWEI_KERNEL
 		if (mdp_hw_revision < MDP4_REVISION_V2_1) {
-		
 			/* need dmas dmap switch */
 			if (which == 0 && dmap_vsync_enable == 0 &&
 				mfd->panel_info.lcd.rev < 2) /* dma_p */
 				return;
 		}
-	#endif
-	/* DTS2011110704670 sunkai 20111117 end> */
+
 		if (vsync_start_y_adjust <= pipe->dst_y)
 			start_y = pipe->dst_y - vsync_start_y_adjust;
 		else
@@ -178,7 +168,7 @@ void mdp4_overlay_update_lcd(struct msm_fb_data_type *mfd)
 		ptype = mdp4_overlay_format2type(mfd->fb_imgType);
 		if (ptype < 0)
 			printk(KERN_INFO "%s: format2type failed\n", __func__);
-		pipe = mdp4_overlay_pipe_alloc(ptype, MDP4_MIXER0, 0);
+		pipe = mdp4_overlay_pipe_alloc(ptype, MDP4_MIXER0);
 		if (pipe == NULL)
 			printk(KERN_INFO "%s: pipe_alloc failed\n", __func__);
 		pipe->pipe_used++;
@@ -253,12 +243,14 @@ void mdp4_overlay_update_lcd(struct msm_fb_data_type *mfd)
 		pipe->src_x = 0;
 		pipe->dst_h = fbi->var.yres;
 		pipe->dst_w = fbi->var.xres;
+/*< DTS2012021602342 zhongjinrong 20120224 begin */
 /*< DTS2011090102706 jiaoshuangwei 20110901 begin */
 /*<  DTS2011091905632 jiaoshuangwei 20110924 begin */
 	/*return to the qualcomm original code */
 		pipe->dst_y = 0;
 /*  DTS2011091905632 jiaoshuangwei 20110924 end >*/
 /* DTS2011090102706 jiaoshuangwei 20110901 end >*/
+/* DTS2012021602342 zhongjinrong 20120224 end >*/
 		pipe->dst_x = 0;
 		pipe->srcp0_addr = (uint32)src;
 		pipe->srcp0_ystride = fbi->fix.line_length;
@@ -538,9 +530,11 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 	}
 #endif
 /* DTS2010080403325 lijianzhao 20100804 end >*/
-    /*< DTS2011072603082 fengwei 20110806 begin*/
-    /*for resolving freeze screen because of 60 frame freq and CTS TEST*/
-    if (mdp_hw_revision == MDP4_REVISION_V2_1) {
+
+	/* change mdp clk while mdp is idle` */
+	mdp4_set_perf_level();
+
+	if (mdp_hw_revision == MDP4_REVISION_V2_1) {
 		if (mdp4_overlay_status_read(MDP4_OVERLAY_TYPE_UNSET)) {
 			uint32  data;
 			data = inpdw(MDP_BASE + 0x0028);
@@ -561,11 +555,11 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 			mdp4_overlay_status_write(MDP4_OVERLAY_TYPE_SET, false);
 		}
 	}
-    /*DTS2011072603082 fengwei 20110806 end >*/
 	mdp_enable_irq(MDP_OVERLAY0_TERM);
 	mfd->dma->busy = TRUE;
 	/* start OVERLAY pipe */
 	mdp_pipe_kickoff(MDP_OVERLAY0_TERM, mfd);
+	mdp4_stat.kickoff_ov0++;
 }
 
 void mdp4_dma_s_update_lcd(struct msm_fb_data_type *mfd,
@@ -649,11 +643,15 @@ void mdp4_mddi_dma_s_kickoff(struct msm_fb_data_type *mfd,
 	}
 #endif
 /* DTS2010080403325 lijianzhao 20100804 end >*/
+	/* change mdp clk while mdp is idle` */
+	mdp4_set_perf_level();
+
 	mdp_enable_irq(MDP_DMA_S_TERM);
 	mfd->dma->busy = TRUE;
 	mfd->ibuf_flushed = TRUE;
 	/* start dma_s pipe */
 	mdp_pipe_kickoff(MDP_DMA_S_TERM, mfd);
+	mdp4_stat.kickoff_dmas++;
 
 	/* wait until DMA finishes the current job */
 /* <DTS2010100802855 hufeng 20101008 begin */
@@ -697,25 +695,13 @@ void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
 		} else	/* no dams dmap switch  */
 			mdp4_mddi_kickoff_ui(mfd, mddi_pipe);
 
-		mdp4_stat.kickoff_mddi++;
-
 	/* signal if pan function is waiting for the update completion */
 		if (mfd->pan_waiting) {
 			mfd->pan_waiting = FALSE;
 			complete(&mfd->pan_comp);
 		}
 	}
-	mdp4_overlay_resource_release();
 	mutex_unlock(&mfd->dma->ov_mutex);
-    /*< DTS2011101103751 wangjiongfeng 20111011 begin */
-    #ifdef CONFIG_HUAWEI_KERNEL
-    /* avoid to the ui thread occupy the ov_mutex continuously.If overlay_is_set is true,then schedule */
-    if (overlay_is_set)
-	{	
-		schedule();
-	}
-    #endif
-    /* DTS2011101103751 wangjiongfeng 20111011 end >*/
 }
 
 int mdp4_mddi_overlay_cursor(struct fb_info *info, struct fb_cursor *cursor)

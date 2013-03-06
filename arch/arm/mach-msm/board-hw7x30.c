@@ -1,5 +1,5 @@
-/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
- *
+/* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+ * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -8,11 +8,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
  *
  */
 
@@ -26,25 +21,24 @@
 #ifdef CONFIG_SPI_QSD
 #include <linux/spi/spi.h>
 #endif
+#include <linux/msm_ssbi.h>
 #include <linux/mfd/pmic8058.h>
+#include <linux/leds.h>
 #include <linux/mfd/marimba.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
-/* <DTS2010072202961 hufeng 20100722 begin */
-/* removed several lines */
-/* DTS2010072202961 hufeng 20100722 end> */
+#include <linux/smsc911x.h>
 #include <linux/ofn_atlab.h>
 #include <linux/power_supply.h>
 #include <linux/input/pmic8058-keypad.h>
 #include <linux/i2c/isa1200.h>
-#include <linux/pwm.h>
-#include <linux/pmic8058-pwm.h>
 #include <linux/i2c/tsc2007.h>
 #include <linux/input/kp_flip_switch.h>
 #include <linux/leds-pmic8058.h>
 #include <linux/input/cy8c_ts.h>
 #include <linux/msm_adc.h>
 #include <linux/dma-mapping.h>
+#include <linux/regulator/consumer.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -71,6 +65,8 @@
 #include <mach/rpc_server_handset.h>
 #include <mach/msm_tsif.h>
 #include <mach/socinfo.h>
+#include <linux/audio_amplifier.h>
+#include <mach/msm_memtypes.h>
 #include <linux/cyttsp.h>
 /*< DTS2011012004226 xuhui 20110120 begin */
 //porting wifi driver for 7x30 platform
@@ -79,6 +75,10 @@
 #include <linux/wifi_tiwlan.h>
 #include <linux/skbuff.h>
 #endif
+
+#include <linux/ion.h>
+#include <mach/ion.h>
+
 
 /*<DTS2011042602009  fengwei 20110426 begin*/
 #ifdef CONFIG_HUAWEI_KERNEL
@@ -90,18 +90,17 @@ static ssize_t  buf_vkey_size=0;
 
 atomic_t touch_detected_yet = ATOMIC_INIT(0); 
 #define MSM_7x30_TOUCH_INT       148
-#define MSM_7x30_RESET_PIN 		 85
-struct vreg *vreg_gp4 = NULL;
+#define MSM_7x30_RESET_PIN         85
+/*fengwei begin*/		 
+/* updated for regulator interface */
+struct regulator *vreg_gp4 = NULL;
+/*fengwei end*/
 #endif
 /*DTS2011042602009 fengwei  20110426 end>*/
 
 /* DTS2010111804286  hanshirong 20101118 end > */
 /* DTS2011012004226 xuhui 20110120 end >*/
 /* <DTS2010060900262 liyuping 20100805 begin */
-#ifdef CONFIG_USB_AUTO_INSTALL
-#include "../../../drivers/usb/gadget/usb_switch_huawei.h"
-#include "../../../arch/arm/mach-msm/proc_comm.h"
-#include "smd_private.h"
 
 /* < DTS2011042602168 caomingxing 20110426 begin */
 /*< DTS2011011904316 genghua 20110121 begin */
@@ -111,27 +110,6 @@ struct vreg *vreg_gp4 = NULL;
 /* DTS2011011904316 genghua 20110121 end >*/
 /* DTS2011042602168 caomingxing 20110426 end > */
 
-#define USB_SERIAL_LEN 20
-/* keep the parameters transmitted from SMEM */
-smem_huawei_vender usb_para_data;
-
-/* keep the boot mode transfered from APPSBL */
-//unsigned int usb_boot_mode = 0;
-
-/* keep usb parameters transfered from modem */
-app_usb_para usb_para_info;
-
-/* all the pid used by mobile */
-/* add new pid config for google */
-/* new requirement: usb tethering */
-usb_pid_stru usb_pid_array[]={
-    {PID_ONLY_CDROM,     PID_NORMAL,     PID_UDISK, PID_AUTH,     PID_GOOGLE, PID_WLAN}, /* for COMMON products */
-    {PID_ONLY_CDROM_TMO, PID_NORMAL_TMO, PID_UDISK, PID_AUTH_TMO, PID_GOOGLE, PID_WLAN}, /* for TMO products */
-};
-
-/* pointer to the member of usb_pid_array[], according to the current product */
-usb_pid_stru *curr_usb_pid_ptr = &usb_pid_array[0];
-#endif  
 /* DTS2010060900262 liyuping 20100805 end > */
 
 /*<BU5D09205 zhangtao 20100503 begin*/
@@ -140,21 +118,23 @@ usb_pid_stru *curr_usb_pid_ptr = &usb_pid_array[0];
 #endif
 /*BU5D09205 zhangtao 20100503 end>*/
 /* < DTS2010061100003 luojianhong 201000612 begin*/
-#include <linux/audio_amplifier.h>
 #include <asm/mach/mmc.h>
 #include <asm/mach/flash.h>
 #include <mach/vreg.h>
+#include <linux/platform_data/qcom_crypto_device.h>
+
 #include "devices.h"
 #include "timer.h"
-#ifdef CONFIG_USB_ANDROID
-#include <linux/usb/android_composite.h>
+#ifdef CONFIG_USB_G_ANDROID
+#include <linux/usb/android.h>
+#include <mach/usbdiag.h>
 #endif
 #include "pm.h"
+#include "pm-boot.h"
 #include "spm.h"
-#include <linux/msm_kgsl.h>
+#include "acpuclock.h"
 #include <mach/dal_axi.h>
 #include <mach/msm_serial_hs.h>
-#include <mach/msm_reqs.h>
 #include <mach/qdsp5v2/mi2s.h>
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 
@@ -178,51 +158,71 @@ usb_pid_stru *curr_usb_pid_ptr = &usb_pid_array[0];
 #include <mach/sdio_al.h>
 #include "smd_private.h"
 #include <linux/bma150.h>
+/*< DTS2012021602342 zhongjinrong 20120224 begin */
 /*< DTS2011093001643 lijianzhao 20110930 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
 #include <linux/gpio_event.h>
 #define GPIO_SLIDE_DETECT 42 //hall irq gpio
+#endif
 /* DTS2011093001643 lijianzhao 20110930 end >*/
+/* DTS2012021602342 zhongjinrong 20120224 end >*/
 /*DTS2011082405478 zhudengkui 20110913 begin */
-//modify PMEM from 23M to 36M
-#define MSM_PMEM_SF_SIZE	0x2400000
+#include "board-msm7x30-regulator.h"
+/* <DTS2012060502167 yufei 20120605 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+#define MSM_PMEM_SF_SIZE  0x1900000
+#else
+#define MSM_PMEM_SF_SIZE  0x2400000
+#endif
+/* DTS2012060502167 yufei 20120605 end >*/
 /* DTS2011082405478 zhudengkui 20110913 end>*/
-#define MSM_FB_SIZE		0x500000
- /*< DTS2011062504321 songxiaoming 20110625 begin */
- /*<DTS2010102803387 penghai 20101028 begin*/
- /*<DTS2010090400203 penghai 20100904 begin*/
+
+/*< DTS2012011801998 chenxi 20120203 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+#include <asm-arm/huawei/smem_vendor_huawei.h>
+#include <asm-arm/huawei/usb_switch_huawei.h>
+#endif
+/* DTS2012011801998 chenxi 20120203 end >*/
+
+#ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
+/*< DTS2012052202320 zhongjinrong 20120522 begin */
+/* 480*854*4*3 = 0x4B0F00  <  0x500000 */
+#ifdef CONFIG_HUAWEI_KERNEL
+#define MSM_FB_SIZE            0x500000
+#else
+#define MSM_FB_SIZE            0x780000
+#endif
+/* DTS2012052202320 zhongjinrong 20120522 end >*/
+#else
+#define MSM_FB_SIZE            0x500000
+#endif
+
+ /* < DTS2012031903751 lizhigang 20120319 begin */
  /*<DTS2010082702166 penghai 20100827 begin*/
 /*add dsp memory space for video*/
+ /*<DTS2012020207840 tangying 20120202 begin*/
+/*add dsp memory space for video*/
 #define MSM_PMEM_ADSP_SIZE      0x2400000
+ /* DTS2012020207840 tangying 20120202 end>*/
 /*DTS2010082702166 penghai 20100827 end>*/
-/*DTS2010090400203 penghai 20100904 end>*/
-/*DTS2010102803387 penghai 20101028 end>*/
-/* DTS2011062504321 songxiaoming 20110625 end > */
+ /* DTS2012031903751 lizhigang 20120319 end > */
 
 #define MSM_FLUID_PMEM_ADSP_SIZE	0x2800000
-#define PMEM_KERNEL_EBI1_SIZE   0x600000
+#define PMEM_KERNEL_EBI0_SIZE   0x600000
 #define MSM_PMEM_AUDIO_SIZE     0x200000
 
 #define PMIC_GPIO_INT		27
 #define PMIC_VREG_WLAN_LEVEL	2900
-
-/* < DTS2011092803933  sunhonghui 20110928 begin */
-#ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
+/* < DTS2012051500642  xiezhoukai 20120506 begin*/
+/* use pimc gpio 36 to enable the powre of SD and gpio_21 to detect */
 #ifdef CONFIG_HUAWEI_KERNEL
-/*interupt pin*/
-#define PMIC_GPIO_SD_DET_PMICGPIO21_INTERUPT	21
-#define PMIC_GPIO_SD_DET_PMICGPIO36_INTERUPT	36
-#endif
-#endif
-/* DTS2011092803933  sunhonghui 20110928 end > */
-
-/* DTS2011101201153  hujun 20111030 end > */
-/*use pimc gpio 36 to enable the powre of SD*/
-#ifdef CONFIG_HUAWEI_KERNEL
+#define PMIC_GPIO_SD_DET	22
 #define PMIC_GPIO_SDC4_EN_N	35  /* PMIC GPIO Number 36 */
 #else
+#define PMIC_GPIO_SD_DET	36
 #define PMIC_GPIO_SDC4_EN_N	17  /* PMIC GPIO Number 18 */
 #endif
-/* DTS2011101201153  hujun 20111030 end > */
+/* DTS2012051500642  xiezhoukai 20120506 end > */
 #define PMIC_GPIO_HDMI_5V_EN_V3 32  /* PMIC GPIO for V3 H/W */
 #define PMIC_GPIO_HDMI_5V_EN_V2 39 /* PMIC GPIO for V2 H/W */
 
@@ -233,14 +233,16 @@ usb_pid_stru *curr_usb_pid_ptr = &usb_pid_array[0];
 #define FPGA_OPTNAV_GPIO_ADDR	0x8E000026
 #define OPTNAV_I2C_SLAVE_ADDR	(0xB0 >> 1)
 #define OPTNAV_IRQ		20
-/*  DTS2010061100003 luojianhong 201000612 end > */
 #define OPTNAV_CHIP_SELECT	19
 /*<BU5D08118 zhangtao 20100419 begin*/
 /*this is i2c pull-up power configs the i2c 
 *pinname is gp13 and the voltage of the pin is 1800 mv */
 #ifdef CONFIG_HUAWEI_KERNEL
+	/*fengwei begin*/
 	#define VREG_GP13_NAME	"gp13" 
-	#define VREG_GP13_VOLTAGE_VALUE	1800
+	#define VREG_GP13_VOLTAGE_VALUE	1800000
+	#define VREG_S3_VOLTAGE_VALUE	1800000
+	/*fengwei end*/
 #endif
 /*BU5D08118 zhangtao 20100419 end>*/
 /*<BU5D09205 zhangtao 20100503 begin*/
@@ -253,14 +255,18 @@ usb_pid_stru *curr_usb_pid_ptr = &usb_pid_array[0];
 /* Macros assume PMIC GPIOs start at 0 */
 #define PM8058_GPIO_PM_TO_SYS(pm_gpio)     (pm_gpio + NR_GPIO_IRQS)
 #define PM8058_GPIO_SYS_TO_PM(sys_gpio)    (sys_gpio - NR_GPIO_IRQS)
+#define PM8058_MPP_BASE			   PM8058_GPIO_PM_TO_SYS(PM8058_GPIOS)
+#define PM8058_MPP_PM_TO_SYS(pm_gpio)	   (pm_gpio + PM8058_MPP_BASE)
 
 #define PMIC_GPIO_FLASH_BOOST_ENABLE	15	/* PMIC GPIO Number 16 */
 #define PMIC_GPIO_HAP_ENABLE   16  /* PMIC GPIO Number 17 */
 
 #define PMIC_GPIO_WLAN_EXT_POR  22 /* PMIC GPIO NUMBER 23 */
+/* <DTS2012041003722 sibingsong 20120410 begin */
 /* < DTS2011102201769 zhangyu 20111025 begin */
 #define PMIC_GPIO_TORCH_FLASH   23 /*  PMIC GPIO NUMBER 24   */
 /* DTS2011102201769 zhangyu 20111025 end > */
+/* DTS2012041003722 sibingsong 20120410 end> */
 
 #define BMA150_GPIO_INT 1
 
@@ -272,7 +278,9 @@ usb_pid_stru *curr_usb_pid_ptr = &usb_pid_array[0];
 
 /*< DTS2011012004291 xuhui 20110120 begin */
 /*config res for  BCM4329 bt-wifi-fm in one */
-#ifdef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BTLA_VER30) && defined(CONFIG_HUAWEI_KERNEL))
+/* DTS2012020604357 zhangyun 20120206 end > */
 
 /*< DTS2011021001070 xuhui 20110210 begin */
 // 50 mSeconds for BCM4329 stable
@@ -305,6 +313,17 @@ usb_pid_stru *curr_usb_pid_ptr = &usb_pid_array[0];
 #endif
 /* DTS2011012004291 xuhui 20110120 end >*/
 
+#define MSM_ION_EBI_SIZE        MSM_PMEM_SF_SIZE
+#define MSM_ION_ADSP_SIZE       MSM_PMEM_ADSP_SIZE
+#define MSM_ION_SMI_SIZE    MSM_PMEM_SMIPOOL_SIZE
+
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+#define MSM_ION_HEAP_NUM    5
+#else
+#define MSM_ION_HEAP_NUM    2
+#endif
+
+
 /*< BU5D08419 haoqingtao 20100424 begin*/    
 
 static unsigned int camera_id = 0;
@@ -316,144 +335,90 @@ static unsigned int sub_board_id = 0;
 static unsigned int charge_flag = 0;
 #endif
 /* DTS2010071502918 shenjinming 20101008 end> */ 
-/* < DTS2011042703449  liujinggang 20110427 begin */
-compass_gs_position_type  get_compass_gs_position(void)
-{
-	compass_gs_position_type compass_gs_position=COMPASS_TOP_GS_TOP;
-	
-	/* < DTS2011043000257  liujinggang 20110503 begin */
-	/* <DTS2011050700551 zhangbo 20110505 begin */
-	/* <DTS2011062600102 sunhonghui 20110626 begin */
-    /* <DTS2011071600361 liyuping 20110716 begin */
-	/* < DTS2011090504241 liwei 20110905 begin */
-	/* < DTS2011082302564 liwei 20110823 begin */
-	/*<DTS2011091502092 liyuping 20110915 begin */
-	/* < DTS2011102401822 liwei 20111024 begin */
-	if((machine_is_msm7x30_u8800()) 
-		|| (machine_is_msm7x30_u8820()) 
-		|| (machine_is_msm7x30_u8800_51())
-		|| (machine_is_msm8255_u8800_pro())
-		|| (machine_is_msm8255_u8860()) 
-		|| (machine_is_msm8255_c8860()) 
-		|| (machine_is_msm8255_u8860lp())
-		|| (machine_is_msm8255_u8860_92())            
-	    || (machine_is_msm8255_u8667())
-		|| (machine_is_msm8255_u8860_51()))
-    /* DTS2011102401822 liwei 20111024 end > */
-	/* DTS2011091502092 liyuping 20110915 end> */
-	/* DTS2011082302564 liwei 20110823 end > */
-	/* DTS2011071600361 liyuping 20110716 end> */
-	/* DTS2011062600102 sunhonghui 20110626 end> */
-	/* DTS2011050700551 zhangbo 20110505 end> */
-	{
-		compass_gs_position=COMPASS_BOTTOM_GS_BOTTOM;
-	}
-	/* <DTS2011091200073 zhangbo 20110912 begin */
-	else if(machine_is_msm8255_u8680() 
-	        || machine_is_msm8255_u8730())
-	/* DTS2011091200073 zhangbo 20110912 end> */
-	{
-	    compass_gs_position=COMPASS_TOP_GS_TOP;
-	}
-	else
-	{
-		compass_gs_position=COMPASS_TOP_GS_TOP;
-	}
-	/* DTS2011090504241 liwei 20110905 end > */	
-	/* DTS2011043000257  liujinggang 20110503 end > */
-	return compass_gs_position;
-}
-/*return the string by compass position*/
-char *get_compass_gs_position_name(void)
-{
-	compass_gs_position_type compass_gs_position=COMPASS_TOP_GS_TOP;
-	char *position_name=NULL;
-
-	compass_gs_position = get_compass_gs_position();
-
-	switch(compass_gs_position)
-	{
-		case COMPASS_TOP_GS_TOP:
-			 position_name = "COMPASS_TOP_GS_TOP";
-			 break;
-			 
-		case COMPASS_TOP_GS_BOTTOM:
-			 position_name = "COMPASS_TOP_GS_BOTTOM";
-			 break;
-
-		case COMPASS_BOTTOM_GS_TOP:
-			 position_name = "COMPASS_BOTTOM_GS_TOP";
-			 break;
-
-		case COMPASS_BOTTOM_GS_BOTTOM:
-			 position_name = "COMPASS_BOTTOM_GS_BOTTOM";
-			 break;
-			 
-		case COMPASS_NONE_GS_BOTTOM:
-			 position_name = "COMPASS_NONE_GS_BOTTOM";
-			 break;
-
-		default:
-			 position_name = "COMPASS_TOP_GS_TOP";
-			 break;
-	}
-
-	return position_name;
-	
-}
-/* DTS2011042703449  liujinggang 20110427 end > */
+/* <DTS2012041003722 sibingsong 20120410 begin */
+/* < DTS2012031904303 zhouqiwei 20130319 begin */
+#define CAMERA_NAME_LEN 128
+char back_camera_name[CAMERA_NAME_LEN]  = {0};
+char front_camera_name[CAMERA_NAME_LEN] = {0};
+/* DTS2012031904303 zhouqiwei 20130319 end > */
+/* < DTS2012013004920 zhangmin 20120130 begin */
+/*delete and move it to hareware_self_adapt*/
+/* DTS2012013004920 zhangmin 20120130 end > */
+#ifdef CONFIG_HUAWEI_CAMERA
+/* < DTS2012031403324 zhouqiwei 20120314 begin */
+#define S5K5CA_IS_NOT_ON 0 
+/*we use the variable to sign whether s5k5ca is on*/
+static int s5k5ca_is_on = S5K5CA_IS_NOT_ON;
+/* DTS2012031403324 zhouqiwei 20120314 end > */
+#endif
+/* DTS2012041003722 sibingsong 20120410 end> */
+struct pm8xxx_gpio_init_info {
+	unsigned			gpio;
+	struct pm_gpio			config;
+};
 
 static int pm8058_gpios_init(void)
 {
 	int rc;
-	int pmic_gpio_hdmi_5v_en;
-
-#ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
-	struct pm8058_gpio sdcc_det = {
-		.direction      = PM_GPIO_DIR_IN,
-		.pull           = PM_GPIO_PULL_UP_1P5,
-		.vin_sel        = 2,
-		.function       = PM_GPIO_FUNC_NORMAL,
-		.inv_int_pol    = 0,
+	/*DTS2012061500773   xiezhoukai 20120615begin*/
+/* < DTS2012051500642  xiezhoukai 20120506 begin*/
+/* use pimc gpio 36 to enable the powre of SD and gpio_21 to detect */
+	struct pm8xxx_gpio_init_info sdc4_en = {
+		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SDC4_EN_N),
+		{
+			.direction      = PM_GPIO_DIR_OUT,
+			.pull           = PM_GPIO_PULL_NO,
+			.vin_sel        = PM8058_GPIO_VIN_L5,
+			.function       = PM_GPIO_FUNC_NORMAL,
+			.inv_int_pol    = 0,
+			.out_strength   = PM_GPIO_STRENGTH_LOW,
+			.output_value   = 0,
+		},
 	};
-#endif
-	struct pm8058_gpio sdc4_en = {
-		.direction      = PM_GPIO_DIR_OUT,
-		.pull           = PM_GPIO_PULL_NO,
-		.vin_sel        = PM_GPIO_VIN_L5,
-		.function       = PM_GPIO_FUNC_NORMAL,
-		.inv_int_pol    = 0,
-		.out_strength   = PM_GPIO_STRENGTH_LOW,
-		.output_value   = 0,
-	};
-
-	struct pm8058_gpio haptics_enable = {
-		.direction      = PM_GPIO_DIR_OUT,
-		.pull           = PM_GPIO_PULL_NO,
-		.out_strength   = PM_GPIO_STRENGTH_HIGH,
-		.function       = PM_GPIO_FUNC_NORMAL,
-		.inv_int_pol    = 0,
-		.vin_sel        = 2,
-		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-		.output_value   = 0,
-	};
-
-	struct pm8058_gpio flash_boost_enable = {
-		.direction      = PM_GPIO_DIR_OUT,
-		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-		.output_value   = 0,
-		.pull           = PM_GPIO_PULL_NO,
-		.vin_sel        = PM_GPIO_VIN_S3,
-		.out_strength   = PM_GPIO_STRENGTH_HIGH,
-		.function       = PM_GPIO_FUNC_2,
+/* DTS2012051500642  xiezhoukai 20120506 end > */
+ 	/*DTS2012061500773   xiezhoukai 20120615begin*/
+	struct pm8xxx_gpio_init_info haptics_enable = {
+		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HAP_ENABLE),
+		{
+			.direction      = PM_GPIO_DIR_OUT,
+			.pull           = PM_GPIO_PULL_NO,
+			.out_strength   = PM_GPIO_STRENGTH_HIGH,
+			.function       = PM_GPIO_FUNC_NORMAL,
+			.inv_int_pol    = 0,
+			.vin_sel        = 2,
+			.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+			.output_value   = 0,
+		},
 	};
 
-	/*< DTS2011091402372   yuguangcai 20110914 begin */
-	/* < DTS2011102201769 zhangyu 20111025 begin */
-	/* Init pm gpio23 with 0 like Qualcomm default config */
+	struct pm8xxx_gpio_init_info hdmi_5V_en = {
+		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HDMI_5V_EN_V3),
+		{
+			.direction      = PM_GPIO_DIR_OUT,
+			.pull           = PM_GPIO_PULL_NO,
+			.vin_sel        = PM8058_GPIO_VIN_VPH,
+			.function       = PM_GPIO_FUNC_NORMAL,
+			.out_strength   = PM_GPIO_STRENGTH_LOW,
+			.output_value   = 0,
+		},
+	};
 
+	struct pm8xxx_gpio_init_info flash_boost_enable = {
+		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_FLASH_BOOST_ENABLE),
+		{
+			.direction      = PM_GPIO_DIR_OUT,
+			.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+			.output_value   = 0,
+			.pull           = PM_GPIO_PULL_NO,
+			.vin_sel        = PM8058_GPIO_VIN_S3,
+			.out_strength   = PM_GPIO_STRENGTH_HIGH,
+			.function        = PM_GPIO_FUNC_2,
+		},
+	};
 
-		struct pm8058_gpio gpio23 = {
+	struct pm8xxx_gpio_init_info gpio23 = {
+		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_WLAN_EXT_POR),
+		{
 			.direction      = PM_GPIO_DIR_OUT,
 			.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
 			.output_value   = 0,
@@ -461,9 +426,12 @@ static int pm8058_gpios_init(void)
 			.vin_sel        = 2,
 			.out_strength   = PM_GPIO_STRENGTH_LOW,
 			.function       = PM_GPIO_FUNC_NORMAL,
-		};
-
-		struct pm8058_gpio gpio24 = {
+		}
+	};
+    /* <DTS2012041003722 sibingsong 20120410 begin */
+    struct pm8xxx_gpio_init_info gpio24 = {
+		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_TORCH_FLASH),
+		{
 			.direction      = PM_GPIO_DIR_OUT,
 			.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
 			.output_value   = 0,
@@ -471,84 +439,80 @@ static int pm8058_gpios_init(void)
 			.vin_sel        = 2,
 			.out_strength   = PM_GPIO_STRENGTH_LOW,
 			.function       = PM_GPIO_FUNC_NORMAL,
-		};
-
-		/* Deassert GPIO#23 (source for Ext_POR on WLAN-Volans) */		
-		rc = pm8058_gpio_config(PMIC_GPIO_WLAN_EXT_POR, &gpio23);
-		if (rc) {
-			pr_err("%s PMIC_GPIO_WLAN_EXT_POR config failed\n", __func__);
-			return rc;
 		}
-		
-		/* config pmic gpio 24 mean TORCH/FLASH */
-		rc = pm8058_gpio_config(PMIC_GPIO_TORCH_FLASH, &gpio24);
-		if (rc) {
-			pr_err("%s PMIC_GPIO_WLAN_EXT_POR config failed\n", __func__);
-			return rc;
-		}
-
-	/* DTS2011102201769 zhangyu 20111025 end > */
-
-	/* DTS2011091402372   yuguangcai 20110914 end > */
-
-
-	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa() ||
-						machine_is_msm7x30_fluid())
-		pmic_gpio_hdmi_5v_en = PMIC_GPIO_HDMI_5V_EN_V2 ;
-	else
-		pmic_gpio_hdmi_5v_en = PMIC_GPIO_HDMI_5V_EN_V3 ;
-
-	if (machine_is_msm7x30_fluid()) {
-		rc = pm8058_gpio_config(PMIC_GPIO_HAP_ENABLE, &haptics_enable);
-		if (rc) {
-			pr_err("%s: PMIC GPIO %d write failed\n", __func__,
-				(PMIC_GPIO_HAP_ENABLE + 1));
-			return rc;
-		}
-		rc = pm8058_gpio_config(PMIC_GPIO_FLASH_BOOST_ENABLE,
-			&flash_boost_enable);
-		if (rc) {
-			pr_err("%s: PMIC GPIO %d write failed\n", __func__,
-				(PMIC_GPIO_FLASH_BOOST_ENABLE + 1));
-			return rc;
-		}
-	}
-
-/* < DTS2010092900628 luojianhong 201000929 begin*/
-/* support U8820 version*/
+	};
+    /* DTS2012041003722 sibingsong 20120410 end> */
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
-/* < DTS2011092803933  sunhonghui 20110928 begin */
-    /*set U8860 interupt flag*/
-    sdcc_det.inv_int_pol = 1;
-    /*set the pin to interupt function*/
-#ifdef CONFIG_HUAWEI_KERNEL
-    if(machine_is_msm8255_u8860_51())
-    {
-        rc = pm8058_gpio_config(PMIC_GPIO_SD_DET_PMICGPIO21_INTERUPT - 1, &sdcc_det);
-    }
-	/* < DTS2011102401822 liwei 20111024 begin */
-    else if(machine_is_msm8255_u8680()
-	    || machine_is_msm8255_u8667()
-	    || machine_is_msm8255_u8730())
-    /* DTS2011102401822 liwei 20111024 end > */
-    {
-        rc = pm8058_gpio_config(PMIC_GPIO_SD_DET_PMICGPIO36_INTERUPT - 1, &sdcc_det);
-    }
-    else
-    {
-        rc = 0;
-    }
-#else
-    rc = pm8058_gpio_config(PMIC_GPIO_SD_DET_PMICGPIO36_INTERUPT - 1, &sdcc_det);
-#endif
-/* DTS2011092803933  sunhonghui 20110928 end > */
-	
+	struct pm8xxx_gpio_init_info sdcc_det = {
+		PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET - 1),
+		{
+			.direction      = PM_GPIO_DIR_IN,
+			.pull           = PM_GPIO_PULL_UP_1P5,
+			.vin_sel        = 2,
+			.function       = PM_GPIO_FUNC_NORMAL,
+			.inv_int_pol    = 0,
+		},
+	};
+
+	if (machine_is_msm7x30_fluid())
+		sdcc_det.config.inv_int_pol = 1;
+
+	rc = pm8xxx_gpio_config(sdcc_det.gpio, &sdcc_det.config);
 	if (rc) {
 		pr_err("%s PMIC_GPIO_SD_DET config failed\n", __func__);
 		return rc;
 	}
 #endif
 
+	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa() ||
+						machine_is_msm7x30_fluid())
+		hdmi_5V_en.gpio = PMIC_GPIO_HDMI_5V_EN_V2;
+	else
+		hdmi_5V_en.gpio = PMIC_GPIO_HDMI_5V_EN_V3;
+
+	hdmi_5V_en.gpio = PM8058_GPIO_PM_TO_SYS(hdmi_5V_en.gpio);
+
+	rc = pm8xxx_gpio_config(hdmi_5V_en.gpio, &hdmi_5V_en.config);
+	if (rc) {
+		pr_err("%s PMIC_GPIO_HDMI_5V_EN config failed\n", __func__);
+		return rc;
+	}
+
+	/* Deassert GPIO#23 (source for Ext_POR on WLAN-Volans) */
+	rc = pm8xxx_gpio_config(gpio23.gpio, &gpio23.config);
+	if (rc) {
+		pr_err("%s PMIC_GPIO_WLAN_EXT_POR config failed\n", __func__);
+		return rc;
+	}
+    /* <DTS2012041003722 sibingsong 20120410 begin */
+    rc = pm8xxx_gpio_config(gpio24.gpio, &gpio24.config);
+	if (rc) {
+		pr_err("%s PMIC_GPIO_TORCH_FLASH config failed\n", __func__);
+		return rc;
+	}
+    /* DTS2012041003722 sibingsong 20120410 end> */
+	if (machine_is_msm7x30_fluid()) {
+		/* Haptics gpio */
+		rc = pm8xxx_gpio_config(haptics_enable.gpio,
+						&haptics_enable.config);
+		if (rc) {
+			pr_err("%s: PMIC GPIO %d write failed\n", __func__,
+							haptics_enable.gpio);
+			return rc;
+		}
+		/* Flash boost gpio */
+		rc = pm8xxx_gpio_config(flash_boost_enable.gpio,
+						&flash_boost_enable.config);
+		if (rc) {
+			pr_err("%s: PMIC GPIO %d write failed\n", __func__,
+						flash_boost_enable.gpio);
+			return rc;
+		}
+	}
+/* < DTS2012051500642  xiezhoukai 20120506 begin*/
+/* have config so we delet  */
+/* use pimc gpio 36 to enable the powre of SD and gpio_21 to detect */
+/* DTS2012051500642  xiezhoukai 20120506 end > */
 
 	/*< DTS2011091402372   yuguangcai 20110914 begin */
     /*delete some lines*/
@@ -566,31 +530,37 @@ static int pm8058_gpios_init(void)
 	|| (machine_is_msm7x30_u8800_51()) 
 	|| (machine_is_msm8255_u8800_pro()))
 	{
-	/* DTS2011061703204 caomingxing 20110617 end > */
-	/* DTS2011050700551 zhangbo 20110505 end> */
-	/* DTS2011042703705 zhangbo 20110422 end >*/
-	/* DTS2011030202729  liliang 20110302 end >*/
-	/* DTS2010112702297 wangquanli 201001125 end >*/
-		rc = pm8058_gpio_config(PMIC_GPIO_SDC4_EN_N, &sdc4_en);
+		/* SCD4 gpio */
+		rc = pm8xxx_gpio_config(sdc4_en.gpio, &sdc4_en.config);
 		if (rc) {
 			pr_err("%s PMIC_GPIO_SDC4_EN_N config failed\n",
 								 __func__);
 			return rc;
 		}
-		rc = gpio_request(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SDC4_EN_N),
-				  "sdc4_en");
+		rc = gpio_request(sdc4_en.gpio, "sdc4_en");
 		if (rc) {
 			pr_err("%s PMIC_GPIO_SDC4_EN_N gpio_request failed\n",
 				__func__);
 			return rc;
 		}
-		gpio_set_value_cansleep(
-			PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SDC4_EN_N), 0);
+		gpio_set_value_cansleep(sdc4_en.gpio, 0);
 	}
-/*  DTS2010092900628 luojianhong 201000929 end > */
+
 	return 0;
 }
-/* BU5D08419 haoqingtao 20100424 end>*/    
+
+/* Regulator API support */
+
+#ifdef CONFIG_MSM_PROC_COMM_REGULATOR
+static struct platform_device msm_proccomm_regulator_dev = {
+	.name = PROCCOMM_REGULATOR_DEV_NAME,
+	.id   = -1,
+	.dev  = {
+		.platform_data = &msm7x30_proccomm_regulator_data
+	}
+};
+#endif
+
 /*virtual key support */
 static ssize_t tma300_vkeys_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
@@ -620,56 +590,43 @@ static struct attribute_group tma300_properties_attr_group = {
 };
 
 static struct kobject *properties_kobj;
+static struct regulator_bulk_data cyttsp_regs[] = {
+	{ .supply = "ldo8",  .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "ldo15", .min_uV = 3050000, .max_uV = 3100000 },
+};
 
 #define CYTTSP_TS_GPIO_IRQ	150
 static int cyttsp_platform_init(struct i2c_client *client)
 {
 	int rc = -EINVAL;
-	struct vreg *vreg_ldo8, *vreg_ldo15;
 
-	vreg_ldo8 = vreg_get(NULL, "gp7");
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(cyttsp_regs), cyttsp_regs);
 
-	if (!vreg_ldo8) {
-		pr_err("%s: VREG L8 get failed\n", __func__);
-		return rc;
-	}
-
-	rc = vreg_set_level(vreg_ldo8, 1800);
 	if (rc) {
-		pr_err("%s: VREG L8 set failed\n", __func__);
-		goto l8_put;
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		goto out;
 	}
 
-	rc = vreg_enable(vreg_ldo8);
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(cyttsp_regs), cyttsp_regs);
+
 	if (rc) {
-		pr_err("%s: VREG L8 enable failed\n", __func__);
-		goto l8_put;
+		pr_err("%s: could not set regulator voltages: %d\n", __func__,
+				rc);
+		goto regs_free;
 	}
 
-	vreg_ldo15 = vreg_get(NULL, "gp6");
+	rc = regulator_bulk_enable(ARRAY_SIZE(cyttsp_regs), cyttsp_regs);
 
-	if (!vreg_ldo15) {
-		pr_err("%s: VREG L15 get failed\n", __func__);
-		goto l8_disable;
-	}
-
-	rc = vreg_set_level(vreg_ldo15, 3050);
 	if (rc) {
-		pr_err("%s: VREG L15 set failed\n", __func__);
-		goto l8_disable;
-	}
-
-	rc = vreg_enable(vreg_ldo15);
-	if (rc) {
-		pr_err("%s: VREG L15 enable failed\n", __func__);
-		goto l8_disable;
+		pr_err("%s: could not enable regulators: %d\n", __func__, rc);
+		goto regs_free;
 	}
 
 	/* check this device active by reading first byte/register */
 	rc = i2c_smbus_read_byte_data(client, 0x01);
 	if (rc < 0) {
 		pr_err("%s: i2c sanity check failed\n", __func__);
-		goto l8_disable;
+		goto regs_disable;
 	}
 
 	rc = gpio_tlmm_config(GPIO_CFG(CYTTSP_TS_GPIO_IRQ, 0, GPIO_CFG_INPUT,
@@ -677,14 +634,7 @@ static int cyttsp_platform_init(struct i2c_client *client)
 	if (rc) {
 		pr_err("%s: Could not configure gpio %d\n",
 					 __func__, CYTTSP_TS_GPIO_IRQ);
-		goto l8_disable;
-	}
-
-	rc = gpio_request(CYTTSP_TS_GPIO_IRQ, "ts_irq");
-	if (rc) {
-		pr_err("%s: unable to request gpio %d (%d)\n",
-			__func__, CYTTSP_TS_GPIO_IRQ, rc);
-		goto l8_disable;
+		goto regs_disable;
 	}
 
 	/* virtual keys */
@@ -700,11 +650,20 @@ static int cyttsp_platform_init(struct i2c_client *client)
 
 	return CY_OK;
 
-l8_disable:
-	vreg_disable(vreg_ldo8);
-l8_put:
-	vreg_put(vreg_ldo8);
+regs_disable:
+	regulator_bulk_disable(ARRAY_SIZE(cyttsp_regs), cyttsp_regs);
+regs_free:
+	regulator_bulk_free(ARRAY_SIZE(cyttsp_regs), cyttsp_regs);
+out:
 	return rc;
+}
+
+/* TODO: Put the regulator to LPM / HPM in suspend/resume*/
+static int cyttsp_platform_suspend(struct i2c_client *client)
+{
+	msleep(20);
+
+	return CY_OK;
 }
 
 static int cyttsp_platform_resume(struct i2c_client *client)
@@ -716,6 +675,7 @@ static int cyttsp_platform_resume(struct i2c_client *client)
 }
 
 static struct cyttsp_platform_data cyttsp_data = {
+	.fw_fname = "cyttsp_7630_fluid.hex",
 	.panel_maxx = 479,
 	.panel_maxy = 799,
 	.disp_maxx = 469,
@@ -728,7 +688,7 @@ static struct cyttsp_platform_data cyttsp_data = {
 	.use_mt = CY_USE_MT,
 	.use_hndshk = CY_SEND_HNDSHK,
 	.use_trk_id = CY_USE_TRACKING_ID,
-	.use_sleep = CY_USE_SLEEP,
+	.use_sleep = CY_USE_DEEP_SLEEP_SEL | CY_USE_LOW_POWER_SEL,
 	.use_gestures = CY_USE_GESTURES,
 	/* activate up to 4 groups
 	 * and set active distance
@@ -749,17 +709,22 @@ static struct cyttsp_platform_data cyttsp_data = {
 	 */
 	.lp_intrvl = CY_LP_INTRVL_DFLT,
 	.resume = cyttsp_platform_resume,
+	.suspend = cyttsp_platform_suspend,
 	.init = cyttsp_platform_init,
+	.sleep_gpio = -1,
+	.resout_gpio = -1,
+	.irq_gpio = CYTTSP_TS_GPIO_IRQ,
+	.correct_fw_ver = 2,
 };
 
 static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
 {
-	struct pm8058_gpio pwm_gpio_config = {
+	struct pm_gpio pwm_gpio_config = {
 		.direction      = PM_GPIO_DIR_OUT,
 		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
 		.output_value   = 0,
 		.pull           = PM_GPIO_PULL_NO,
-		.vin_sel        = PM_GPIO_VIN_S3,
+		.vin_sel        = PM8058_GPIO_VIN_S3,
 		.out_strength   = PM_GPIO_STRENGTH_HIGH,
 		.function       = PM_GPIO_FUNC_2,
 	};
@@ -773,9 +738,10 @@ static int pm8058_pwm_config(struct pwm_device *pwm, int ch, int on)
 	case 2:
 		if (on) {
 			id = 24 + ch;
-			rc = pm8058_gpio_config(id - 1, &pwm_gpio_config);
+			rc = pm8xxx_gpio_config(PM8058_GPIO_PM_TO_SYS(id - 1),
+							&pwm_gpio_config);
 			if (rc)
-				pr_err("%s: pm8058_gpio_config(%d): rc=%d\n",
+				pr_err("%s: pm8xxx_gpio_config(%d): rc=%d\n",
 				       __func__, id, rc);
 		}
 		break;
@@ -887,6 +853,33 @@ static const unsigned int surf_keymap[] = {
     KEY(3, 3, KEY_MENU),   //big_board  1 -- 1
 };
 /* BU5D08125 durui 20100419 end > */
+/*< DTS2011120503227 duanfei 20111205 begin */
+/* add for U8667, which do NOT use keypad row array . */
+static const unsigned int U8667_keymap[] = {
+    KEY(0, 0, KEY_VOLUMEUP),
+    KEY(0, 1, KEY_VOLUMEDOWN),
+    KEY(0, 2, KEY_SOUND), 	//handless key
+    KEY(0, 3, KEY_CHAT), 	//PTT key
+};
+
+static struct matrix_keymap_data U8667_keymap_data = {
+    .keymap_size    = ARRAY_SIZE(U8667_keymap),
+    .keymap         = U8667_keymap,
+};
+static struct pm8xxx_keypad_platform_data U8667_keypad_data = {
+	.input_name		= "fluid-keypad",
+	.input_phys_device	= "fluid-keypad/input0",
+	.num_rows		= 5,
+	.num_cols		= 5,
+	.rows_gpio_start	= PM8058_GPIO_PM_TO_SYS(8),
+	.cols_gpio_start	= PM8058_GPIO_PM_TO_SYS(0),
+	.debounce_ms		= 15,
+	.scan_delay_ms		= 32,
+	.row_hold_ns		= 91500,
+	.wakeup			= 1,
+	.keymap_data            = &U8667_keymap_data,
+};
+/* DTS2011120503227 duanfei 20111205 end >*/
 /*< DTS2011090104536 duanfei 20110901 begin */
 /* add for U8680, which do NOT use keypad row array .  */
 static const unsigned int U8680_keymap[] = {
@@ -900,72 +893,57 @@ static struct matrix_keymap_data U8680_keymap_data = {
     .keymap         = U8680_keymap,
 };
 
-static struct pmic8058_keypad_data U8680_keypad_data = {
+static struct pm8xxx_keypad_platform_data U8680_keypad_data = {
 	.input_name		= "fluid-keypad",
 	.input_phys_device	= "fluid-keypad/input0",
 	.num_rows		= 5,
 	.num_cols		= 5,
-	.rows_gpio_start	= 8,
-	.cols_gpio_start	= 0,
-	.debounce_ms		= {8, 10},
+	.rows_gpio_start	= PM8058_GPIO_PM_TO_SYS(8),
+	.cols_gpio_start	= PM8058_GPIO_PM_TO_SYS(0),
+	.debounce_ms		= 15,
 	.scan_delay_ms		= 32,
 	.row_hold_ns		= 91500,
 	.wakeup			= 1,
 	.keymap_data            = &U8680_keymap_data,
 };
 /* DTS2011090104536 duanfei 20110901 end >*/
-static struct resource resources_keypad[] = {
-	{
-		.start	= PM8058_KEYPAD_IRQ(PMIC8058_IRQ_BASE),
-		.end	= PM8058_KEYPAD_IRQ(PMIC8058_IRQ_BASE),
-		.flags	= IORESOURCE_IRQ,
-	},
-	{
-		.start	= PM8058_KEYSTUCK_IRQ(PMIC8058_IRQ_BASE),
-		.end	= PM8058_KEYSTUCK_IRQ(PMIC8058_IRQ_BASE),
-		.flags	= IORESOURCE_IRQ,
-	},
-};
 
 static struct matrix_keymap_data surf_keymap_data = {
         .keymap_size    = ARRAY_SIZE(surf_keymap),
         .keymap         = surf_keymap,
 };
 
-
-static struct pmic8058_keypad_data surf_keypad_data = {
+static struct pm8xxx_keypad_platform_data surf_keypad_data = {
 	.input_name		= "surf_keypad",
 	.input_phys_device	= "surf_keypad/input0",
 	.num_rows		= 12,
 	.num_cols		= 8,
-	.rows_gpio_start	= 8,
-	.cols_gpio_start	= 0,
-	.debounce_ms		= {8, 10},
+	.rows_gpio_start	= PM8058_GPIO_PM_TO_SYS(8),
+	.cols_gpio_start	= PM8058_GPIO_PM_TO_SYS(0),
+	.debounce_ms		= 15,
 	.scan_delay_ms		= 32,
 	.row_hold_ns		= 91500,
 	.wakeup			= 1,
-	.keymap_data            = &surf_keymap_data,
+	.keymap_data		= &surf_keymap_data,
 };
 
 static struct matrix_keymap_data fluid_keymap_data = {
-        .keymap_size    = ARRAY_SIZE(fluid_keymap),
-        .keymap         = fluid_keymap,
+	.keymap_size	= ARRAY_SIZE(fluid_keymap),
+	.keymap		= fluid_keymap,
 };
 
-
-
-static struct pmic8058_keypad_data fluid_keypad_data = {
+static struct pm8xxx_keypad_platform_data fluid_keypad_data = {
 	.input_name		= "fluid-keypad",
 	.input_phys_device	= "fluid-keypad/input0",
 	.num_rows		= 5,
 	.num_cols		= 5,
-	.rows_gpio_start	= 8,
-	.cols_gpio_start	= 0,
-	.debounce_ms		= {8, 10},
+	.rows_gpio_start	= PM8058_GPIO_PM_TO_SYS(8),
+	.cols_gpio_start	= PM8058_GPIO_PM_TO_SYS(0),
+	.debounce_ms		= 15,
 	.scan_delay_ms		= 32,
 	.row_hold_ns		= 91500,
 	.wakeup			= 1,
-	.keymap_data            = &fluid_keymap_data,
+	.keymap_data		= &fluid_keymap_data,
 };
 
 /*< DTS2011042203570 n00111309 20110422 begin */
@@ -975,14 +953,14 @@ static struct matrix_keymap_data fluid_norow_keymap_data = {
         .keymap         = fluid_norow_keymap,
 };
 
-static struct pmic8058_keypad_data fluid_norow_keypad_data = {
+static struct pm8xxx_keypad_platform_data fluid_norow_keypad_data = {
 	.input_name		= "fluid-keypad",
 	.input_phys_device	= "fluid-keypad/input0",
 	.num_rows		= 5,
 	.num_cols		= 5,
-	.rows_gpio_start	= 8,
-	.cols_gpio_start	= 0,
-	.debounce_ms		= {8, 10},
+	.rows_gpio_start	= PM8058_GPIO_PM_TO_SYS(8),
+	.cols_gpio_start	= PM8058_GPIO_PM_TO_SYS(0),
+	.debounce_ms		= 15,
 	.scan_delay_ms		= 32,
 	.row_hold_ns		= 91500,
 	.wakeup			= 1,
@@ -991,6 +969,8 @@ static struct pmic8058_keypad_data fluid_norow_keypad_data = {
 /* DTS2011042203570 n00111309 20110422 end */
 
 /*< DTS2011092601370 zhongjinrong 20110926 begin */
+/*< DTS2011120104065  zhongjinrong 20111220 begin */
+/*Sliding mobile phone should report key value with the phone vertical otherwise sideways*/
 static const unsigned int u8730_keymap[] = {
     KEY(0, 0, KEY_VOLUMEUP), 
     KEY(0, 1, KEY_VOLUMEDOWN), 
@@ -1015,8 +995,8 @@ static const unsigned int u8730_keymap[] = {
 
     KEY(3, 0, KEY_EMAIL),
     KEY(3, 1, KEY_COMMA ),
-    KEY(3, 3, KEY_LEFT),
-    KEY(3, 4, KEY_RIGHT),
+    KEY(3, 3, KEY_UP),
+    KEY(3, 4, KEY_DOWN),
 
     
     
@@ -1034,11 +1014,11 @@ static const unsigned int u8730_keymap[] = {
     KEY(5, 4, KEY_P),
 
 
-   KEY(6, 0, KEY_Z),
+    KEY(6, 0, KEY_Z),
     KEY(6, 1, KEY_QUESTION),
     KEY(6, 2, KEY_V),
     KEY(6, 3, KEY_M),
-    KEY(6, 4, KEY_DOWN),
+    KEY(6, 4, KEY_LEFT),
 
     
     
@@ -1053,23 +1033,23 @@ static const unsigned int u8730_keymap[] = {
     KEY(8, 1, KEY_C),
     KEY(8, 2, KEY_H),
     KEY(8, 3, KEY_N),
-    KEY(8, 4, KEY_UP),
+    KEY(8, 4, KEY_RIGHT),
 };
-
+/* DTS2011120104065 zhongjinrong 20111220 end >*/
 static struct matrix_keymap_data u8730_keymap_data = {
         .keymap_size    = ARRAY_SIZE(u8730_keymap),
         .keymap         = u8730_keymap,
 };
 
 
-static struct pmic8058_keypad_data u8730_keypad_data = {
+static struct pm8xxx_keypad_platform_data u8730_keypad_data = {
 	.input_name		= "fluid-keypad",
 	.input_phys_device	= "fluid-keypad/input0",
 	.num_rows		= 10,
 	.num_cols		= 6,
-	.rows_gpio_start	= 8,
-	.cols_gpio_start	= 0,
-	.debounce_ms		= {8, 10},
+	.rows_gpio_start	= PM8058_GPIO_PM_TO_SYS(8),
+	.cols_gpio_start	= PM8058_GPIO_PM_TO_SYS(0),
+	.debounce_ms		= 15,
 	.scan_delay_ms		= 32,
 	.row_hold_ns		= 91500,
 	.wakeup			= 1,
@@ -1086,21 +1066,6 @@ static struct platform_device msm_device_pmic_keyboard_leds = {
 static struct pm8058_pwm_pdata pm8058_pwm_data = {
 	.config		= pm8058_pwm_config,
 	.enable		= pm8058_pwm_enable,
-};
-
-/* Put sub devices with fixed location first in sub_devices array */
-#define	PM8058_SUBDEV_KPD	0
-#define	PM8058_SUBDEV_LED	1
-
-static struct pm8058_gpio_platform_data pm8058_gpio_data = {
-	.gpio_base	= PM8058_GPIO_PM_TO_SYS(0),
-	.irq_base	= PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, 0),
-	.init		= pm8058_gpios_init,
-};
-
-static struct pm8058_gpio_platform_data pm8058_mpp_data = {
-	.gpio_base	= PM8058_GPIO_PM_TO_SYS(PM8058_GPIOS),
-	.irq_base	= PM8058_MPP_IRQ(PMIC8058_IRQ_BASE, 0),
 };
 
 /* < DTS2011030404089 zhangtao 20110314 begin */
@@ -1137,38 +1102,6 @@ static struct pmic8058_led pmic8058_surf_leds[] = {
 	},
 };
 
-static struct mfd_cell pm8058_subdevs[] = {
-	{	.name = "pm8058-keypad",
-		.id		= -1,
-		.num_resources	= ARRAY_SIZE(resources_keypad),
-		.resources	= resources_keypad,
-	},
-	{	.name = "pm8058-led",
-		.id		= -1,
-	},
-	{	.name = "pm8058-gpio",
-		.id		= -1,
-		.platform_data	= &pm8058_gpio_data,
-		.data_size	= sizeof(pm8058_gpio_data),
-	},
-	{	.name = "pm8058-mpp",
-		.id		= -1,
-		.platform_data	= &pm8058_mpp_data,
-		.data_size	= sizeof(pm8058_mpp_data),
-	},
-	{	.name = "pm8058-pwm",
-		.id		= -1,
-		.platform_data	= &pm8058_pwm_data,
-		.data_size	= sizeof(pm8058_pwm_data),
-	},
-	{	.name = "pm8058-nfc",
-		.id		= -1,
-	},
-	{	.name = "pm8058-upl",
-		.id		= -1,
-	},
-};
-
 static struct pmic8058_leds_platform_data pm8058_surf_leds_data = {
 	.num_leds = ARRAY_SIZE(pmic8058_surf_leds),
 	.leds	= pmic8058_surf_leds,
@@ -1197,12 +1130,10 @@ static struct pmic8058_leds_platform_data pm8058_fluid_leds_data = {
 	.leds	= pmic8058_fluid_leds,
 };
 
-static struct pm8058_platform_data pm8058_7x30_data = {
-	.irq_base = PMIC8058_IRQ_BASE,
-
-	.num_subdevs = ARRAY_SIZE(pm8058_subdevs),
-	.sub_devices = pm8058_subdevs,
-	.irq_trigger_flags = IRQF_TRIGGER_LOW,
+static struct pm8xxx_irq_platform_data pm8xxx_irq_pdata = {
+	.irq_base		= PMIC8058_IRQ_BASE,
+	.devirq			= MSM_GPIO_TO_INT(PMIC_GPIO_INT),
+	.irq_trigger_flag       = IRQF_TRIGGER_LOW,
 };
 /* < DTS2010092501047 luojianhong 201000926 begin*/
 /*add one more audio_amplifier_data for the right channel*/
@@ -1231,25 +1162,26 @@ static struct i2c_board_info msm_amplifier_boardinfo[]  = {
  */
 #ifdef CONFIG_HUAWEI_KERNEL
  /* < DTS2011042801270 yuezenglong 20110428 begin */
+ /*fengwei begin*/
 int power_switch(int pm)
 {
     int rc_gp4 = 0;
     int value = IC_PM_VDD;
 	if (IC_PM_ON == pm)
 	{
-        vreg_gp4 = vreg_get(NULL,"gp4");
+        vreg_gp4 = regulator_get(NULL,"gp4");
         if (IS_ERR(vreg_gp4)) 
         {
 		    pr_err("%s:gp4 power init get failed\n", __func__);
             goto err_power_fail;
         }
-        rc_gp4=vreg_set_level(vreg_gp4, value);
+        rc_gp4=regulator_set_voltage(vreg_gp4, value,value);
         if(rc_gp4)
         {
             pr_err("%s:gp4 power init faild\n",__func__);
             goto err_power_fail;
         }
-        rc_gp4=vreg_enable(vreg_gp4);
+        rc_gp4=regulator_enable(vreg_gp4);
         if (rc_gp4) 
         {
 		    pr_err("%s:gp4 power init failed \n", __func__);
@@ -1262,7 +1194,7 @@ int power_switch(int pm)
 	{
 		if(NULL != vreg_gp4)
 		{
-           rc_gp4 = vreg_disable(vreg_gp4);
+           rc_gp4 = regulator_disable(vreg_gp4);
            if (rc_gp4)
            {
                pr_err("%s:gp4 power disable failed \n", __func__);
@@ -1277,6 +1209,7 @@ int power_switch(int pm)
 err_power_fail:
 	return rc_gp4;
 }
+ /*fengwei end*/
 /* DTS2011042801270 yuezenglong 20110428 end > */
 /*
  *use the touch_gpio_config_interrupt to config the gpio
@@ -1349,14 +1282,6 @@ int get_touch_reset_pin(void)
 /*this function get the tp  resolution*/
 static int get_phone_version(struct tp_resolution_conversion *tp_resolution_type)
 {
-    int ret = 0;
-    
-    ret = touch_reset();
-    if(ret)
-    {
-        printk(KERN_ERR "%s: reset failed \n", __func__);
-        return -1;
-    }
     /*<DTS2011051601005 fengwei 20110516 begin*/
     if (machine_is_msm7x30_u8820()
 	  ||machine_is_msm7x30_u8800_51()
@@ -1364,7 +1289,10 @@ static int get_phone_version(struct tp_resolution_conversion *tp_resolution_type
     {
         tp_resolution_type->lcd_x = LCD_X_WVGA;
         tp_resolution_type->lcd_y = LCD_Y_WVGA;   
-        tp_resolution_type->jisuan = LCD_JS_WVGA;
+    	/* < DTS2012020907660 sunlibin 20120213 begin */
+        /* Change name */
+        tp_resolution_type->lcd_all = LCD_ALL_WVGA_4INCHTP;
+    	/* DTS2012020907660 sunlibin 20120213 end > */
     }
     /*< DTS2011070901815  sunhonghui 20110709 begin */
     /* <DTS2011071600361 liyuping 20110716 begin */
@@ -1374,6 +1302,9 @@ static int get_phone_version(struct tp_resolution_conversion *tp_resolution_type
     else if (machine_is_msm8255_u8860()
             ||(machine_is_msm8255_c8860())
             ||(machine_is_msm8255_u8860lp())
+            /* < DTS2012022905490 ganfan 20120301 begin */
+            || machine_is_msm8255_u8860_r()
+            /* DTS2012022905490 ganfan 20120301 end > */
             ||(machine_is_msm8255_u8860_92())
             ||(machine_is_msm8255_u8860_51()))
     /* DTS2011091902006 duanfei 20110919 end >*/
@@ -1384,27 +1315,33 @@ static int get_phone_version(struct tp_resolution_conversion *tp_resolution_type
     {
         tp_resolution_type->lcd_x = LCD_X_FWVGA;
         tp_resolution_type->lcd_y = LCD_Y_FWVGA;   
-        tp_resolution_type->jisuan = LCD_JS_FWVGA;
+        /* < DTS2012020907660 sunlibin 20120213 begin */
+        /* Change name */
+        tp_resolution_type->lcd_all = LCD_ALL_FWVGA;
+        /* DTS2012020907660 sunlibin 20120213 end > */
     }
     /*< DTS2011091902006 duanfei 20110919 begin*/
-    /* <DTS2011091200073 zhangbo 20110912 begin */
-    /* < DTS2011102401822 liwei 20111024 begin */
+/* <DTS2011091200073 zhangbo 20110912 begin */
     else if (machine_is_msm8255_u8680()
-         || machine_is_msm8255_u8667()
 	     || machine_is_msm8255_u8730())
     {
     	tp_resolution_type->lcd_x = LCD_X_WVGA;
         tp_resolution_type->lcd_y = LCD_Y_WVGA;   
-        tp_resolution_type->jisuan = LCD_JS_WVGA_4INCHTP;
+        /* < DTS2012020907660 sunlibin 20120213 begin */
+        /* Change name */
+        tp_resolution_type->lcd_all = LCD_ALL_WVGA_4INCHTP1;
+        /* DTS2012020907660 sunlibin 20120213 end > */
     }
-    /* DTS2011102401822 liwei 20111024 end > */
-    /* DTS2011091200073 zhangbo 20110912 end> */
+/* DTS2011091200073 zhangbo 20110912 end> */
     /* DTS2011091902006 duanfei 20110919 end >*/
     else
     {
         tp_resolution_type->lcd_x = LCD_X_WVGA;
         tp_resolution_type->lcd_y = LCD_Y_WVGA;   
-        tp_resolution_type->jisuan = LCD_JS_WVGA;
+        /* < DTS2012020907660 sunlibin 20120213 begin */
+        /* Change name */
+        tp_resolution_type->lcd_all = LCD_ALL_WVGA_4INCHTP;
+        /* DTS2012020907660 sunlibin 20120213 end > */
     }    
     /*DTS2011051601005  fengwei 20110516 end>*/
   
@@ -1429,23 +1366,6 @@ static struct aps9900_hw_platform_data aps9900_hw_data = {
 };
 #endif
 /* <DTS2011050303216 wangjiongfeng 20110504 end */
-/* < DTS2011102806486  zhangmin 20111029  begin */
-#ifdef CONFIG_HUAWEI_FEATURE_PROXIMITY_LITEON_LTR_558
-int ltr558_gpio_config_interrupt(void)
-{
-    int gpio_config = 0;
-    int ret = 0;
-    gpio_config = GPIO_CFG(MSM_7X30_LTR558_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA);
-    ret = gpio_tlmm_config(gpio_config, GPIO_CFG_ENABLE);
-    return ret; 
-}
-static struct ltr558_hw_platform_data ltr558_hw_data = {
-    .ltr558_power = power_switch,
-    .ltr558_gpio_config_interrupt = ltr558_gpio_config_interrupt,
-};
-#endif
-/* DTS2011102806486  zhangmin 20111029  end > */
-
 /* < DTS2011042801270 yuezenglong 20110428 begin */
 static struct touch_hw_platform_data touch_hw_data = {
     .touch_power = power_switch,
@@ -1458,17 +1378,39 @@ static struct touch_hw_platform_data touch_hw_data = {
 };
 /* DTS2011042801270 yuezenglong 20110428 end > */
 #endif
-
 /*DTS2011042602009 fengwei 20110426 end>*/
 
+static struct pm8xxx_gpio_platform_data pm8xxx_gpio_pdata = {
+	.gpio_base		= PM8058_GPIO_PM_TO_SYS(0),
+};
 
-static struct i2c_board_info pm8058_boardinfo[] __initdata = {
-	{
-		I2C_BOARD_INFO("pm8058-core", 0x55),
-		.irq = MSM_GPIO_TO_INT(PMIC_GPIO_INT),
-		.platform_data = &pm8058_7x30_data,
+static struct pm8xxx_mpp_platform_data pm8xxx_mpp_pdata = {
+	.mpp_base	= PM8058_MPP_PM_TO_SYS(0),
+};
+
+static struct pm8058_platform_data pm8058_7x30_data = {
+	.irq_pdata		= &pm8xxx_irq_pdata,
+	.gpio_pdata		= &pm8xxx_gpio_pdata,
+	.mpp_pdata		= &pm8xxx_mpp_pdata,
+	.pwm_pdata		= &pm8058_pwm_data,
+};
+
+#ifdef CONFIG_MSM_SSBI
+static struct msm_ssbi_platform_data msm7x30_ssbi_pm8058_pdata = {
+/*< DTS2012010403939 fengwei 20120111 begin */
+/* msm_ssbi add remote spinlock flag
+ * qualcomm case :00724486*/
+#ifdef CONFIG_HUAWEI_KERNEL		
+	.rsl_id = "D:PMIC_SSBI",
+#endif	
+/* DTS2012010403939 fengwei 20120111 end >*/
+	.controller_type = MSM_SBI_CTRL_SSBI2,
+	.slave	= {
+		.name			= "pm8058-core",
+		.platform_data		= &pm8058_7x30_data,
 	},
 };
+#endif
 
 static struct i2c_board_info cy8info[] __initdata = {
 	{
@@ -1520,11 +1462,17 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 /*DTS2011042704563 penghai 20110427 end>*/
 /*<BU5D08116, lijuan 00152865, 20100419 begin*/
 /* < DTS2011071802246 zhangyu 20110718 BEGIN */
-#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX
+/* <DTS2012032603420 sibingsong 20120326 begin */
+#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1
 	{
-		I2C_BOARD_INFO("s5k4e1gx", 0x6E >> 1),
+		I2C_BOARD_INFO("s5k4e1", 0x6E >> 1),
+	},
+	/* real address is 0x0C */
+	{
+		I2C_BOARD_INFO("s5k4e1_af", 0x18 >> 2),	
 	},
 #endif 
+/* DTS2012032603420 sibingsong 20120326 end> */
 /* DTS2011071802246 zhangyu 20110718 END > */ 
 /* BU5D08116, lijuan 00152865, 20100419 end> */
 /*<BU5D09497  lijuan 00152865  20100514 begin*/
@@ -1535,6 +1483,14 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 #endif 
 /* BU5D09497  lijuan 00152865 20100514 end> */
 
+/* < DTS2012041003147 liuxin 20120223 begin */
+#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX_P
+	{
+		I2C_BOARD_INFO("s5k4e1gx_p", 0x30 >> 1),
+	},
+#endif 
+/* DTS2012041003147 liuxin 20120223 end > */
+
 /*<DTS2011042704563 penghai 20110427 begin*/
 #ifdef CONFIG_HUAWEI_SENSOR_MT9E013
 	{
@@ -1543,6 +1499,11 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 #endif
 /*DTS2011042704563 penghai 20110427 end>*/
 
+#ifdef CONFIG_WEBCAM_OV9726
+	{
+		I2C_BOARD_INFO("ov9726", 0x10),
+	},
+#endif
 #ifdef CONFIG_S5K3E2FX
 	{
 		I2C_BOARD_INFO("s5k3e2fx", 0x20 >> 1),
@@ -1593,32 +1554,27 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 	},
 #endif
 /* DTS2011090701903 zhangyu 20110907 end > */ 
+/* <DTS2012041003722 sibingsong 20120410 begin */
 /*<  DTS2011101000840   yuguangcai 20111010 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_S5K5CA
+#ifdef CONFIG_HUAWEI_CAMERA_SENSOR_S5K5CA
 	{
 		I2C_BOARD_INFO("s5k5ca", 0x5A >> 1),
 	},
 #endif
 /* DTS2011101000840   yuguangcai 20111010 end > */
-/* < DTS2011100802746 zhangyu 20111010 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX_P
-	{
-		I2C_BOARD_INFO("s5k4e1gx_p", 0x30 >> 1),
-	},
-#endif 
-/* DTS2011100802746 zhangyu 20111010 end > */ 
 /*< DTS2011102805854 yuguangcai 20111031 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_MT9T113
+#ifdef CONFIG_HUAWEI_CAMERA_SENSOR_MT9T113
 	{
 		I2C_BOARD_INFO("mt9t113", 0x3C >> 2), 
 	},
 #endif
 /* DTS2011102805854 yuguangcai 20111031 end > */
-
+/* DTS2012041003722 sibingsong 20120410 end> */
 };
 
 #ifdef CONFIG_MSM_CAMERA
 #define	CAM_STNDBY	143
+
 /*<DTS2011042704563 penghai 20110427 begin*/
 static uint32_t camera_off_gpio_table[] = {
 	/* parallel CAMERA interfaces */
@@ -1638,7 +1594,9 @@ static uint32_t camera_off_gpio_table[] = {
 	GPIO_CFG(12, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* PCLK */
 	GPIO_CFG(13, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* HSYNC_IN */
 	GPIO_CFG(14, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* VSYNC_IN */
-	GPIO_CFG(15, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), /* MCLK */
+	/*< DTS2011122201199 yuguangcai 20120326 begin */
+	GPIO_CFG(15, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* MCLK */
+	/* DTS2011122201199 yuguangcai 20120326 end > */
 	#ifdef CONFIG_HUAWEI_CAMERA
     /*< DTS2011062900801   songxiaoming 20110629 begin */
     /*< DTS2011081004264 zhangyu 20110810 begin */
@@ -1647,16 +1605,17 @@ static uint32_t camera_off_gpio_table[] = {
 	/* DTS2011062900801   songxiaoming 20110629 end > */
 	GPIO_CFG(31, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), /* RESET FOR OV7690*/
 	GPIO_CFG(52, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* pwd FOR mt9d113*/
-	GPIO_CFG(55, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* RESET FOR 4E1*/	
+	/* <DTS2012041003722 sibingsong 20120410 begin */
+	GPIO_CFG(55, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), /* RESET FOR 4E1*/	
 	GPIO_CFG(56, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* VCM FOR 4E1*/	
-	GPIO_CFG(88, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* ov5647*/	
+	GPIO_CFG(88, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), /* ov5647*/	
+	/* DTS2012041003722 sibingsong 20120410 end> */
 	#endif
 /*  DTS2010072200238 luojianhong 201000722 end > */
 };
 static uint32_t camera_on_gpio_table[] = {
 	/* parallel CAMERA interfaces */
 	GPIO_CFG(0,  0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* RST */
-	GPIO_CFG(1, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), /* VCM */
 	GPIO_CFG(2,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT2 */
 	GPIO_CFG(3,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT3 */
 	GPIO_CFG(4,  1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* DAT4 */
@@ -1670,7 +1629,10 @@ static uint32_t camera_on_gpio_table[] = {
 	GPIO_CFG(12, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* PCLK */
 	GPIO_CFG(13, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* HSYNC_IN */
 	GPIO_CFG(14, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), /* VSYNC_IN */
-	GPIO_CFG(15, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), /* MCLK */
+	/*< DTS2011122201199 yuguangcai 20120326 begin */
+	/*increase the driving capability of  MCLK*/
+	GPIO_CFG(15, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* MCLK */
+	/* DTS2011122201199 yuguangcai 20120326 end > */
 	/*<BU5D09497  lijuan 00152865  20100514 begin*/
 	#ifdef CONFIG_HUAWEI_CAMERA
 	GPIO_CFG(16, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), /* SCL */
@@ -1713,90 +1675,62 @@ static void config_gpio_table(uint32_t *table, int len)
 }
 
 /*<BU5D08108, lijuan 00152865, 20100419 begin*/
+/*< DTS2012020400396 zhangyu 20120206 begin */
 #ifdef CONFIG_HUAWEI_CAMERA
-/*< DTS2010062300810 lijianzhao 20100624 begin*/
- struct msm_camera_sensor_vreg sensor_vreg_array[] = {
-    {
-		.vreg_name   = "gp7",
-		.mv	  = 2850,
-		.always_on = 0,
-	},    
-    {
-		.vreg_name   = "gp2",
-		.mv	  = 1800,
-		.always_on = 0,
-	},
-
+/*< DTS2011122201199 yuguangcai 20120326 begin */
+/*pull up the IOVDD/DVDD first*/
+static struct regulator_bulk_data regs_camera[] = {
+	{ .supply = "gp2", .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "gp7", .min_uV = 2850000, .max_uV = 2850000 },
 };
-/*DTS2010062300810 lijianzhao 20100624 end >*/
-static int32_t msm_camera_vreg_config_on(
-       struct msm_camera_sensor_vreg *sensor_vreg,
-       uint8_t vreg_num)
+/* DTS2011122201199 yuguangcai 20120326 end > */
+
+static void __init msm_camera_vreg_init(void)
 {
-    struct vreg *vreg_handle;
-    uint8_t temp_vreg_sum;
-    int32_t rc;
-    
-    if(sensor_vreg_array == NULL)
-    {
-        return 0;
-    }
-    
-    for(temp_vreg_sum = 0; temp_vreg_sum < vreg_num;temp_vreg_sum++)
-    {
-        vreg_handle = vreg_get(0, sensor_vreg[temp_vreg_sum].vreg_name);
-    	if (!vreg_handle) {
-    		printk(KERN_ERR "vreg_handle get failed\n");
-    		return -EIO;
-    	}
-    	rc = vreg_set_level(vreg_handle, sensor_vreg[temp_vreg_sum].mv);
-    	if (rc) {
-    		printk(KERN_ERR "vreg_handle set level failed\n");
-    		return -EIO;
-    	}
-    	rc = vreg_enable(vreg_handle);
-    	if (rc) {
-    		printk(KERN_ERR "vreg_handle enable failed\n");
-    		return -EIO;
-    	}
-    }
-    return 0;
+	int rc;
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs_camera), regs_camera);
+
+	if (rc) {
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		return;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs_camera), regs_camera);
+
+	if (rc) {
+		pr_err("%s: could not set voltages: %d\n", __func__, rc);
+		return;
+	}
 }
 
-static int32_t msm_camera_vreg_config_off(
-       struct msm_camera_sensor_vreg *sensor_vreg,
-       uint8_t vreg_num)
+static void msm_camera_vreg_config(int vreg_en)
 {
-    struct vreg *vreg_handle;
-    uint8_t temp_vreg_sum;
-    int32_t rc;
-    
-    if(sensor_vreg == NULL)
-    {
-        return 0;
-    }
+	int rc = vreg_en ?
+		regulator_bulk_enable(ARRAY_SIZE(regs_camera), regs_camera) :
+		regulator_bulk_disable(ARRAY_SIZE(regs_camera), regs_camera);
 
-    for(temp_vreg_sum = 0; temp_vreg_sum < vreg_num;temp_vreg_sum++)
-    {
-        if(sensor_vreg[temp_vreg_sum].always_on)
-        {
-            continue;
-        }
-        vreg_handle = vreg_get(0, sensor_vreg[temp_vreg_sum].vreg_name);
-    	if (!vreg_handle) {
-    		printk(KERN_ERR "vreg_handle get failed\n");
-    		return -EIO;
-    	}
-    	rc = vreg_disable(vreg_handle);
-    	if (rc) {
-    		printk(KERN_ERR "vreg_handle disable failed\n");
-    		return -EIO;
-    	}
-    }
-    return 0;
+	if (rc)
+		pr_err("%s: could not %sable regulators: %d\n",
+				__func__, vreg_en ? "en" : "dis", rc);
 }
+
 #endif //CONFIG_HUAWEI_CAMERA
+/* DTS2012020400396 zhangyu 20120206 end > */
 /* BU5D08108, lijuan 00152865, 20100419 end> */
+/* <DTS2012041003722 sibingsong 20120410 begin */
+#ifdef CONFIG_HUAWEI_CAMERA
+static void set_s5k5ca_is_on(int s5k5ca_probe_success)
+{
+	s5k5ca_is_on = s5k5ca_probe_success ;
+}
+
+static int get_s5k5ca_is_on(void)
+{
+	return  s5k5ca_is_on;
+}
+#endif
+/* DTS2012041003722 sibingsong 20120410 end> */
 static int config_camera_on_gpios(void)
 {
 	config_gpio_table(camera_on_gpio_table,
@@ -1860,7 +1794,7 @@ struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.csisz  = 0x00000400,
 	.ioext.csiirq = INT_CSI,
 	.ioclk.mclk_clk_rate = 24000000,
-	.ioclk.vfe_clk_rate  = 122880000,
+	.ioclk.vfe_clk_rate  = 147456000,
 };
 
 /*<DTS2010052800141 liqingshan 20100511 begin*/
@@ -1915,13 +1849,16 @@ static struct msm_camera_sensor_flash_data flash_hi701 = {
 	.flash_src  = &msm_flash_src_pwm
 };
 
-static struct msm_camera_sensor_info msm_camera_sensor_hi701_data = {	
-	.sensor_name	= "hi701",
+/*< DTS2012020400396 zhangyu 20120206 begin */
+static struct msm_camera_sensor_info msm_camera_sensor_hi701_data = {
+    /* <DTS2012041003722 sibingsong 20120410 begin */
+	/* < DTS2012031904303 zhouqiwei 20130319 begin */
+	.sensor_name	= (char*)front_camera_name,
+	/* DTS2012031904303 zhouqiwei 20130319 end > */
+    /* DTS2012041003722 sibingsong 20120410 end> */
 	.sensor_reset   = 31,
-	.sensor_vreg  = sensor_vreg_array,
-    .vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 1,
 	.sensor_pwd     = 52,
 	.vcm_pwd        = 0,
@@ -1941,21 +1878,21 @@ static struct platform_device msm_camera_sensor_hi701 = {
 };
 #endif
 /* DTS2011051400258   songxiaoming 20110514 end > */
-
+/* <DTS2012041003722 sibingsong 20120410 begin */
 /*<  DTS2011101000840   yuguangcai 20111010 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_S5K5CA
+#ifdef CONFIG_HUAWEI_CAMERA_SENSOR_S5K5CA
 static struct msm_camera_sensor_flash_data flash_s5k5ca = {
 	.flash_type = MSM_CAMERA_FLASH_LED,
 	.flash_src  = &msm_flash_src_pwm
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_s5k5ca_data = {	
-	.sensor_name	= "s5k5ca",
+	/* < DTS2012031904303 zhouqiwei 20130319 begin */
+	.sensor_name	= (char*)back_camera_name,
+	/* DTS2012031904303 zhouqiwei 20130319 end > */
 	.sensor_reset   = 88,
-	.sensor_vreg  = sensor_vreg_array,
-       .vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 0,
 	.sensor_pwd     = 55,
 	.vcm_pwd        = 56,
@@ -1964,6 +1901,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_s5k5ca_data = {
 	.resource       = msm_camera_resources,
 	.flash_data     = &flash_s5k5ca,
 	.num_resources  = ARRAY_SIZE(msm_camera_resources),
+	.set_s5k5ca_is_on = set_s5k5ca_is_on,
 	.csi_if         = 1
     //    .master_init_control_slave = sensor_master_init_control_slave,
 };
@@ -1977,19 +1915,19 @@ static struct platform_device msm_camera_sensor_s5k5ca = {
 #endif
 /* DTS2011101000840   yuguangcai 20111010 end > */
 /*< DTS2011102805854 yuguangcai 20111029 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_MT9T113
+#ifdef CONFIG_HUAWEI_CAMERA_SENSOR_MT9T113
 static struct msm_camera_sensor_flash_data flash_mt9t113 = {
 	.flash_type = MSM_CAMERA_FLASH_LED,
 	.flash_src  = &msm_flash_src_pwm
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_mt9t113_data = {	
-	.sensor_name	= "mt9t113",
+	/* < DTS2012031904303 zhouqiwei 20130319 begin */
+	.sensor_name	= (char*)back_camera_name,
+	/* DTS2012031904303 zhouqiwei 20130319 end > */
 	.sensor_reset   = 88,
-	.sensor_vreg  = sensor_vreg_array,
-       .vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 0,
 	.sensor_pwd     = 55,
 	.vcm_pwd        = 56,
@@ -2010,6 +1948,7 @@ static struct platform_device msm_camera_sensor_mt9t113 = {
 };
 #endif
 /* DTS2011102805854 yuguangcai 20111029 end > */
+/* DTS2012041003722 sibingsong 20120410 end> */
 /*<BU5D08108, lijuan 00152865, 20100419 begin*/
 #ifdef CONFIG_HUAWEI_SENSOR_OV7690
 static struct msm_camera_sensor_flash_data flash_ov7690 = {
@@ -2024,10 +1963,8 @@ static struct msm_camera_sensor_info msm_camera_sensor_ov7690_data = {
 	/* DTS2011031804440 penghai 20110318 end>*/	
 	/*DTS2011042704563 penghai 20110427 end>*/
 	.sensor_reset   = 31,
-	.sensor_vreg  = sensor_vreg_array,
-    	.vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	/*<BU5D08116, lijuan 00152865, 20100419 begin*/
 	.slave_sensor = 1,
 	/*<BU5D08116, lijuan 00152865, 20100419 end*/
@@ -2063,10 +2000,8 @@ static struct msm_camera_sensor_info msm_camera_sensor_himax0356_data = {
 	/* DTS2011031804440 penghai 20110318 end>*/	
 	/*DTS2011042704563 penghai 20110427 end>*/
 	.sensor_reset   = 31,
-	.sensor_vreg  = sensor_vreg_array,
-    .vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 1,
 	.sensor_pwd     = 0,
 	.vcm_pwd        = 0,
@@ -2094,14 +2029,16 @@ static struct msm_camera_sensor_flash_data flash_mt9d113 = {
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_mt9d113_data = {
-	/*<DTS2011022300749 zhangyu 20110223 begin*/	
-	.sensor_name	= "mt9d113",
+    /* <DTS2012041003722 sibingsong 20120410 begin */
+    /*<DTS2011022300749 zhangyu 20110223 begin*/	
+	/* < DTS2012031904303 zhouqiwei 20130319 begin */
+	.sensor_name	= (char*)front_camera_name,
+	/* DTS2012031904303 zhouqiwei 20130319 end > */
 	/*DTS2011022300749 zhangyu 20110223 end>*/
+    /* DTS2012041003722 sibingsong 20120410 end> */
 	.sensor_reset   = 31,
-	.sensor_vreg  = sensor_vreg_array,
-    .vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 1,
 	.sensor_pwd     = 52,
 	.vcm_pwd        = 0,
@@ -2130,12 +2067,14 @@ static struct msm_camera_sensor_flash_data flash_mt9v114 = {
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_mt9v114_data = {
-	.sensor_name	= "mt9v114_sunny",
+    /* <DTS2012041003722 sibingsong 20120410 begin */
+    /* < DTS2012031904303 zhouqiwei 20130319 begin */
+	.sensor_name	= (char*)front_camera_name,
+	/* DTS2012031904303 zhouqiwei 20130319 end > */
+    /* DTS2012041003722 sibingsong 20120410 end> */
 	.sensor_reset   = 31,
-	.sensor_vreg  = sensor_vreg_array,
-    .vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 1,
 	.sensor_pwd     = 52,
 	.vcm_pwd        = 0,
@@ -2165,10 +2104,8 @@ static struct msm_camera_sensor_flash_data flash_ov7736 = {
 static struct msm_camera_sensor_info msm_camera_sensor_ov7736_data = {
 	.sensor_name	= "ov7736",
 	.sensor_reset   = 31,
-	.sensor_vreg  = sensor_vreg_array,
-    .vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 1,
 	.sensor_pwd     = 52,
 	.vcm_pwd        = 0,
@@ -2202,83 +2139,48 @@ static struct platform_device msm_device_pmic_leds = {
 /*BU5D10275  liyuping  00166065 20100529 end> */
 
 /*<BU5D10443, lijuan 00152865, 20100524 begin*/
-#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX
-static struct msm_camera_sensor_flash_data flash_s5k4e1gx = {
+/* <DTS2012032603420 sibingsong 20120326 begin */
+#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1
+static struct msm_camera_sensor_flash_data flash_s5k4e1 = {
 	.flash_type = MSM_CAMERA_FLASH_LED,
 	.flash_src  = &msm_flash_src_pwm
 };
 
 /* < DTS2011071802246 zhangyu 20110718 BEGIN */
-static struct msm_camera_sensor_info msm_camera_sensor_s5k4e1gx_data = {
-	/*<DTS2011042704563 penghai 20110427 begin*/
+static struct msm_camera_sensor_info msm_camera_sensor_s5k4e1_data = {
+    /* <DTS2012041003722 sibingsong 20120410 begin */
+    /*<DTS2011042704563 penghai 20110427 begin*/
 	/*<DTS2011031804440 penghai 20110318 begin*/
-	.sensor_name    = "s5k4e1gx",
+	/* < DTS2012031904303 zhouqiwei 20130319 begin */
+	.sensor_name    = (char*)back_camera_name,
+	/* DTS2012031904303 zhouqiwei 20130319 end > */
 	/* DTS2011031804440 penghai 20110318 end>*/	
 	/*DTS2011042704563 penghai 20110427 end>*/
-	/*<  DTS2011101302587   yuguangcai 20111013 begin */
+    /* DTS2012041003722 sibingsong 20120410 end> */
 	.sensor_reset   = 88,
-	/* DTS2011101302587   yuguangcai 20111013 end > */
-	.sensor_vreg  = sensor_vreg_array,
-	.vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 0,
-	.sensor_pwd     = 0,
+	.sensor_pwd     = 55,
 	.vcm_pwd        = 56,
 	.vcm_enable     = 1,
 	.pdata          = &msm_camera_device_data,
 	.resource       = msm_camera_resources,
-	.flash_data     = &flash_s5k4e1gx,
+	.flash_data     = &flash_s5k4e1,
 	.num_resources  = ARRAY_SIZE(msm_camera_resources),
 	.csi_if         = 1
 };
 /* DTS2011071802246 zhangyu 20110718 END > */ 
 
-static struct platform_device msm_camera_sensor_s5k4e1gx = {
-	.name = "msm_camera_s5k4e1gx",
+static struct platform_device msm_camera_sensor_s5k4e1 = {
+	.name = "msm_camera_s5k4e1",
 	.dev = {
-		.platform_data = &msm_camera_sensor_s5k4e1gx_data,
+		.platform_data = &msm_camera_sensor_s5k4e1_data,
 	},
 };
 #endif
+/* DTS2012032603420 sibingsong 20120326 end> */
 /* BU5D10443, lijuan 00152865, 20100524 end >*/
-
-/* < DTS2011100802746 zhangyu 20111010 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX_P
-static struct msm_camera_sensor_flash_data flash_s5k4e1gx_p = {
-	.flash_type = MSM_CAMERA_FLASH_LED,
-	.flash_src  = &msm_flash_src_pwm
-};
-
-static struct msm_camera_sensor_info msm_camera_sensor_s5k4e1gx_p_data = {
-	.sensor_name    = "s5k4e1gx_p",
-	/*<  DTS2011101302587   yuguangcai 20111013 begin */
-	/*< DTS2011110104318 zhangyu 20111103 begin */
-	.sensor_reset   = 55,
-	/* DTS2011110104318 zhangyu 20111103 end > */
-	/* DTS2011101302587   yuguangcai 20111013 end > */
-	.sensor_vreg  = sensor_vreg_array,
-	.vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
-	.slave_sensor = 0,
-	.sensor_pwd     = 0,
-	.vcm_pwd        = 56,
-	.vcm_enable     = 1,
-	.pdata          = &msm_camera_device_data,
-	.resource       = msm_camera_resources,
-	.flash_data     = &flash_s5k4e1gx_p,
-	.num_resources  = ARRAY_SIZE(msm_camera_resources)
-};
-
-static struct platform_device msm_camera_sensor_s5k4e1gx_p = {
-	.name = "msm_camera_s5k4e1gx_p",
-	.dev = {
-		.platform_data = &msm_camera_sensor_s5k4e1gx_p_data,
-	},
-};
-#endif
-/* DTS2011100802746 zhangyu 20111010 end > */ 
 
 /* < DTS2011090701903 zhangyu 20110907 begin */
 #ifdef CONFIG_HUAWEI_SENSOR_MT9P017
@@ -2288,17 +2190,19 @@ static struct msm_camera_sensor_flash_data flash_mt9p017 = {
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_mt9p017_data = {
-	.sensor_name    = "mt9p017",
+    /* <DTS2012041003722 sibingsong 20120410 begin */
+    /* < DTS2012031904303 zhouqiwei 20130319 begin */
+	.sensor_name    = (char*)back_camera_name,
+	/* DTS2012031904303 zhouqiwei 20130319 end > */
+    /* DTS2012041003722 sibingsong 20120410 end> */
 	.sensor_reset   = 88,
 	.sensor_pwd     = 55,
 	.vcm_pwd        = 56,
 	.vcm_enable     = 1,
 	.pdata          = &msm_camera_device_data,
 	.flash_data     = &flash_mt9p017,
-	.sensor_vreg  = sensor_vreg_array,
-	.vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 0, 	
 	 .resource       = msm_camera_resources,        
 	.num_resources  = ARRAY_SIZE(msm_camera_resources),
@@ -2329,10 +2233,8 @@ static struct msm_camera_sensor_info msm_camera_sensor_ov5647_sunny_data = {
 	/* DTS2011031804440 penghai 20110318 end>*/	
 	/*DTS2011042704563 penghai 20110427 end>*/
 	.sensor_reset   = 88,
-	.sensor_vreg  = sensor_vreg_array,
-	.vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor = 0,
 	.sensor_pwd     = 55,
 	.vcm_pwd        = 56,
@@ -2351,6 +2253,37 @@ static struct platform_device msm_camera_sensor_ov5647_sunny = {
 };
 #endif
 /* BU5D09497  lijuan 00152865  20100514 end> */
+/* < DTS2012041003147 liuxin 20120223 begin */
+#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX_P
+static struct msm_camera_sensor_flash_data flash_s5k4e1gx_p = {
+	.flash_type = MSM_CAMERA_FLASH_LED,
+	.flash_src  = &msm_flash_src_pwm
+};
+
+static struct msm_camera_sensor_info msm_camera_sensor_s5k4e1gx_p_data = {
+	.sensor_name    = "s5k4e1gx_p",
+	.sensor_reset   = 55,
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
+	.slave_sensor = 0,
+	.sensor_pwd     = 0,
+	.vcm_pwd        = 56,
+	.vcm_enable     = 1,
+	.pdata          = &msm_camera_device_data,
+	.resource       = msm_camera_resources,
+	.flash_data     = &flash_s5k4e1gx_p,
+	.num_resources  = ARRAY_SIZE(msm_camera_resources)
+};
+
+static struct platform_device msm_camera_sensor_s5k4e1gx_p = {
+	.name = "msm_camera_s5k4e1gx_p",
+	.dev = {
+		.platform_data = &msm_camera_sensor_s5k4e1gx_p_data,
+	},
+};
+#endif
+/* DTS2012041003147 liuxin 20120223 end > */
+
 
 /*<DTS2011042704563 penghai 20110427 begin*/
 #ifdef CONFIG_HUAWEI_SENSOR_MT9E013
@@ -2360,11 +2293,13 @@ static struct msm_camera_sensor_flash_data flash_mt9e013 = {
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_mt9e013_data = {
-	.sensor_name    = "mt9e013",
-	.sensor_vreg  = sensor_vreg_array,
-	.vreg_num     = ARRAY_SIZE(sensor_vreg_array),
-	.vreg_enable_func = msm_camera_vreg_config_on,
-	.vreg_disable_func = msm_camera_vreg_config_off,
+    /* <DTS2012041003722 sibingsong 20120410 begin */
+    /* < DTS2012031904303 zhouqiwei 20130319 begin */
+	.sensor_name    = (char*)back_camera_name,
+	/* DTS2012031904303 zhouqiwei 20130319 end > */
+    /* DTS2012041003722 sibingsong 20120410 end> */
+	.vreg_enable_func = msm_camera_vreg_config,
+	.vreg_disable_func = msm_camera_vreg_config,
 	.slave_sensor   = 0,
 	.sensor_reset   = 88,
 	.sensor_pwd     = 55,
@@ -2376,6 +2311,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_mt9e013_data = {
 	.flash_data     = &flash_mt9e013,
 	.csi_if         = 1
 };
+/* DTS2012020400396 zhangyu 20120206 end > */
 
 static struct platform_device msm_camera_sensor_mt9e013 = {
 	.name      = "msm_camera_mt9e013",
@@ -2388,6 +2324,11 @@ static struct platform_device msm_camera_sensor_mt9e013 = {
 
 
 #ifdef CONFIG_WEBCAM_OV9726
+
+static struct msm_camera_sensor_platform_info ov9726_sensor_7630_info = {
+	.mount_angle = 90
+};
+
 static struct msm_camera_sensor_flash_data flash_ov9726 = {
 	.flash_type	= MSM_CAMERA_FLASH_LED,
 	.flash_src	= &msm_flash_src_pwm
@@ -2402,6 +2343,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_ov9726_data = {
 	.resource	= msm_camera_resources,
 	.num_resources	= ARRAY_SIZE(msm_camera_resources),
 	.flash_data	= &flash_ov9726,
+	.sensor_platform_info = &ov9726_sensor_7630_info,
 	.csi_if		= 1
 };
 struct platform_device msm_camera_sensor_ov9726 = {
@@ -2470,6 +2412,10 @@ static struct platform_device msm_camera_sensor_mt9p012 = {
 /*deletes some lines*/
 /*DTS2011042704563 penghai 20110427 end>*/
 #ifdef CONFIG_VX6953
+static struct msm_camera_sensor_platform_info vx6953_sensor_7630_info = {
+	.mount_angle = 0
+};
+
 static struct msm_camera_sensor_flash_data flash_vx6953 = {
 	.flash_type = MSM_CAMERA_FLASH_LED,
 	.flash_src  = &msm_flash_src_pwm
@@ -2483,6 +2429,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_vx6953_data = {
 	.pdata          = &msm_camera_device_data,
 	.resource       = msm_camera_resources,
 	.num_resources  = ARRAY_SIZE(msm_camera_resources),
+	.sensor_platform_info = &vx6953_sensor_7630_info,
 	.flash_data     = &flash_vx6953,
 	.csi_if         = 1
 };
@@ -2534,6 +2481,7 @@ static struct platform_device huawei_device_detect = {
 	.id		= -1,
 };
 /* <DTS2011032104626 shenjinming 20110321 end> */
+/*< DTS2012021602342 zhongjinrong 20120224 begin */
 /*< DTS2011093001643 lijianzhao 20110930 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 static struct gpio_event_direct_entry hw_slide_map[] = {
@@ -2588,6 +2536,7 @@ static void __init add_slide_detect_device(void)
 }
 #endif
 /* DTS2011093001643 lijianzhao 20110930 end >*/
+/* DTS2012021602342 zhongjinrong 20120224 end >*/
 #ifdef CONFIG_MT9T013
 static struct msm_camera_sensor_flash_data flash_mt9t013 = {
 	.flash_type = MSM_CAMERA_FLASH_LED,
@@ -2722,17 +2671,17 @@ static int __init snddev_hac_gpio_init(void)
     /* <DTS2011071600361 liyuping 20110716 begin */
 	/* < DTS2011082302564 liwei 20110823 begin */
 	/*<DTS2011091502092 liyuping 20110915 begin */
-    /* <DTS2011091200073 zhangbo 20110912 begin */
-	/* < DTS2011102401822 liwei 20111024 begin */
+/* <DTS2011091200073 zhangbo 20110912 begin */
     } else if (machine_is_msm8255_u8860() 
     			|| machine_is_msm8255_u8860lp()
+                /* < DTS2012022905490 ganfan 20120301 begin */
+                || machine_is_msm8255_u8860_r()
+                /* DTS2012022905490 ganfan 20120301 end > */
     			|| machine_is_msm8255_u8860_92()
                 || machine_is_msm8255_u8680()
-                || machine_is_msm8255_u8667()
 				|| machine_is_msm8255_u8860_51()
 				|| machine_is_msm8255_u8730())
-	/* DTS2011102401822 liwei 20111024 end > */
-    /* DTS2011091200073 zhangbo 20110912 end> */
+/* DTS2011091200073 zhangbo 20110912 end> */
 	/* DTS2011091502092 liyuping 20110915 end> */             
 	/* DTS2011082302564 liwei 20110823 end > */
 	/* DTS2011071600361 liyuping 20110716 end> */
@@ -2760,13 +2709,48 @@ static int __init snddev_hac_gpio_init(void)
     return rc;
 }
 /* DTS2011060201308 yanghaimin 20110602, end>*/
+
+/* < DTS2012022402932 gaolin 20120224 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+static struct regulator_bulk_data snddev_silicon_mic_pmic_regs[] = {
+	{ .supply = "wlan", .min_uV = 2900000, .max_uV = 2900000 },
+};
+
+/* init silicon mic */
+static int __init snddev_silicon_mic_pmic_voltage_init(void)
+{
+	int rc;
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(snddev_silicon_mic_pmic_regs), snddev_silicon_mic_pmic_regs);
+
+	if (rc) {
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		goto out;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(snddev_silicon_mic_pmic_regs), snddev_silicon_mic_pmic_regs);
+
+	if (rc) {
+		pr_err("%s: could not set regulator voltages: %d\n",
+				__func__, rc);
+		goto regs_free;
+	}
+
+	return 0;
+
+regs_free:
+	regulator_bulk_free(ARRAY_SIZE(snddev_silicon_mic_pmic_regs), snddev_silicon_mic_pmic_regs);
+out:
+	return rc;
+}
+#endif
+/* DTS2012022402932 gaolin 20120224 end > */
+
 /*< BU5D08419 haoqingtao 20100424 begin*/    
 void msm_snddev_tx_route_config(void)
 {
 	int rc;
-    /*<DTS2011092905909 yinzhaoyang 20110929  begin*/
-    struct vreg *   vreg_ldo13 = NULL;
-    /* DTS2011092905909 yinzhaoyang 20110929  end >*/
+
 	pr_debug("%s()\n", __func__);
 /*< DTS2010092400487  lijianzhao 20100924 begin */
 	/*< DTS2010112702297 wangquanli 201001125 begin */
@@ -2796,49 +2780,31 @@ void msm_snddev_tx_route_config(void)
 	}
 /* DTS2010092400487  lijianzhao 20100924 end >*/
 
-    /*<DTS2011092905909 yinzhaoyang 20110929  begin*/
-    /*enable L13 for master and second MIC power */
-    if (machine_is_msm8255_u8730())
+/* < DTS2012022402932 gaolin 20120224 begin */
+/* enable silicon mic */
+#ifdef CONFIG_HUAWEI_KERNEL
+    if (machine_is_msm8255_u8730()
+	    || machine_is_msm8255_u8667())
     {
-      vreg_ldo13 = vreg_get(NULL, "wlan");
-      if (!vreg_ldo13) 
-      {
-          pr_err("%s: VREG L13 get failed\n", __func__);
-	
-      }
-      else
-      {
-          pr_err("%s: VREG L13 get succ \n", __func__);
-		  rc = vreg_set_level(vreg_ldo13, 2900);
-          if (rc)
-          {
-              pr_err("%s: VREG L13 set failed\n", __func__);
-          }
-          else
-          {
-              pr_err("%s: VREG L13set succ \n", __func__);
-          }
+       int rcc = regulator_bulk_enable(ARRAY_SIZE(snddev_silicon_mic_pmic_regs), snddev_silicon_mic_pmic_regs);
 
-          rc = vreg_enable(vreg_ldo13);
-          if (rc)
-          {
-              pr_err("%s: VREG L13 enable failed\n", __func__);
-          }
-          else
-          {
-              pr_err("%s: VREG L13 enable succ \n", __func__);
-          }
-      }	      
+       if (rcc)
+       {
+          pr_err("%s: could not enable regulators of silicon mic on pmic: %d\n", __func__, rcc);
+       }
+       else
+       {
+          pr_err("%s: enable regulators of silicon mic on pmic succ: %d\n", __func__, rcc);
+       } 
     }
-    /* DTS2011092905909 yinzhaoyang 20110929  end >*/
+#endif
+/* DTS2012022402932 gaolin 20120224 end > */
 }
 
 void msm_snddev_tx_route_deconfig(void)
 {
 	int rc;
-    /*<DTS2011092905909 yinzhaoyang 20110929  begin*/
-    struct vreg *   vreg_ldo13 = NULL;
-    /* DTS2011092905909 yinzhaoyang 20110929  end >*/
+
 	pr_debug("%s()\n", __func__);
 /*< DTS2010092400487  lijianzhao 20100924 begin */
 	/*< DTS2010112702297 wangquanli 201001125 begin */
@@ -2866,31 +2832,26 @@ void msm_snddev_tx_route_deconfig(void)
 		}
 	}
 /* DTS2010092400487  lijianzhao 20100924 end >*/
-    /*<DTS2011092905909 yinzhaoyang 20110929  begin*/
-    /*disable L13 for master and second MIC power */
-    if (machine_is_msm8255_u8730())
+
+/* < DTS2012022402932 gaolin 20120224 begin */
+/* disable silicon mic */
+#ifdef CONFIG_HUAWEI_KERNEL
+    if (machine_is_msm8255_u8730()
+	    || machine_is_msm8255_u8667())
     {
-      vreg_ldo13 = vreg_get(NULL, "wlan");
-      if (!vreg_ldo13) 
+      int rcc = regulator_bulk_disable(ARRAY_SIZE(snddev_silicon_mic_pmic_regs), snddev_silicon_mic_pmic_regs);
+
+      if (rcc) 
       {
-          pr_err("%s: VREG L13 get failed\n", __func__);
-	      
+         pr_err("%s: could not disable regulators of silicon mic on pmic: %d\n", __func__, rcc);
       }
       else
-	  {
-          pr_err("%s: VREG L13 get succ \n", __func__);
-		  rc = vreg_disable(vreg_ldo13);
-	      if (rc)
-	      {
-	         pr_err("%s: VREG L13 disable failed\n", __func__);
-	      }
-	      else
-	      {
-	         pr_err("%s: VREG L13 disable succ \n", __func__);
-	      }
+      {
+         pr_err("%s: disable regulators of silicon mic on pmic succ: %d\n", __func__, rcc);
       }
     }
-    /* DTS2011092905909 yinzhaoyang 20110929  end >*/
+#endif
+/* DTS2012022402932 gaolin 20120224 end > */
 }
 /* < DTS2010061100003 luojianhong 201000612 begin*/
 static struct amplifier_platform_data audio_amplifier_data = {
@@ -2948,6 +2909,49 @@ void msm_snddev_poweramp_off(void)
 /*  DTS2010061100003 luojianhong 201000612 end > */
 
 /*< DTS2010120204486 dongchen 20101223 begin */
+/*< DTS2012021102090 gaolin 20120211 begin */
+/*< DTS2011121401923 yinzhaoyang 20111220 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+static struct regulator_bulk_data snddev_regs[] = {
+	//{ .supply = "gp4", .min_uV = 2600000, .max_uV = 2600000 },
+	{ .supply = "ncp", .min_uV = 1800000, .max_uV = 1800000 },
+};
+#else
+static struct regulator_bulk_data snddev_regs[] = {
+	{ .supply = "gp4", .min_uV = 2600000, .max_uV = 2600000 },
+	{ .supply = "ncp", .min_uV = 1800000, .max_uV = 1800000 },
+};
+#endif
+/* DTS2011121401923 yinzhaoyang 20111220 end > */
+/* DTS2012021102090 gaolin 20120211 end >*/
+
+static int __init snddev_hsed_voltage_init(void)
+{
+	int rc;
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(snddev_regs), snddev_regs);
+
+	if (rc) {
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		goto out;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(snddev_regs), snddev_regs);
+
+	if (rc) {
+		pr_err("%s: could not set regulator voltages: %d\n",
+				__func__, rc);
+		goto regs_free;
+	}
+
+	return 0;
+
+regs_free:
+	regulator_bulk_free(ARRAY_SIZE(snddev_regs), snddev_regs);
+out:
+	return rc;
+}
+
 #ifdef CONFIG_HUAWEI_KERNEL
 void msm_snddev_poweramp_4music_on(void)
 {
@@ -2988,58 +2992,22 @@ void msm_snddev_hac_off(void)
 #endif
 /* DTS2011060201308 yanghaimin 20110602, end>*/
 
-static struct vreg *snddev_vreg_ncp, *snddev_vreg_gp4;
 
 void msm_snddev_hsed_voltage_on(void)
 {
-	int rc;
+	int rc = regulator_bulk_enable(ARRAY_SIZE(snddev_regs), snddev_regs);
 
-	snddev_vreg_gp4 = vreg_get(NULL, "gp4");
-	if (IS_ERR(snddev_vreg_gp4)) {
-		pr_err("%s: vreg_get(%s) failed (%ld)\n",
-		__func__, "gp4", PTR_ERR(snddev_vreg_gp4));
-		return;
-	}
-	rc = vreg_enable(snddev_vreg_gp4);
 	if (rc)
-		pr_err("%s: vreg_enable(gp4) failed (%d)\n", __func__, rc);
-
-	snddev_vreg_ncp = vreg_get(NULL, "ncp");
-	if (IS_ERR(snddev_vreg_ncp)) {
-		pr_err("%s: vreg_get(%s) failed (%ld)\n",
-		__func__, "ncp", PTR_ERR(snddev_vreg_ncp));
-		return;
-	}
-	rc = vreg_enable(snddev_vreg_ncp);
-	if (rc)
-		pr_err("%s: vreg_enable(ncp) failed (%d)\n", __func__, rc);
+		pr_err("%s: could not enable regulators: %d\n", __func__, rc);
 }
 
 void msm_snddev_hsed_voltage_off(void)
 {
-	int rc;
+	int rc = regulator_bulk_disable(ARRAY_SIZE(snddev_regs), snddev_regs);
 
-	if (IS_ERR(snddev_vreg_ncp)) {
-		pr_err("%s: vreg_get(%s) failed (%ld)\n",
-		__func__, "ncp", PTR_ERR(snddev_vreg_ncp));
-		return;
+	if (rc) {
+		pr_err("%s: could not disable regulators: %d\n", __func__, rc);
 	}
-	rc = vreg_disable(snddev_vreg_ncp);
-	if (rc)
-		pr_err("%s: vreg_disable(ncp) failed (%d)\n", __func__, rc);
-	vreg_put(snddev_vreg_ncp);
-
-	if (IS_ERR(snddev_vreg_gp4)) {
-		pr_err("%s: vreg_get(%s) failed (%ld)\n",
-		__func__, "gp4", PTR_ERR(snddev_vreg_gp4));
-		return;
-	}
-	rc = vreg_disable(snddev_vreg_gp4);
-	if (rc)
-		pr_err("%s: vreg_disable(gp4) failed (%d)\n", __func__, rc);
-
-	vreg_put(snddev_vreg_gp4);
-
 }
 
 static unsigned aux_pcm_gpio_on[] = {
@@ -3199,77 +3167,52 @@ static int __init buses_init(void)
 				  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE))
 		pr_err("%s: gpio_tlmm_config (gpio=%d) failed\n",
 		       __func__, PMIC_GPIO_INT);
-/*< DTS2011042203570 n00111309 20110422 begin */
-/* <DTS2010092702071 liugaofei 20100927 begin */
-/* support U8820 keypad */
-	/*< DTS2010112702297 wangquanli 201001125 begin */
-	/*< DTS2011030202729  liliang 20110302  begin */		
-	if (machine_is_msm7x30_fluid() || machine_is_msm7x30_u8800() || machine_is_msm7x30_u8820() || machine_is_msm7x30_u8800_51() || machine_is_msm8255_u8800_pro())  {
-    /* DTS2011042203570 n00111309, do not add machine_is_msm8255_u8860() here.
-	 * it will be handled seperately */
-	/* DTS2011030202729  liliang 20110302 end >*/
-	/* DTS2010112702297 wangquanli 201001125 end >*/
-/* DTS2010092702071 liugaofei 20100927 end > */ 
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].platform_data
+/*< DTS2012021007223 lijianzhao 20120211 begin */
+	if (machine_is_msm7x30_fluid() 
+		|| machine_is_msm7x30_u8800() 
+		|| machine_is_msm7x30_u8820() 
+		|| machine_is_msm7x30_u8800_51() 
+		|| machine_is_msm8255_u8800_pro()) 
+	{
+	 /* it will be handled seperately */
+		pm8058_7x30_data.keypad_pdata
 			= &fluid_keypad_data;
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].data_size
-			= sizeof(fluid_keypad_data);
 	 
-	/* add for U8860, which do NOT use keypad row array .  */
-	/* <DTS2011050700551 zhangbo 20110505 begin */
-    /* <DTS2011062600102  sunhonghui 20110626 begin */	
-    /* <DTS2011071600361 liyuping 20110716 begin */
-	/* < DTS2011082302564 liwei 20110823 begin */
-/*< DTS2011090104536 duanfei 20110901 begin */
-	/*<DTS2011091502092 liyuping 20110915 begin */
-    } else if ( machine_is_msm8255_u8860() 
-			    || machine_is_msm8255_c8860() 
-			    || machine_is_msm8255_u8860lp()
-			    || machine_is_msm8255_u8860_92()
-			    || machine_is_msm8255_u8860_51())
-	/* DTS2011091502092 liyuping 20110915 end> */ 
-/* DTS2011090104536 duanfei 20110901 end >*/
-	/* DTS2011082302564 liwei 20110823 end > */
-	/* DTS2011071600361 liyuping 20110716 end> */
-    /* DTS2011062600102  sunhonghui 20110626 end> */
-	/* DTS2011050700551 zhangbo 20110505 end> */
+    } 
+	else if ( machine_is_msm8255_u8860() 
+			|| machine_is_msm8255_c8860() 
+			|| machine_is_msm8255_u8860lp()
+            /* < DTS2012022905490 ganfan 20120301 begin */
+            || machine_is_msm8255_u8860_r()
+            /* DTS2012022905490 ganfan 20120301 end > */
+			|| machine_is_msm8255_u8860_92()
+			|| machine_is_msm8255_u8860_51())
     {
-        pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].platform_data
+        pm8058_7x30_data.keypad_pdata
                = &fluid_norow_keypad_data;
-        pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].data_size
-               = sizeof(fluid_norow_keypad_data);
-/*< DTS2011090104536 duanfei 20110901 begin */
     }
-	/* < DTS2011102401822 liwei 20111024 begin */
-    else if (machine_is_msm8255_u8680()
-	    || machine_is_msm8255_u8667())
-	/* DTS2011102401822 liwei 20111024 end > */
+    else if (machine_is_msm8255_u8680())
     {
-    	pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].platform_data
+    	pm8058_7x30_data.keypad_pdata
 			= &U8680_keypad_data;
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].data_size
-			= sizeof(U8680_keypad_data);
+    }
+    else if (machine_is_msm8255_u8667())
+    {
+    	pm8058_7x30_data.keypad_pdata
+			= &U8667_keypad_data;
     }
 /*< DTS2011092601370 zhongjinrong 20110926 begin */
     else if(machine_is_msm8255_u8730())
     {
-   	 	pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].platform_data
+    	pm8058_7x30_data.keypad_pdata
 			= &u8730_keypad_data;
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].data_size
-			= sizeof(u8730_keypad_data);
     }
 /* DTS2011092601370 zhongjinrong 20119026 end >*/
     else {
-/* DTS2011090104536 duanfei 20110901 end >*/
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].platform_data
+		pm8058_7x30_data.keypad_pdata
 			= &surf_keypad_data;
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_KPD].data_size
-			= sizeof(surf_keypad_data);
 	}
-/* DTS2011042203570 n00111309 20110422 end */
-	
-	i2c_register_board_info(6 /* I2C_SSBI ID */, pm8058_boardinfo,
-				ARRAY_SIZE(pm8058_boardinfo));
+/* DTS2012021007223 lijianzhao 20120211 end >*/
 
 	return 0;
 }
@@ -3288,10 +3231,9 @@ enum version{
 	VER_UNSUPPORTED = 0xFF
 };
 
-
-static struct vreg *vreg_marimba_1;
-static struct vreg *vreg_marimba_2;
-static struct vreg *vreg_marimba_3;
+static struct regulator *vreg_marimba_1;
+static struct regulator *vreg_marimba_2;
+static struct regulator *vreg_bahama;
 
 static struct msm_gpio timpani_reset_gpio_cfg[] = {
 { GPIO_CFG(TIMPANI_RESET_GPIO, 0, GPIO_CFG_OUTPUT,
@@ -3349,34 +3291,33 @@ static unsigned int msm_timpani_setup_power(void)
 	if (rc < 0)
 		goto out;
 
-	rc = vreg_enable(vreg_marimba_1);
+	rc = regulator_enable(vreg_marimba_1);
 	if (rc) {
-		printk(KERN_ERR "%s: vreg_enable() = %d\n",
-					__func__, rc);
+		pr_err("%s: regulator_enable failed (%d)\n", __func__, rc);
 		goto out;
 	}
-	rc = vreg_enable(vreg_marimba_2);
+
+	rc = regulator_enable(vreg_marimba_2);
 	if (rc) {
-		printk(KERN_ERR "%s: vreg_enable() = %d\n",
-					__func__, rc);
-		goto fail_disable_vreg_marimba_1;
+		pr_err("%s: regulator_enable failed (%d)\n", __func__, rc);
+		goto disable_marimba_1;
 	}
 
 	rc = gpio_direction_output(TIMPANI_RESET_GPIO, 1);
 	if (rc < 0) {
-		printk(KERN_ERR
-			"%s: gpio_direction_output failed (%d)\n",
+		pr_err("%s: gpio_direction_output failed (%d)\n",
 				__func__, rc);
 		msm_gpios_free(timpani_reset_gpio_cfg,
 				ARRAY_SIZE(timpani_reset_gpio_cfg));
-		vreg_disable(vreg_marimba_2);
-	} else
-		goto out;
+		goto disable_marimba_2;
+	}
 
+	return 0;
 
-fail_disable_vreg_marimba_1:
-	vreg_disable(vreg_marimba_1);
-
+disable_marimba_2:
+	regulator_disable(vreg_marimba_2);
+disable_marimba_1:
+	regulator_disable(vreg_marimba_1);
 out:
 	return rc;
 };
@@ -3385,23 +3326,18 @@ static void msm_timpani_shutdown_power(void)
 {
 	int rc;
 
-	rc = vreg_disable(vreg_marimba_1);
-	if (rc) {
-		printk(KERN_ERR "%s: return val: %d\n",
-					__func__, rc);
-	}
-	rc = vreg_disable(vreg_marimba_2);
-	if (rc) {
-		printk(KERN_ERR "%s: return val: %d\n",
-					__func__, rc);
-	}
+	rc = regulator_disable(vreg_marimba_2);
+	if (rc)
+		pr_err("%s: regulator_disable failed (%d)\n", __func__, rc);
+
+	rc = regulator_disable(vreg_marimba_1);
+	if (rc)
+		pr_err("%s: regulator_disable failed (%d)\n", __func__, rc);
 
 	rc = gpio_direction_output(TIMPANI_RESET_GPIO, 0);
-	if (rc < 0) {
-		printk(KERN_ERR
-			"%s: gpio_direction_output failed (%d)\n",
+	if (rc < 0)
+		pr_err("%s: gpio_direction_output failed (%d)\n",
 				__func__, rc);
-	}
 
 	msm_gpios_free(timpani_reset_gpio_cfg,
 				   ARRAY_SIZE(timpani_reset_gpio_cfg));
@@ -3450,13 +3386,10 @@ static unsigned int msm_bahama_core_config(int type)
 
 static unsigned int msm_bahama_setup_power(void)
 {
-	int rc;
+	int rc = regulator_enable(vreg_bahama);
 
-	rc = vreg_enable(vreg_marimba_3);
-	if (rc) {
-		printk(KERN_ERR "%s: vreg_enable() = %d\n",
-				__func__, rc);
-	}
+	if (rc)
+		pr_err("%s: regulator_enable failed (%d)\n", __func__, rc);
 
 	return rc;
 };
@@ -3466,11 +3399,11 @@ static unsigned int msm_bahama_shutdown_power(int value)
 	int rc = 0;
 
 	if (value != BAHAMA_ID) {
-		rc = vreg_disable(vreg_marimba_3);
-		if (rc) {
-			printk(KERN_ERR "%s: return val: %d\n",
+		rc = regulator_disable(vreg_bahama);
+
+		if (rc)
+			pr_err("%s: regulator_disable failed (%d)\n",
 					__func__, rc);
-		}
 	}
 
 	return rc;
@@ -3500,39 +3433,42 @@ static unsigned int msm_marimba_setup_power(void)
 {
 	int rc;
 
-	rc = vreg_enable(vreg_marimba_1);
+	rc = regulator_enable(vreg_marimba_1);
 	if (rc) {
-		printk(KERN_ERR "%s: vreg_enable() = %d \n",
-					__func__, rc);
+		pr_err("%s: regulator_enable failed (%d)\n", __func__, rc);
 		goto out;
 	}
-	rc = vreg_enable(vreg_marimba_2);
+
+	rc = regulator_enable(vreg_marimba_2);
 	if (rc) {
-		printk(KERN_ERR "%s: vreg_enable() = %d \n",
-					__func__, rc);
-		goto out;
+		pr_err("%s: regulator_enable failed (%d)\n", __func__, rc);
+		goto disable_marimba_1;
 	}
 
 	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa()) {
 		rc = msm_gpios_request_enable(marimba_svlte_config_clock,
 				ARRAY_SIZE(marimba_svlte_config_clock));
 		if (rc < 0) {
-			printk(KERN_ERR
-				"%s: msm_gpios_request_enable failed (%d)\n",
+			pr_err("%s: msm_gpios_request_enable failed (%d)\n",
 					__func__, rc);
-			return rc;
+			goto disable_marimba_2;
 		}
 
 		rc = gpio_direction_output(GPIO_PIN
 			(marimba_svlte_config_clock->gpio_cfg), 0);
 		if (rc < 0) {
-			printk(KERN_ERR
-				"%s: gpio_direction_output failed (%d)\n",
+			pr_err("%s: gpio_direction_output failed (%d)\n",
 					__func__, rc);
-			return rc;
+			goto disable_marimba_2;
 		}
 	}
 
+	return 0;
+
+disable_marimba_2:
+	regulator_disable(vreg_marimba_2);
+disable_marimba_1:
+	regulator_disable(vreg_marimba_1);
 out:
 	return rc;
 };
@@ -3541,20 +3477,19 @@ static void msm_marimba_shutdown_power(void)
 {
 	int rc;
 
-	rc = vreg_disable(vreg_marimba_1);
-	if (rc) {
-		printk(KERN_ERR "%s: return val: %d\n",
-					__func__, rc);
-	}
-	rc = vreg_disable(vreg_marimba_2);
-	if (rc) {
-		printk(KERN_ERR "%s: return val: %d \n",
-					__func__, rc);
-	}
+	rc = regulator_disable(vreg_marimba_2);
+	if (rc)
+		pr_err("%s: regulator_disable failed (%d)\n", __func__, rc);
+
+	rc = regulator_disable(vreg_marimba_1);
+	if (rc)
+		pr_err("%s: regulator_disable failed (%d)\n", __func__, rc);
 };
 /* < DTS2011030705328 sihongfang 20110311 begin */
 /*bcm4329 do not use this function*/
-#ifndef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
+/* DTS2012020604357 zhangyun 20120206 end > */
 /* DTS2011030705328 sihongfang 20110311 end > */
 static int bahama_present(void)
 {
@@ -3574,82 +3509,89 @@ static int bahama_present(void)
 	}
 }
 
-
-struct vreg *fm_regulator;
+struct regulator *fm_regulator;
 static int fm_radio_setup(struct marimba_fm_platform_data *pdata)
 {
-	int rc;
+	int rc, voltage;
 	uint32_t irqcfg;
 	const char *id = "FMPW";
 
 	int bahama_not_marimba = bahama_present();
 
-	if (bahama_not_marimba == -1) {
-		printk(KERN_WARNING "%s: bahama_present: %d\n",
+	if (bahama_not_marimba < 0) {
+		pr_warn("%s: bahama_present: %d\n",
 				__func__, bahama_not_marimba);
-		return -ENODEV;
+		rc = -ENODEV;
+		goto out;
 	}
-	if (bahama_not_marimba)
-		fm_regulator = vreg_get(NULL, "s3");
-	else
-		fm_regulator = vreg_get(NULL, "s2");
+	if (bahama_not_marimba) {
+		fm_regulator = regulator_get(NULL, "s3");
+		voltage = 1800000;
+	} else {
+		fm_regulator = regulator_get(NULL, "s2");
+		voltage = 1300000;
+	}
 
 	if (IS_ERR(fm_regulator)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
-			__func__, PTR_ERR(fm_regulator));
-		return -1;
+		rc = PTR_ERR(fm_regulator);
+		pr_err("%s: regulator_get failed (%d)\n", __func__, rc);
+		goto out;
 	}
-	if (!bahama_not_marimba) {
 
-		rc = pmapp_vreg_level_vote(id, PMAPP_VREG_S2, 1300);
+	rc = regulator_set_voltage(fm_regulator, voltage, voltage);
 
-		if (rc < 0) {
-			printk(KERN_ERR "%s: voltage level vote failed (%d)\n",
-				__func__, rc);
-			return rc;
-		}
-	}
-	rc = vreg_enable(fm_regulator);
 	if (rc) {
-		printk(KERN_ERR "%s: vreg_enable() = %d\n",
-					__func__, rc);
-		return rc;
+		pr_err("%s: regulator_set_voltage failed (%d)\n", __func__, rc);
+		goto regulator_free;
 	}
 
-	rc = pmapp_clock_vote(id, PMAPP_CLOCK_ID_DO,
-					  PMAPP_CLOCK_VOTE_ON);
-	if (rc < 0) {
-		printk(KERN_ERR "%s: clock vote failed (%d)\n",
-			__func__, rc);
-		goto fm_clock_vote_fail;
+	rc = regulator_enable(fm_regulator);
+
+	if (rc) {
+		pr_err("%s: regulator_enable failed (%d)\n", __func__, rc);
+		goto regulator_free;
 	}
+
+	rc = pmapp_clock_vote(id, PMAPP_CLOCK_ID_DO, PMAPP_CLOCK_VOTE_ON);
+
+	if (rc < 0) {
+		pr_err("%s: clock vote failed (%d)\n", __func__, rc);
+		goto regulator_disable;
+	}
+
 	/*Request the Clock Using GPIO34/AP2MDM_MRMBCK_EN in case
 	of svlte*/
-	if (machine_is_msm8x55_svlte_surf() ||
-			machine_is_msm8x55_svlte_ffa())	{
+	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa()) {
 		rc = marimba_gpio_config(1);
-		if (rc < 0)
-			printk(KERN_ERR "%s: clock enable for svlte : %d\n",
-						__func__, rc);
+		if (rc < 0) {
+			pr_err("%s: clock enable for svlte : %d\n",
+					__func__, rc);
+			goto clock_devote;
+		}
 	}
 	irqcfg = GPIO_CFG(147, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
 					GPIO_CFG_2MA);
 	rc = gpio_tlmm_config(irqcfg, GPIO_CFG_ENABLE);
 	if (rc) {
-		printk(KERN_ERR "%s: gpio_tlmm_config(%#x)=%d\n",
-				__func__, irqcfg, rc);
+		pr_err("%s: gpio_tlmm_config(%#x)=%d\n", __func__, irqcfg, rc);
 		rc = -EIO;
-		goto fm_gpio_config_fail;
+		goto gpio_deconfig;
 
 	}
 	return 0;
-fm_gpio_config_fail:
-	pmapp_clock_vote(id, PMAPP_CLOCK_ID_DO,
-				  PMAPP_CLOCK_VOTE_OFF);
-fm_clock_vote_fail:
-	vreg_disable(fm_regulator);
-	return rc;
 
+gpio_deconfig:
+	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa())
+		marimba_gpio_config(0);
+clock_devote:
+	pmapp_clock_vote(id, PMAPP_CLOCK_ID_DO, PMAPP_CLOCK_VOTE_OFF);
+regulator_disable:
+	regulator_disable(fm_regulator);
+regulator_free:
+	regulator_put(fm_regulator);
+	fm_regulator = NULL;
+out:
+	return rc;
 };
 
 static void fm_radio_shutdown(struct marimba_fm_platform_data *pdata)
@@ -3661,48 +3603,36 @@ static void fm_radio_shutdown(struct marimba_fm_platform_data *pdata)
 
 	int bahama_not_marimba = bahama_present();
 	if (bahama_not_marimba == -1) {
-		printk(KERN_WARNING "%s: bahama_present: %d\n",
-			__func__, bahama_not_marimba);
+		pr_warn("%s: bahama_present: %d\n",
+				__func__, bahama_not_marimba);
 		return;
 	}
 
 	rc = gpio_tlmm_config(irqcfg, GPIO_CFG_ENABLE);
 	if (rc) {
-		printk(KERN_ERR "%s: gpio_tlmm_config(%#x)=%d\n",
-				__func__, irqcfg, rc);
+		pr_err("%s: gpio_tlmm_config(%#x)=%d\n", __func__, irqcfg, rc);
 	}
-	if (fm_regulator != NULL) {
-		rc = vreg_disable(fm_regulator);
+	if (!IS_ERR_OR_NULL(fm_regulator)) {
+		rc = regulator_disable(fm_regulator);
 
-		if (rc) {
-			printk(KERN_ERR "%s: return val: %d\n",
-					__func__, rc);
-		}
+		if (rc)
+			pr_err("%s: return val: %d\n", __func__, rc);
+
+		regulator_put(fm_regulator);
 		fm_regulator = NULL;
 	}
 	rc = pmapp_clock_vote(id, PMAPP_CLOCK_ID_DO,
 					  PMAPP_CLOCK_VOTE_OFF);
 	if (rc < 0)
-		printk(KERN_ERR "%s: clock_vote return val: %d\n",
-						__func__, rc);
+		pr_err("%s: clock_vote return val: %d\n", __func__, rc);
 
 	/*Disable the Clock Using GPIO34/AP2MDM_MRMBCK_EN in case
 	of svlte*/
-	if (machine_is_msm8x55_svlte_surf() ||
-			machine_is_msm8x55_svlte_ffa())	{
+	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa()) {
 		rc = marimba_gpio_config(0);
 		if (rc < 0)
-			printk(KERN_ERR "%s: clock disable for svlte : %d\n",
-						__func__, rc);
-	}
-
-
-	if (!bahama_not_marimba)	{
-		rc = pmapp_vreg_level_vote(id, PMAPP_VREG_S2, 0);
-
-		if (rc < 0)
-			printk(KERN_ERR "%s: vreg level vote return val: %d\n",
-						__func__, rc);
+			pr_err("%s: clock disable for svlte : %d\n",
+					__func__, rc);
 	}
 }
 
@@ -3712,6 +3642,8 @@ static struct marimba_fm_platform_data marimba_fm_pdata = {
 	.irq = MSM_GPIO_TO_INT(147),
 	.vreg_s2 = NULL,
 	.vreg_xo_out = NULL,
+	.is_fm_soc_i2s_master = false,
+	.config_i2s_gpio = NULL,
 };
 /* < DTS2011030705328 sihongfang 20110311 begin */
 #endif
@@ -3729,82 +3661,60 @@ static struct marimba_fm_platform_data marimba_fm_pdata = {
 #define BAHAMA_SLAVE_ID_QMEMBIST_ADDR   0x7B
 
 static const char *tsadc_id = "MADC";
-static const char *vregs_tsadc_name[] = {
-	"gp12",
-	"s2",
-};
-static struct vreg *vregs_tsadc[ARRAY_SIZE(vregs_tsadc_name)];
 
-static const char *vregs_timpani_tsadc_name[] = {
-	"s3",
-	"gp12",
-	"gp16"
+static struct regulator_bulk_data regs_tsadc_marimba[] = {
+	{ .supply = "gp12", .min_uV = 2200000, .max_uV = 2200000 },
+	{ .supply = "s2",   .min_uV = 1300000, .max_uV = 1300000 },
 };
-static struct vreg *vregs_timpani_tsadc[ARRAY_SIZE(vregs_timpani_tsadc_name)];
+
+static struct regulator_bulk_data regs_tsadc_timpani[] = {
+	{ .supply = "s3",   .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "gp12", .min_uV = 2200000, .max_uV = 2200000 },
+	{ .supply = "gp16", .min_uV = 1200000, .max_uV = 1200000 },
+};
+
+static struct regulator_bulk_data *regs_tsadc;
+static int regs_tsadc_count;
 
 static int marimba_tsadc_power(int vreg_on)
 {
-	int i, rc = 0;
+	int rc = 0;
 	int tsadc_adie_type = adie_get_detected_codec_type();
 
-	if (tsadc_adie_type == TIMPANI_ID) {
-		for (i = 0; i < ARRAY_SIZE(vregs_timpani_tsadc_name); i++) {
-			if (!vregs_timpani_tsadc[i]) {
-				pr_err("%s: vreg_get %s failed(%d)\n",
-				__func__, vregs_timpani_tsadc_name[i], rc);
-				goto vreg_fail;
-			}
-
-			rc = vreg_on ? vreg_enable(vregs_timpani_tsadc[i]) :
-				  vreg_disable(vregs_timpani_tsadc[i]);
-			if (rc < 0) {
-				pr_err("%s: vreg %s %s failed(%d)\n",
-					__func__, vregs_timpani_tsadc_name[i],
-				       vreg_on ? "enable" : "disable", rc);
-				goto vreg_fail;
-			}
-		}
-		/* Vote for D0 and D1 buffer */
+	switch (tsadc_adie_type) {
+	case TIMPANI_ID:
 		rc = pmapp_clock_vote(tsadc_id, PMAPP_CLOCK_ID_D1,
 			vreg_on ? PMAPP_CLOCK_VOTE_ON : PMAPP_CLOCK_VOTE_OFF);
 		if (rc)	{
 			pr_err("%s: unable to %svote for d1 clk\n",
 				__func__, vreg_on ? "" : "de-");
-			goto do_vote_fail;
+			goto D1_vote_fail;
 		}
+
+		/* fall through */
+	case MARIMBA_ID:
 		rc = pmapp_clock_vote(tsadc_id, PMAPP_CLOCK_ID_DO,
 			vreg_on ? PMAPP_CLOCK_VOTE_ON : PMAPP_CLOCK_VOTE_OFF);
 		if (rc)	{
 			pr_err("%s: unable to %svote for d1 clk\n",
 				__func__, vreg_on ? "" : "de-");
-			goto do_vote_fail;
+			goto D0_vote_fail;
 		}
-	} else if (tsadc_adie_type == MARIMBA_ID) {
-		for (i = 0; i < ARRAY_SIZE(vregs_tsadc_name); i++) {
-			if (!vregs_tsadc[i]) {
-				pr_err("%s: vreg_get %s failed (%d)\n",
-					__func__, vregs_tsadc_name[i], rc);
-				goto vreg_fail;
-			}
 
-			rc = vreg_on ? vreg_enable(vregs_tsadc[i]) :
-				  vreg_disable(vregs_tsadc[i]);
-			if (rc < 0) {
-				pr_err("%s: vreg %s %s failed (%d)\n",
-					__func__, vregs_tsadc_name[i],
-				       vreg_on ? "enable" : "disable", rc);
-				goto vreg_fail;
-			}
+		WARN_ON(regs_tsadc_count == 0);
+
+		rc = vreg_on ?
+			regulator_bulk_enable(regs_tsadc_count, regs_tsadc) :
+			regulator_bulk_disable(regs_tsadc_count, regs_tsadc);
+
+		if (rc) {
+			pr_err("%s: regulator %sable failed: %d\n",
+					__func__, vreg_on ? "en" : "dis", rc);
+			goto regulator_switch_fail;
 		}
-		/* If marimba vote for DO buffer */
-		rc = pmapp_clock_vote(tsadc_id, PMAPP_CLOCK_ID_DO,
-			vreg_on ? PMAPP_CLOCK_VOTE_ON : PMAPP_CLOCK_VOTE_OFF);
-		if (rc)	{
-			pr_err("%s: unable to %svote for d0 clk\n",
-				__func__, vreg_on ? "" : "de-");
-			goto do_vote_fail;
-		}
-	} else {
+
+		break;
+	default:
 		pr_err("%s:Adie %d not supported\n",
 				__func__, tsadc_adie_type);
 		return -ENODEV;
@@ -3814,120 +3724,77 @@ static int marimba_tsadc_power(int vreg_on)
 
 	return 0;
 
-do_vote_fail:
-vreg_fail:
-	while (i) {
-		if (vreg_on) {
-			if (tsadc_adie_type == TIMPANI_ID)
-				vreg_disable(vregs_timpani_tsadc[--i]);
-			else if (tsadc_adie_type == MARIMBA_ID)
-				vreg_disable(vregs_tsadc[--i]);
-		} else {
-			if (tsadc_adie_type == TIMPANI_ID)
-				vreg_enable(vregs_timpani_tsadc[--i]);
-			else if (tsadc_adie_type == MARIMBA_ID)
-				vreg_enable(vregs_tsadc[--i]);
-		}
-	}
-
-	return rc;
-}
-
-static int marimba_tsadc_vote(int vote_on)
-{
-	int rc = 0;
-
-	if (adie_get_detected_codec_type() == MARIMBA_ID) {
-		int level = vote_on ? 1300 : 0;
-		rc = pmapp_vreg_level_vote(tsadc_id, PMAPP_VREG_S2, level);
-		if (rc < 0)
-			pr_err("%s: vreg level %s failed (%d)\n",
-			__func__, vote_on ? "on" : "off", rc);
-	}
-
+regulator_switch_fail:
+	pmapp_clock_vote(tsadc_id, PMAPP_CLOCK_ID_DO,
+		vreg_on ? PMAPP_CLOCK_VOTE_OFF : PMAPP_CLOCK_VOTE_ON);
+D0_vote_fail:
+	if (tsadc_adie_type == TIMPANI_ID)
+		pmapp_clock_vote(tsadc_id, PMAPP_CLOCK_ID_D1,
+			vreg_on ? PMAPP_CLOCK_VOTE_OFF : PMAPP_CLOCK_VOTE_ON);
+D1_vote_fail:
 	return rc;
 }
 
 static int marimba_tsadc_init(void)
 {
-	int i, rc = 0;
+	int rc = 0;
 	int tsadc_adie_type = adie_get_detected_codec_type();
 
-	if (tsadc_adie_type == TIMPANI_ID) {
-		for (i = 0; i < ARRAY_SIZE(vregs_timpani_tsadc_name); i++) {
-			vregs_timpani_tsadc[i] = vreg_get(NULL,
-						vregs_timpani_tsadc_name[i]);
-			if (IS_ERR(vregs_timpani_tsadc[i])) {
-				pr_err("%s: vreg get %s failed (%ld)\n",
-				       __func__, vregs_timpani_tsadc_name[i],
-				       PTR_ERR(vregs_timpani_tsadc[i]));
-				rc = PTR_ERR(vregs_timpani_tsadc[i]);
-				goto vreg_get_fail;
-			}
-		}
-	} else if (tsadc_adie_type == MARIMBA_ID) {
-		for (i = 0; i < ARRAY_SIZE(vregs_tsadc_name); i++) {
-			vregs_tsadc[i] = vreg_get(NULL, vregs_tsadc_name[i]);
-			if (IS_ERR(vregs_tsadc[i])) {
-				pr_err("%s: vreg get %s failed (%ld)\n",
-				       __func__, vregs_tsadc_name[i],
-				       PTR_ERR(vregs_tsadc[i]));
-				rc = PTR_ERR(vregs_tsadc[i]);
-				goto vreg_get_fail;
-			}
-		}
-	} else {
+	switch (tsadc_adie_type) {
+	case MARIMBA_ID:
+		regs_tsadc = regs_tsadc_marimba;
+		regs_tsadc_count = ARRAY_SIZE(regs_tsadc_marimba);
+		break;
+	case TIMPANI_ID:
+		regs_tsadc = regs_tsadc_timpani;
+		regs_tsadc_count = ARRAY_SIZE(regs_tsadc_timpani);
+		break;
+	default:
 		pr_err("%s:Adie %d not supported\n",
 				__func__, tsadc_adie_type);
-		return -ENODEV;
+		rc = -ENODEV;
+		goto out;
+	}
+
+	rc = regulator_bulk_get(NULL, regs_tsadc_count, regs_tsadc);
+	if (rc) {
+		pr_err("%s: could not get regulators: %d\n",
+				__func__, rc);
+		goto out;
+	}
+
+	rc = regulator_bulk_set_voltage(regs_tsadc_count, regs_tsadc);
+	if (rc) {
+		pr_err("%s: could not set regulator voltages: %d\n",
+				__func__, rc);
+		goto vreg_free;
 	}
 
 	return 0;
 
-vreg_get_fail:
-	while (i) {
-		if (tsadc_adie_type == TIMPANI_ID)
-			vreg_put(vregs_timpani_tsadc[--i]);
-		else if (tsadc_adie_type == MARIMBA_ID)
-			vreg_put(vregs_tsadc[--i]);
-	}
+vreg_free:
+	regulator_bulk_free(regs_tsadc_count, regs_tsadc);
+out:
+	regs_tsadc = NULL;
+	regs_tsadc_count = 0;
 	return rc;
 }
 
 static int marimba_tsadc_exit(void)
 {
-	int i, rc = 0;
-	int tsadc_adie_type = adie_get_detected_codec_type();
+	regulator_bulk_free(regs_tsadc_count, regs_tsadc);
+	regs_tsadc_count = 0;
+	regs_tsadc = NULL;
 
-	if (tsadc_adie_type == TIMPANI_ID) {
-		for (i = 0; i < ARRAY_SIZE(vregs_timpani_tsadc_name); i++) {
-			if (vregs_tsadc[i])
-				vreg_put(vregs_timpani_tsadc[i]);
-		}
-	} else if (tsadc_adie_type == MARIMBA_ID) {
-		for (i = 0; i < ARRAY_SIZE(vregs_tsadc_name); i++) {
-			if (vregs_tsadc[i])
-				vreg_put(vregs_tsadc[i]);
-		}
-		rc = pmapp_vreg_level_vote(tsadc_id, PMAPP_VREG_S2, 0);
-		if (rc < 0)
-			pr_err("%s: vreg level off failed (%d)\n",
-						__func__, rc);
-	} else {
-		pr_err("%s:Adie %d not supported\n",
-				__func__, tsadc_adie_type);
-		rc = -ENODEV;
-	}
-
-	return rc;
+	return 0;
 }
 
 
 static struct msm_ts_platform_data msm_ts_data = {
-	.min_x          = 0,
-	.max_x          = 4096,
-	.min_y          = 0,
-	.max_y          = 4096,
+	.min_x          = 284,
+	.max_x          = 3801,
+	.min_y          = 155,
+	.max_y          = 3929,
 	.min_press      = 0,
 	.max_press      = 255,
 	.inv_x          = 4096,
@@ -3939,7 +3806,6 @@ static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
 	.marimba_tsadc_power =  marimba_tsadc_power,
 	.init		     =  marimba_tsadc_init,
 	.exit		     =  marimba_tsadc_exit,
-	.level_vote	     =  marimba_tsadc_vote,
 	.tsadc_prechg_en = true,
 	.can_wakeup	= false,
 	.setup = {
@@ -3958,39 +3824,47 @@ static struct marimba_tsadc_platform_data marimba_tsadc_pdata = {
 	.tssc_data = &msm_ts_data,
 };
 
-static struct vreg *vreg_codec_s4;
+static struct regulator_bulk_data codec_regs[] = {
+	{ .supply = "s4", .min_uV = 2200000, .max_uV = 2200000 },
+};
+
+static int __init msm_marimba_codec_init(void)
+{
+	int rc = regulator_bulk_get(NULL, ARRAY_SIZE(codec_regs), codec_regs);
+
+	if (rc) {
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		goto out;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(codec_regs), codec_regs);
+	if (rc) {
+		pr_err("%s: could not set regulator voltages: %d\n",
+				__func__, rc);
+		goto reg_free;
+	}
+
+	return rc;
+
+reg_free:
+	regulator_bulk_free(ARRAY_SIZE(codec_regs), codec_regs);
+out:
+	return rc;
+}
+
 static int msm_marimba_codec_power(int vreg_on)
 {
-	int rc = 0;
+	int rc = vreg_on ?
+		regulator_bulk_enable(ARRAY_SIZE(codec_regs), codec_regs) :
+		regulator_bulk_disable(ARRAY_SIZE(codec_regs), codec_regs);
 
-	if (!vreg_codec_s4) {
-
-		vreg_codec_s4 = vreg_get(NULL, "s4");
-
-		if (IS_ERR(vreg_codec_s4)) {
-			printk(KERN_ERR "%s: vreg_get() failed (%ld)\n",
-				__func__, PTR_ERR(vreg_codec_s4));
-			rc = PTR_ERR(vreg_codec_s4);
-			goto  vreg_codec_s4_fail;
-		}
+	if (rc) {
+		pr_err("%s: could not %sable regulators: %d",
+				__func__, vreg_on ? "en" : "dis", rc);
+		return rc;
 	}
 
-	if (vreg_on) {
-		rc = vreg_enable(vreg_codec_s4);
-		if (rc)
-			printk(KERN_ERR "%s: vreg_enable() = %d \n",
-					__func__, rc);
-		goto vreg_codec_s4_fail;
-	} else {
-		rc = vreg_disable(vreg_codec_s4);
-		if (rc)
-			printk(KERN_ERR "%s: vreg_disable() = %d \n",
-					__func__, rc);
-		goto vreg_codec_s4_fail;
-	}
-
-vreg_codec_s4_fail:
-	return rc;
+	return 0;
 }
 
 static struct marimba_codec_platform_data mariba_codec_pdata = {
@@ -4014,40 +3888,52 @@ static struct marimba_platform_data marimba_pdata = {
 	.bahama_core_config = msm_bahama_core_config,
 /* < DTS2011030705328 sihongfang 20110311 begin */
 /*bcm4329 do not use this function*/
-#ifndef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
+/* DTS2012020604357 zhangyun 20120206 end > */
 	.fm = &marimba_fm_pdata,
 #endif
 /* DTS2011030705328 sihongfang 20110311 end > */
 	.codec = &mariba_codec_pdata,
+	.tsadc_ssbi_adap = MARIMBA_SSBI_ADAP,
 };
 
 static void __init msm7x30_init_marimba(void)
 {
 	int rc;
 
-	vreg_marimba_1 = vreg_get(NULL, "s3");
-	if (IS_ERR(vreg_marimba_1)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
-			__func__, PTR_ERR(vreg_marimba_1));
-		return;
-	}
-	rc = vreg_set_level(vreg_marimba_1, 1800);
+	struct regulator_bulk_data regs[] = {
+		{ .supply = "s3",   .min_uV = 1800000, .max_uV = 1800000 },
+		{ .supply = "gp16", .min_uV = 1200000, .max_uV = 1200000 },
+		{ .supply = "usb2", .min_uV = 1800000, .max_uV = 1800000 },
+	};
 
-	vreg_marimba_2 = vreg_get(NULL, "gp16");
-	if (IS_ERR(vreg_marimba_1)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
-			__func__, PTR_ERR(vreg_marimba_1));
-		return;
-	}
-	rc = vreg_set_level(vreg_marimba_2, 1200);
+	rc = msm_marimba_codec_init();
 
-	vreg_marimba_3 = vreg_get(NULL, "usb2");
-	if (IS_ERR(vreg_marimba_3)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
-			__func__, PTR_ERR(vreg_marimba_3));
+	if (rc) {
+		pr_err("%s: msm_marimba_codec_init failed (%d)\n",
+				__func__, rc);
 		return;
 	}
-	rc = vreg_set_level(vreg_marimba_3, 1800);
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs), regs);
+
+	if (rc) {
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		return;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs), regs);
+
+	if (rc) {
+		pr_err("%s: could not set voltages: %d\n", __func__, rc);
+		regulator_bulk_free(ARRAY_SIZE(regs), regs);
+		return;
+	}
+
+	vreg_marimba_1 = regs[0].consumer;
+	vreg_marimba_2 = regs[1].consumer;
+	vreg_bahama    = regs[2].consumer;
 }
 
 static struct marimba_codec_platform_data timpani_codec_pdata = {
@@ -4064,6 +3950,7 @@ static struct marimba_platform_data timpani_pdata = {
 	.marimba_shutdown = msm_timpani_shutdown_power,
 	.codec = &timpani_codec_pdata,
 	.tsadc = &marimba_tsadc_pdata,
+	.tsadc_ssbi_adap = MARIMBA_SSBI_ADAP,
 };
 
 #define TIMPANI_I2C_SLAVE_ADDR	0xD
@@ -4348,239 +4235,81 @@ static struct platform_device msm_device_adspdec = {
 	},
 };
 
-	/* <DTS2010072202961 hufeng 20100722 begin */
-	/* removed several lines */
-	/* DTS2010072202961 hufeng 20100722 end> */
-
-#ifdef CONFIG_USB_FUNCTION
-static struct usb_mass_storage_platform_data usb_mass_storage_pdata = {
-	.nluns          = 0x02,
-	.buf_size       = 16384,
-	.vendor         = "GOOGLE",
-	.product        = "Mass storage",
-	.release        = 0xffff,
-};
-
-static struct platform_device mass_storage_device = {
-	.name           = "usb_mass_storage",
-	.id             = -1,
-	.dev            = {
-		.platform_data          = &usb_mass_storage_pdata,
+static struct resource smc91x_resources[] = {
+	[0] = {
+		.start = 0x8A000300,
+		.end = 0x8A0003ff,
+		.flags  = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = MSM_GPIO_TO_INT(156),
+		.end = MSM_GPIO_TO_INT(156),
+		.flags  = IORESOURCE_IRQ,
 	},
 };
-#endif
-#ifdef CONFIG_USB_ANDROID
-/*< updata QC2030 USB yanzhijun 20101105 begin */
-#ifdef CONFIG_USB_AUTO_INSTALL
-static char *usb_functions_hw_normal_adb[] = {
-  "modem",
-  "nmea",
-  "usb_mass_storage",
-  "adb",
-  "diag",
+
+static struct platform_device smc91x_device = {
+	.name           = "smc91x",
+	.id             = 0,
+	.num_resources  = ARRAY_SIZE(smc91x_resources),
+	.resource       = smc91x_resources,
 };
 
-static char *usb_functions_hw_normal[] = {
-  "modem",
-  "nmea",
-  "usb_mass_storage",
+static struct smsc911x_platform_config smsc911x_config = {
+	.phy_interface	= PHY_INTERFACE_MODE_MII,
+	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
+	.flags		= SMSC911X_USE_32BIT,
 };
 
-static char *usb_functions_hw_ms[] = {
-  "usb_mass_storage",
+static struct resource smsc911x_resources[] = {
+	[0] = {
+		.start		= 0x8D000000,
+		.end		= 0x8D000100,
+		.flags		= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start		= MSM_GPIO_TO_INT(88),
+		.end		= MSM_GPIO_TO_INT(88),
+		.flags		= IORESOURCE_IRQ,
+	},
 };
 
-static char *usb_functions_google_ms[] = {
-  "usb_mass_storage",
+static struct platform_device smsc911x_device = {
+	.name		= "smsc911x",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(smsc911x_resources),
+	.resource	= smsc911x_resources,
+	.dev		= {
+		.platform_data = &smsc911x_config,
+	},
 };
 
-static char *usb_functions_google_ms_adb[] = {
-  "usb_mass_storage",
-  "adb",  
+static struct msm_gpio smsc911x_gpios[] = {
+    { GPIO_CFG(172, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr6" },
+    { GPIO_CFG(173, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr5" },
+    { GPIO_CFG(174, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr4" },
+    { GPIO_CFG(175, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr3" },
+    { GPIO_CFG(176, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr2" },
+    { GPIO_CFG(177, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr1" },
+    { GPIO_CFG(178, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), "ebi2_addr0" },
+    { GPIO_CFG(88, 2, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA), "smsc911x_irq"  },
 };
 
-/*< DTS2011082402558 zhangyancun 20110824 begin */
-/* add adb port for USB tether */
-static char *usb_functions_rndis_adb[] = {
-	"rndis", 
-	"adb",	
-};
-/* DTS2011082402558 zhangyancun 20110824 end >*/
-static char *usb_functions_rndis[] = {
-  "rndis", 
-};
+static void msm7x30_cfg_smsc911x(void)
+{
+	int rc;
 
+	rc = msm_gpios_request_enable(smsc911x_gpios,
+			ARRAY_SIZE(smsc911x_gpios));
+	if (rc)
+		pr_err("%s: unable to enable gpios\n", __func__);
+}
 
-static char *usb_functions_all[] = {  
-#ifdef CONFIG_USB_ANDROID_RNDIS
-    "rndis",
-#endif
-#ifdef CONFIG_USB_F_SERIAL
-  "modem",
-  "nmea",
-#endif
-  "usb_mass_storage",
-  "adb",
-#ifdef CONFIG_USB_ANDROID_DIAG
-  "diag",
-#endif
-#ifdef CONFIG_USB_ANDROID_RMNET
-  "rmnet",
-#endif
-#ifdef CONFIG_USB_ANDROID_ACM
-  "acm",
-#endif
-};
-
-static struct android_usb_product_hw usb_products[] = {
-  {
-    .adb_product_id = PID_UDISK,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_hw_ms),
-    .adb_functions  = usb_functions_hw_ms,
-    .product_id = PID_UDISK,
-    .num_functions  = ARRAY_SIZE(usb_functions_hw_ms),
-    .functions  = usb_functions_hw_ms,
-    /*< DTS2011062501797 zhangyancun 20110728 begin */
-    /* two udisks to support internal sdcard (merge DTS2011031601341) */
-    .nluns = 2,
-    /* DTS2011062501797 zhangyancun 20110728 end >*/ 
-		/* no cdrom */
-        .cdrom_index=-1,
-  },
-  {
-    .adb_product_id = PID_ONLY_CDROM,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_hw_ms),
-    .adb_functions  = usb_functions_hw_ms,
-    .product_id = PID_ONLY_CDROM,
-    .num_functions  = ARRAY_SIZE(usb_functions_hw_ms),
-    .functions  = usb_functions_hw_ms,
-    .nluns = 1,
-        .cdrom_index=0,
-  },
-  {
-    .adb_product_id = PID_AUTH,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_hw_normal_adb),
-    .adb_functions  = usb_functions_hw_normal_adb,
-    .product_id = PID_AUTH,
-    .num_functions  = ARRAY_SIZE(usb_functions_hw_normal_adb),
-    .functions  = usb_functions_hw_normal_adb,
-    .nluns = 1,
-        .cdrom_index=0,
-  },
-  {
-    .adb_product_id = PID_NORMAL,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_hw_normal_adb),
-    .adb_functions  = usb_functions_hw_normal_adb,
-    .product_id = PID_NORMAL,
-    .num_functions = ARRAY_SIZE(usb_functions_hw_normal),
-    .functions  = usb_functions_hw_normal,
-    .nluns = 1,
-        .cdrom_index=0,
-  },
-  {
-    .adb_product_id = PID_ONLY_CDROM_TMO,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_hw_ms),
-    .adb_functions  = usb_functions_hw_ms,
-    .product_id = PID_ONLY_CDROM_TMO,
-    .num_functions  = ARRAY_SIZE(usb_functions_hw_ms),
-    .functions  = usb_functions_hw_ms,
-    .nluns = 1,
-        .cdrom_index=0,
-  },
-  {
-    .adb_product_id = PID_AUTH_TMO,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_hw_normal_adb),
-    .adb_functions  = usb_functions_hw_normal_adb,
-    .product_id = PID_AUTH_TMO,
-    .num_functions  = ARRAY_SIZE(usb_functions_hw_normal_adb),
-    .functions  = usb_functions_hw_normal_adb,
-    .nluns = 1,
-        .cdrom_index=0,
-  },
-  {
-    .adb_product_id = PID_NORMAL_TMO,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_hw_normal_adb),
-    .adb_functions  = usb_functions_hw_normal_adb,
-    .product_id = PID_NORMAL_TMO,
-    .num_functions = ARRAY_SIZE(usb_functions_hw_normal),
-    .functions  = usb_functions_hw_normal,
-    .nluns = 1,
-        .cdrom_index=0,
-  },
-  {
-    .adb_product_id = PID_GOOGLE,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_google_ms_adb),
-    .adb_functions  = usb_functions_google_ms_adb,
-    .product_id = PID_GOOGLE_MS,
-    .num_functions = ARRAY_SIZE(usb_functions_google_ms),
-    .functions  = usb_functions_google_ms,
-    .nluns = 3,
-        .cdrom_index=1,
-  },
-  {
-    /*< DTS2011082402558 zhangyancun 20110824 begin */
-    /* add adb port for USB tether */
-    .adb_product_id = PID_WLAN_ADB,
-    .adb_num_functions  = ARRAY_SIZE(usb_functions_rndis_adb),
-    .adb_functions  = usb_functions_rndis_adb,
-    /* DTS2011082402558 zhangyancun 20110824 end >*/
-    .product_id = PID_WLAN,
-    .num_functions  = ARRAY_SIZE(usb_functions_rndis),
-    .functions  = usb_functions_rndis,
-    .nluns = 1,
-        .cdrom_index=-1,
-  },
-};
-
-
-static char product_name[MAX_NAME_LEN];
-static char vendor_name[MAX_NAME_LEN];
-static char manufacturer_name[MAX_NAME_LEN];
-#define MAX_LENS 3
-static struct usb_mass_storage_platform_data mass_storage_pdata = {
-  .nluns    = MAX_LENS,
-  .vendor   = vendor_name,//"Qualcomm Incorporated",
-  .product        = product_name,//"Mass storage",
-  .release  = 0x0100,
-};
-
-static struct platform_device usb_mass_storage_device = {
-  .name = "usb_mass_storage",
-  .id = -1,
-  .dev  = {
-    .platform_data = &mass_storage_pdata,
-  },
-};
-
-static struct usb_ether_platform_data rndis_pdata = {
-  /* ethaddr is filled by board_serialno_setup */
-  .vendorID = HUAWEI_VID,
-  .vendorDescr  = manufacturer_name,//"Huawei Incorporated",
-};
-
-static struct platform_device rndis_device = {
-  .name = "rndis",
-  .id = -1,
-  .dev  = {
-    .platform_data = &rndis_pdata,
-  },
-};
-
+#ifdef CONFIG_USB_G_ANDROID
 static struct android_usb_platform_data android_usb_pdata = {
-  .vendor_id  = HUAWEI_VID,
-  .product_id = 0x9026,
-  .version  = 0x0100,
-  .product_name   = product_name,
-  .manufacturer_name  = manufacturer_name,//"Huawei Incorporated",
-  .num_products = ARRAY_SIZE(usb_products),
-  .products = usb_products,
-  .num_functions = ARRAY_SIZE(usb_functions_all),
-  .functions = usb_functions_all,
-  .serial_number = "1234567890ABCDEF",
+	.update_pid_and_serial_num = usb_diag_update_pid_and_serial_num,
 };
-#endif
-/* updata QC2030 USB yanzhijun 20101105 end >*/
-
 
 static struct platform_device android_usb_device = {
 	.name	= "android_usb",
@@ -4589,232 +4318,11 @@ static struct platform_device android_usb_device = {
 		.platform_data = &android_usb_pdata,
 	},
 };
-
-static int __init board_serialno_setup(char *serialno)
-{
-	int i;
-	char *src = serialno;
-
-	/* create a fake MAC address from our serial number.
-	 * first byte is 0x02 to signify locally administered.
-	 */
-	rndis_pdata.ethaddr[0] = 0x02;
-	for (i = 0; *src; i++) {
-		/* XOR the USB serial across the remaining bytes */
-		rndis_pdata.ethaddr[i % (ETH_ALEN - 1) + 1] ^= *src++;
-	}
-
-	android_usb_pdata.serial_number = serialno;
-	return 1;
-}
-__setup("androidboot.serialno=", board_serialno_setup);
-
 #endif
 
-/* < DTS2010061100003 luojianhong 201000612 begin*/
-/*remove the statements about m33c01*/
-
-/*< DTS2010071700383 haoqingtao 20100716 begin*/
-/* kernel29 -> kernel32 driver modify*/
-/*  DTS2010061100003 luojianhong 201000612 end > */
-/*<BU5D09205 zhangtao 20100503 begin*/
-/* < DTS2010070200975 zhangtao 20100702 begin */
-/* delete some lines*/
-/* DTS2010070200975 zhangtao 20100702 end > */
-/*<BU5D09397 lijuan 00152865, 20100506 begin*/
-lcd_panel_type lcd_panel_probe(void)
-{
-    lcd_panel_type hw_lcd_panel = LCD_NONE;
-/*< DTS2010092400487  lijianzhao 20100924 begin */
-	/*< DTS2010112702297 wangquanli 201001125 begin */
-	/*< DTS2011030202729  liliang 20110302  begin */
-	if ((machine_is_msm7x30_u8800()) || (machine_is_msm7x30_u8820()) || (machine_is_msm7x30_u8800_51()) || (machine_is_msm8255_u8800_pro()))
-	/* DTS2011030202729  liliang 20110302 end >*/
-	/* DTS2010112702297 wangquanli 201001125 end >*/
-	{
-		switch (lcd_id)
-		{
-			case 0:  
-				hw_lcd_panel = LCD_NT35582_BYD_WVGA;
-			break;
-		 	case 1:  
-				hw_lcd_panel = LCD_NT35582_TRULY_WVGA;
-			break;
-			/*< DTS2010120703279 lijianzhao 20101207 begin */
-			/* NT35510 alpha_si is MDDI type2 LCD */
-			case 2:  
-				hw_lcd_panel = LCD_NT35510_ALPHA_SI_WVGA;
-			break;
-			/* DTS2010120703279 lijianzhao 20101207 end >*/
-/*< DTS2011060802925  jiaoshuangwei 20110608 begin */
-			/* NT35510 alpha_si is MDDI type2 LCD */
-			case 3:  
-				hw_lcd_panel = LCD_NT35510_ALPHA_SI_WVGA_TYPE2;
-			break;
-/* DTS2011060802925 jiaoshuangwei 20110608 end >*/
-			default : 
-				hw_lcd_panel = LCD_NONE;
-			break;					  
-		}
-	}
-/*<DTS2011042601502  jiaoshuangwei 20110308 begin*/
-	/* <DTS2011050700551 zhangbo 20110505 begin */
-    /* <DTS2011062600102 sunhonghui 20110626 begin */
-    /* <DTS2011071600361 liyuping 20110716 begin */
-	/* < DTS2011082302564 liwei 20110823 begin */
-/*< DTS2011090102706 jiaoshuangwei 20110901 begin */
-/*<DTS2011091502092 liyuping 20110915 begin */
-    else if (machine_is_msm8255_u8860() 
-			|| machine_is_msm8255_c8860() 
-			|| machine_is_msm8255_u8860lp()
-			|| machine_is_msm8255_u8860_92()
-			|| machine_is_msm8255_u8860_51())
-/* DTS2011091502092 liyuping 20110915 end> */ 
-/* DTS2011090102706 jiaoshuangwei 20110901 end >*/
-	/* DTS2011082302564 liwei 20110823 end > */
-	/* DTS2011071600361 liyuping 20110716 end> */
-    /* DTS2011062600102 sunhonghui 20110626 end> */
-	/* DTS2011050700551 zhangbo 20110505 end> */
-	{
-		switch (lcd_id)
-		{
-            case 0:
-				hw_lcd_panel = LCD_NT35560_TOSHIBA_FWVGA;
-				break;
-			default : 
-				hw_lcd_panel = LCD_NONE;
-				break;					  
-		}
-	}
-/*< DTS2011090102706 jiaoshuangwei 20110901 begin */
-/* <DTS2011091200073 zhangbo 20110912 begin */
-/* < DTS2011102401822 liwei 20111024 begin */
-	else if( machine_is_msm8255_u8680()
-        || machine_is_msm8255_u8667()
-	    || (machine_is_msm8255_u8730()))
-/* DTS2011102401822 liwei 20111024 end > */
-/* DTS2011091200073 zhangbo 20110912 end> */
-	{
-		switch (lcd_id)
-		{
-            case 0:
-				hw_lcd_panel = LCD_RSP61408_CHIMEI_WVGA;
-				break;
-/*< DTS2011100803621  jiaoshuangwei 20111008 begin */
-			case 2:
-				hw_lcd_panel = LCD_RSP61408_BYD_WVGA;
-				break;
-/* DTS2011100803621 jiaoshuangwei 20111008 end >*/
-			default : 
-				hw_lcd_panel = LCD_RSP61408_CHIMEI_WVGA;
-				break;					  
-		}
-	}
-/* DTS2011090102706 jiaoshuangwei 20110901 end >*/
-/* DTS2011042601502  jiaoshuangwei 20110308 end>*/
-/* DTS2010092400487  lijianzhao 20100924 end >*/
-    /*< DTS2011091402488 hujun 20110914 begin */
-    /*delet one line to avoid too much logs*/
-    /*DTS2011091402488 hujun 20110914 end > */
-    return hw_lcd_panel;
-
-}
-/*BU5D09397 lijuan 00152865, 20100506 end>*/
-
-
-/* < BU5D10365 liujinggang 20100521 begin*/
-char *get_lcd_panel_name(void)
-{
-    lcd_panel_type hw_lcd_panel = LCD_NONE;
-    char *pname = NULL;
-    
-    hw_lcd_panel = lcd_panel_probe();
-    
-    switch (hw_lcd_panel)
-    {
-     case LCD_S6D74A0_SAMSUNG_HVGA:
-            pname = "SAMSUNG S6D74A0";
-            break;
-            
-        case LCD_ILI9325_INNOLUX_QVGA:
-            pname = "INNOLUX ILI9325";
-            break;
-
-        case LCD_ILI9325_BYD_QVGA:
-            pname = "BYD ILI9325";
-            break;
-
-        case LCD_ILI9325_WINTEK_QVGA:
-            pname = "WINTEK ILI9325";
-            break;
-
-        case LCD_SPFD5408B_KGM_QVGA:
-            pname = "KGM SPFD5408B";
-            break;
-
-        case LCD_HX8357A_BYD_QVGA:
-            pname = "BYD HX8357A";
-            break;
-
-        case LCD_HX8368A_SEIKO_QVGA:
-            pname = "SEIKO HX8368A";
-            break;
-			
-        case LCD_HX8347D_TRULY_QVGA:
-            pname = "TRULY HX8347D";
-            break;
-			
-        case LCD_ILI9325C_WINTEK_QVGA:
-            pname = "WINTEK ILI9325C";
-            break;
-						
-        case LCD_NT35582_BYD_WVGA:
-            pname = "BYD NT35582";
-            break;
-            
-        case LCD_NT35582_TRULY_WVGA:
-            pname = "TRULY NT35582";
-            break;
-
-/*<DTS2011042601502  jiaoshuangwei 20110308 begin*/
-    	case LCD_NT35560_TOSHIBA_FWVGA:
-		    pname = "TOSHIBA NT35560";
-/* DTS2011042601502  jiaoshuangwei 20110308 end>*/
-/*<DTS2011062801414 fengwei 20110628 begin*/
-			break;
-/*DTS2011062801414 fengwei 20110628 end>*/
-
-		/*< DTS2010120703279 lijianzhao 20101207 begin */
-    	case LCD_NT35510_ALPHA_SI_WVGA:
-/*< DTS2011022503112 lijianzhao 20110225 begin */
-		    pname = "TRULY NT35510";
-/* DTS2011022503112 lijianzhao 20110225 end >*/ 
-            break;
-		/* DTS2010120703279 lijianzhao 20101207 end >*/
-            
-/*< DTS2011060802925 jiaoshuangwei 20110608 begin */
-       /* set the lcd name is SUCCESS NT_35510 */
-    	case LCD_NT35510_ALPHA_SI_WVGA_TYPE2:
-		    pname = "SUCCESS NT35510";
-            break;
-/* DTS2011060802925 jiaoshuangwei 20110608 end >*/
-/*< DTS2011090102706 jiaoshuangwei 20110901 begin */
-		case LCD_RSP61408_CHIMEI_WVGA:
-			pname = "CHIMEI RSP61408";
-			break;
-/* DTS2011090102706 jiaoshuangwei 20110901 end >*/
-/*< DTS2011100803621  jiaoshuangwei 20111008 begin */
-		case LCD_RSP61408_BYD_WVGA:
-			pname = "BYD RSP61408";
-			break;
-/* DTS2011100803621 jiaoshuangwei 20111008 end >*/
-        default:
-            pname = "UNKNOWN LCD";
-            break;
-    }
-
-    return pname;
-}
+/*< DTS2012011904543 lijianzhao 20120119 begin */
+/* remove them to hardware_self_adapt.c */
+/* DTS2012011904543 lijianzhao 20120119 end >*/
 /* < DTS2011042703449  liujinggang 20110427 begin */
 static int gsensor_support_dummyaddr(void)
 {
@@ -4967,33 +4475,35 @@ static int pn544_interrupt_gpio_config(void)
 	return 0;
 }
 
-/* < DTS2011091905981  sunyue 20110929 begin */
-static int pn544_fw_download_pull_down(void)
-{
-	gpio_set_value(PN544_DOWNLOAD_GPIO, 1);
-	mdelay(5);
-	gpio_set_value(PN544_DOWNLOAD_GPIO, 0);
-	mdelay(5);
-	return 0;	
-}
-
+/* < DTS2012030501764 songchuan 20120305 begin */
 static int pn544_fw_download_pull_high(void)
 {
-	gpio_set_value(PN544_DOWNLOAD_GPIO, 0);
+	gpio_set_value(GPIO_NFC_LOAD, 0);
 	mdelay(5);
-	gpio_set_value(PN544_DOWNLOAD_GPIO, 1);
+	gpio_set_value(GPIO_NFC_LOAD, 1);
 	mdelay(5);
 	return 0;
 }
+
+static int pn544_fw_download_pull_down(void)
+{
+	gpio_set_value(GPIO_NFC_LOAD, 1);
+	mdelay(5);
+	gpio_set_value(GPIO_NFC_LOAD, 0);
+	mdelay(5);
+	return 0;	
+}
+/* DTS2012030501764 songchuan 20120305 end > */
 
 static struct pn544_nfc_platform_data pn544_hw_data = 
 {
 	.pn544_ven_reset = pn544_ven_reset,
 	.pn544_interrupt_gpio_config = pn544_interrupt_gpio_config,
+	/* < DTS2012030501764 songchuan 20120305 begin */
+    .pn544_fw_download_pull_high = pn544_fw_download_pull_high,
 	.pn544_fw_download_pull_down = pn544_fw_download_pull_down,
-	.pn544_fw_download_pull_high = pn544_fw_download_pull_high,	
+	/* DTS2012030501764 songchuan 20120305 end > */	
 };
-/* DTS2011091905981  sunyue 20110929 end > */
 
 #endif
 /* DTS2011011904316 genghua 20110121 end >*/
@@ -5128,20 +4638,211 @@ static struct i2c_board_info msm_i2c_board_info[] = {
 	},
 #endif
 /*BU5D09205 zhangtao 20100419 end > */
-/* < DTS2011102806486  zhangmin 20111029  begin */
-#ifdef CONFIG_HUAWEI_FEATURE_PROXIMITY_LITEON_LTR_558
-	{   
-		I2C_BOARD_INFO("ltr-558", 0x46 >> 1),
-        /*they use same int_gpio*/
-        .irq = MSM_GPIO_TO_INT(MSM_7X30_LTR558_INT),
-        .platform_data = &ltr558_hw_data,
-	},
-#endif
-/* DTS2011102806486  zhangmin 20111029  end > */
 /* <DTS2010072202961 hufeng 20100722 begin */
 /* removed several lines */
 /* DTS2010072202961 hufeng 20100722 end> */
 };
+
+static struct msm_gpio optnav_config_data[] = {
+	{ GPIO_CFG(OPTNAV_CHIP_SELECT, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	"optnav_chip_select" },
+};
+
+static struct regulator_bulk_data optnav_regulators[] = {
+	{ .supply = "gp7", .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "gp4", .min_uV = 2600000, .max_uV = 2600000 },
+	{ .supply = "gp9", .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "usb", .min_uV = 3300000, .max_uV = 3300000 },
+};
+
+static void __iomem *virtual_optnav;
+
+static int optnav_gpio_setup(void)
+{
+	int rc = -ENODEV;
+	rc = msm_gpios_request_enable(optnav_config_data,
+			ARRAY_SIZE(optnav_config_data));
+
+	if (rc)
+		return rc;
+
+	/* Configure the FPGA for GPIOs */
+	virtual_optnav = ioremap(FPGA_OPTNAV_GPIO_ADDR, 0x4);
+	if (!virtual_optnav) {
+		pr_err("%s:Could not ioremap region\n", __func__);
+		return -ENOMEM;
+	}
+	/*
+	 * Configure the FPGA to set GPIO 19 as
+	 * normal, active(enabled), output(MSM to SURF)
+	 */
+	writew(0x311E, virtual_optnav);
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(optnav_regulators),
+			optnav_regulators);
+	if (rc)
+		return rc;
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(optnav_regulators),
+			optnav_regulators);
+
+	if (rc)
+		goto regulator_put;
+
+	return rc;
+
+regulator_put:
+	regulator_bulk_free(ARRAY_SIZE(optnav_regulators), optnav_regulators);
+	return rc;
+}
+
+static void optnav_gpio_release(void)
+{
+	msm_gpios_disable_free(optnav_config_data,
+		ARRAY_SIZE(optnav_config_data));
+	iounmap(virtual_optnav);
+	regulator_bulk_free(ARRAY_SIZE(optnav_regulators), optnav_regulators);
+}
+
+static int optnav_enable(void)
+{
+	int rc;
+	/*
+	 * Enable the VREGs L8(gp7), L10(gp4), L12(gp9), L6(usb)
+	 * for I2C communication with keyboard.
+	 */
+
+	rc = regulator_bulk_enable(ARRAY_SIZE(optnav_regulators),
+			optnav_regulators);
+
+	if (rc)
+		return rc;
+
+	/* Enable the chip select GPIO */
+	gpio_set_value(OPTNAV_CHIP_SELECT, 1);
+	gpio_set_value(OPTNAV_CHIP_SELECT, 0);
+
+	return 0;
+}
+
+static void optnav_disable(void)
+{
+	regulator_bulk_disable(ARRAY_SIZE(optnav_regulators),
+			optnav_regulators);
+
+	gpio_set_value(OPTNAV_CHIP_SELECT, 1);
+}
+
+static struct ofn_atlab_platform_data optnav_data = {
+	.gpio_setup    = optnav_gpio_setup,
+	.gpio_release  = optnav_gpio_release,
+	.optnav_on     = optnav_enable,
+	.optnav_off    = optnav_disable,
+	.rotate_xy     = 0,
+	.function1 = {
+		.no_motion1_en		= true,
+		.touch_sensor_en	= true,
+		.ofn_en			= true,
+		.clock_select_khz	= 1500,
+		.cpi_selection		= 1200,
+	},
+	.function2 =  {
+		.invert_y		= false,
+		.invert_x		= true,
+		.swap_x_y		= false,
+		.hold_a_b_en		= true,
+		.motion_filter_en       = true,
+	},
+};
+
+static int hdmi_comm_power(int on, int show);
+static int hdmi_init_irq(void);
+static int hdmi_enable_5v(int on);
+static int hdmi_core_power(int on, int show);
+static int hdmi_cec_power(int on);
+static bool hdmi_check_hdcp_hw_support(void);
+
+static struct msm_hdmi_platform_data adv7520_hdmi_data = {
+	.irq = MSM_GPIO_TO_INT(18),
+	.comm_power = hdmi_comm_power,
+	.init_irq = hdmi_init_irq,
+	.enable_5v = hdmi_enable_5v,
+	.core_power = hdmi_core_power,
+	.cec_power = hdmi_cec_power,
+	.check_hdcp_hw_support = hdmi_check_hdcp_hw_support,
+};
+
+#ifdef CONFIG_BOSCH_BMA150
+
+static struct regulator_bulk_data sensors_ldo[] = {
+	{ .supply = "gp7", .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "gp6", .min_uV = 3050000, .max_uV = 3100000 },
+};
+
+static int __init sensors_ldo_init(void)
+{
+	int rc;
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(sensors_ldo), sensors_ldo);
+
+	if (rc) {
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		goto out;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(sensors_ldo), sensors_ldo);
+
+	if (rc) {
+		pr_err("%s: could not set voltages: %d\n", __func__, rc);
+		goto reg_free;
+	}
+
+	return 0;
+
+reg_free:
+	regulator_bulk_free(ARRAY_SIZE(sensors_ldo), sensors_ldo);
+out:
+	return rc;
+}
+
+static int sensors_ldo_set(int on)
+{
+	int rc = on ?
+		regulator_bulk_enable(ARRAY_SIZE(sensors_ldo), sensors_ldo) :
+		regulator_bulk_disable(ARRAY_SIZE(sensors_ldo), sensors_ldo);
+
+	if (rc)
+		pr_err("%s: could not %sable regulators: %d\n",
+				__func__, on ? "en" : "dis", rc);
+
+	return rc;
+}
+
+static int sensors_ldo_enable(void)
+{
+	return sensors_ldo_set(1);
+}
+
+static void sensors_ldo_disable(void)
+{
+	sensors_ldo_set(0);
+}
+
+static struct bma150_platform_data bma150_data = {
+	.power_on = sensors_ldo_enable,
+	.power_off = sensors_ldo_disable,
+};
+
+static struct i2c_board_info bma150_board_info[] __initdata = {
+	{
+		I2C_BOARD_INFO("bma150", 0x38),
+		.flags = I2C_CLIENT_WAKE,
+		.irq = MSM_GPIO_TO_INT(BMA150_GPIO_INT),
+		.platform_data = &bma150_data,
+	},
+};
+#endif
+
 
 static struct i2c_board_info msm_marimba_board_info[] = {
 	{
@@ -5150,74 +4851,6 @@ static struct i2c_board_info msm_marimba_board_info[] = {
 	}
 };
 
-#ifdef CONFIG_USB_FUNCTION
-static struct usb_function_map usb_functions_map[] = {
-	{"diag", 0},
-	{"adb", 1},
-	{"modem", 2},
-	{"nmea", 3},
-	{"mass_storage", 4},
-	{"ethernet", 5},
-};
-
-static struct usb_composition usb_func_composition[] = {
-	{
-		.product_id         = 0x9012,
-		.functions	    = 0x5, /* 0101 */
-	},
-
-	{
-		.product_id         = 0x9013,
-		.functions	    = 0x15, /* 10101 */
-	},
-
-	{
-		.product_id         = 0x9014,
-		.functions	    = 0x30, /* 110000 */
-	},
-
-	{
-		.product_id         = 0x9016,
-		.functions	    = 0xD, /* 01101 */
-	},
-
-	{
-		.product_id         = 0x9017,
-		.functions	    = 0x1D, /* 11101 */
-	},
-
-	{
-		.product_id         = 0xF000,
-		.functions	    = 0x10, /* 10000 */
-	},
-
-	{
-		.product_id         = 0xF009,
-		.functions	    = 0x20, /* 100000 */
-	},
-
-	{
-		.product_id         = 0x9018,
-		.functions	    = 0x1F, /* 011111 */
-	},
-
-};
-static struct msm_hsusb_platform_data msm_hsusb_pdata = {
-	.version	= 0x0100,
-	.phy_info	= USB_PHY_INTEGRATED | USB_PHY_MODEL_45NM,
-	.vendor_id	= 0x12d1,
-	.product_name	= "Qualcomm HSUSB Device",
-	.serial_number	= "1234567890ABCDEF",
-	.manufacturer_name
-			= "Qualcomm Incorporated",
-	.compositions	= usb_func_composition,
-	.num_compositions
-			= ARRAY_SIZE(usb_func_composition),
-	.function_map	= usb_functions_map,
-	.num_functions	= ARRAY_SIZE(usb_functions_map),
-	.core_clk	= 1,
-};
-#endif
 
 static struct msm_handset_platform_data hs_platform_data = {
 	.hs_name = "7k_handset",
@@ -5233,41 +4866,58 @@ static struct platform_device hs_device = {
 };
 
 static struct msm_pm_platform_data msm_pm_data[MSM_PM_SLEEP_MODE_NR] = {
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE].supported = 1,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE].suspend_enabled = 1,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE].idle_enabled = 1,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE].latency = 8594,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE].residency = 23740,
-
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN].supported = 1,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN].suspend_enabled = 1,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN].idle_enabled = 1,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN].latency = 4594,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN].residency = 23740,
-
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE].supported = 1,
+	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE] = {
+		.idle_supported = 1,
+		.suspend_supported = 1,
+		.idle_enabled = 1,
+		.suspend_enabled = 1,
+		.latency = 8594,
+		.residency = 23740,
+	},
+	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN] = {
+		.idle_supported = 1,
+		.suspend_supported = 1,
+		.idle_enabled = 1,
+		.suspend_enabled = 1,
+		.latency = 4594,
+		.residency = 23740,
+	},
+	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE] = {
 #ifdef CONFIG_MSM_STANDALONE_POWER_COLLAPSE
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE].suspend_enabled = 0,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE].idle_enabled = 1,
+		.idle_supported = 1,
+		.suspend_supported = 1,
+		.idle_enabled = 1,
+		.suspend_enabled = 0,
 #else /*CONFIG_MSM_STANDALONE_POWER_COLLAPSE*/
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE].suspend_enabled = 0,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE].idle_enabled = 0,
+		.idle_supported = 0,
+		.suspend_supported = 0,
+		.idle_enabled = 0,
+		.suspend_enabled = 0,
 #endif /*CONFIG_MSM_STANDALONE_POWER_COLLAPSE*/
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE].latency = 500,
-	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE].residency = 6000,
+		.latency = 500,
+		.residency = 6000,
+	},
+	[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT] = {
+		.idle_supported = 1,
+		.suspend_supported = 1,
+		.idle_enabled = 0,
+		.suspend_enabled = 1,
+		.latency = 443,
+		.residency = 1098,
+	},
+	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT] = {
+		.idle_supported = 1,
+		.suspend_supported = 1,
+		.idle_enabled = 1,
+		.suspend_enabled = 1,
+		.latency = 2,
+		.residency = 0,
+	},
+};
 
-	[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].supported = 1,
-	[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].suspend_enabled
-		= 1,
-	[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].idle_enabled = 0,
-	[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].latency = 443,
-	[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].residency = 1098,
-
-	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT].supported = 1,
-	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT].suspend_enabled = 1,
-	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT].idle_enabled = 1,
-	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT].latency = 2,
-	[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT].residency = 0,
+static struct msm_pm_boot_platform_data msm_pm_boot_pdata __initdata = {
+	.mode = MSM_PM_BOOT_CONFIG_RESET_VECTOR_VIRT,
+	.v_addr = (uint32_t *)PAGE_OFFSET,
 };
 
 static struct resource qsd_spi_resources[] = {
@@ -5353,6 +5003,27 @@ static struct platform_device qsd_device_spi = {
 	.resource	= qsd_spi_resources,
 };
 
+#ifdef CONFIG_SPI_QSD
+static struct spi_board_info lcdc_sharp_spi_board_info[] __initdata = {
+	{
+		.modalias	= "lcdc_sharp_ls038y7dx01",
+		.mode		= SPI_MODE_1,
+		.bus_num	= 0,
+		.chip_select	= 0,
+		.max_speed_hz	= 26331429,
+	}
+};
+static struct spi_board_info lcdc_toshiba_spi_board_info[] __initdata = {
+	{
+		.modalias       = "lcdc_toshiba_ltm030dd40",
+		.mode           = SPI_MODE_3|SPI_CS_HIGH,
+		.bus_num        = 0,
+		.chip_select    = 0,
+		.max_speed_hz   = 9963243,
+	}
+};
+#endif
+
 static struct msm_gpio qsd_spi_gpio_config_data[] = {
 	{ GPIO_CFG(45, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_clk" },
 	{ GPIO_CFG(46, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_cs0" },
@@ -5374,8 +5045,6 @@ static void msm_qsd_spi_gpio_release(void)
 
 static struct msm_spi_platform_data qsd_spi_pdata = {
 	.max_clock_speed = 26331429,
-	.clk_name = "spi_clk",
-	.pclk_name = "spi_pclk",
 	.gpio_config  = msm_qsd_spi_gpio_config,
 	.gpio_release = msm_qsd_spi_gpio_release,
 	.dma_config = msm_qsd_spi_dma_config,
@@ -5386,29 +5055,32 @@ static void __init msm_qsd_spi_init(void)
 	qsd_device_spi.dev.platform_data = &qsd_spi_pdata;
 }
 
-#ifdef CONFIG_USB_EHCI_MSM
+#ifdef CONFIG_USB_EHCI_MSM_72K
 static void msm_hsusb_vbus_power(unsigned phy_info, int on)
 {
         int rc;
         static int vbus_is_on;
-        struct pm8058_gpio usb_vbus = {
-                .direction      = PM_GPIO_DIR_OUT,
-                .pull           = PM_GPIO_PULL_NO,
-                .output_buffer  = PM_GPIO_OUT_BUF_CMOS,
-                .output_value   = 1,
-                .vin_sel        = 2,
-                .out_strength   = PM_GPIO_STRENGTH_MED,
-                .function       = PM_GPIO_FUNC_NORMAL,
-                .inv_int_pol    = 0,
-        };
+	struct pm8xxx_gpio_init_info usb_vbus = {
+		PM8058_GPIO_PM_TO_SYS(36),
+		{
+			.direction      = PM_GPIO_DIR_OUT,
+			.pull           = PM_GPIO_PULL_NO,
+			.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+			.output_value   = 1,
+			.vin_sel        = 2,
+			.out_strength   = PM_GPIO_STRENGTH_MED,
+			.function       = PM_GPIO_FUNC_NORMAL,
+			.inv_int_pol    = 0,
+		},
+	};
 
         /* If VBUS is already on (or off), do nothing. */
         if (unlikely(on == vbus_is_on))
                 return;
 
         if (on) {
-                rc = pm8058_gpio_config(36, &usb_vbus);
-                if (rc) {
+		rc = pm8xxx_gpio_config(usb_vbus.gpio, &usb_vbus.config);
+		if (rc) {
                         pr_err("%s PMIC GPIO 36 write failed\n", __func__);
                         return;
                 }
@@ -5437,7 +5109,7 @@ static int hsusb_rpc_connect(int connect)
 #endif
 
 #ifdef CONFIG_USB_MSM_OTG_72K
-static struct vreg *vreg_3p3;
+static struct regulator *vreg_3p3;
 static int msm_hsusb_ldo_init(int init)
 {
 /* < DTS2011063004178 caomingxing 20110630 begin */
@@ -5445,27 +5117,27 @@ static int msm_hsusb_ldo_init(int init)
  * for preventing usb port from being not recognized by PC sometimes.
  */
 #ifdef CONFIG_HUAWEI_KERNEL
-	int def_vol = 3400;
+	int def_vol = 3400000;
 #else
 	uint32_t version = 0;
-	int def_vol = 3400;
+	int def_vol = 3400000;
 
 	version = socinfo_get_version();
 
 	if (SOCINFO_VERSION_MAJOR(version) >= 2 &&
 			SOCINFO_VERSION_MINOR(version) >= 1) {
-		def_vol = 3075;
+		def_vol = 3075000;
 		pr_debug("%s: default voltage:%d\n", __func__, def_vol);
 	}
 #endif
 /* DTS2011063004178 caomingxing 20110630 end > */
 	if (init) {
-		vreg_3p3 = vreg_get(NULL, "usb");
+		vreg_3p3 = regulator_get(NULL, "usb");
 		if (IS_ERR(vreg_3p3))
 			return PTR_ERR(vreg_3p3);
-		vreg_set_level(vreg_3p3, def_vol);
+		regulator_set_voltage(vreg_3p3, def_vol, def_vol);
 	} else
-		vreg_put(vreg_3p3);
+		regulator_put(vreg_3p3);
 
 	return 0;
 }
@@ -5483,14 +5155,14 @@ static int msm_hsusb_ldo_enable(int enable)
 	ldo_status = enable;
 
 	if (enable)
-		return vreg_enable(vreg_3p3);
-
-	return vreg_disable(vreg_3p3);
+		return regulator_enable(vreg_3p3);
+	else
+		return regulator_disable(vreg_3p3);
 }
 
 static int msm_hsusb_ldo_set_voltage(int mV)
 {
-	static int cur_voltage = 3400;
+	static int cur_voltage;
 
 	if (!vreg_3p3 || IS_ERR(vreg_3p3))
 		return -ENODEV;
@@ -5502,22 +5174,21 @@ static int msm_hsusb_ldo_set_voltage(int mV)
 
 	pr_debug("%s: (%d)\n", __func__, mV);
 
-	return vreg_set_level(vreg_3p3, mV);
+	return regulator_set_voltage(vreg_3p3, mV*1000, mV*1000);
 }
 #endif
 
-#ifndef CONFIG_USB_EHCI_MSM
+#ifndef CONFIG_USB_EHCI_MSM_72K
 static int msm_hsusb_pmic_notif_init(void (*callback)(int online), int init);
 #endif
 static struct msm_otg_platform_data msm_otg_pdata = {
 	.rpc_connect	= hsusb_rpc_connect,
 
-#ifndef CONFIG_USB_EHCI_MSM
+#ifndef CONFIG_USB_EHCI_MSM_72K
 	.pmic_vbus_notif_init         = msm_hsusb_pmic_notif_init,
 #else
 	.vbus_power = msm_hsusb_vbus_power,
 #endif
-	.core_clk		 = 1,
 	.pemp_level		 = PRE_EMPHASIS_WITH_20_PERCENT,
 	.cdr_autoreset		 = CDR_AUTO_RESET_DISABLE,
 	.drv_ampl		 = HS_DRV_AMPLITUDE_DEFAULT,
@@ -5535,7 +5206,7 @@ static struct msm_hsusb_gadget_platform_data msm_gadget_pdata = {
 	.is_phy_status_timer_on = 1,
 };
 #endif
-#ifndef CONFIG_USB_EHCI_MSM
+#ifndef CONFIG_USB_EHCI_MSM_72K
 typedef void (*notify_vbus_state) (int);
 notify_vbus_state notify_vbus_state_func_ptr;
 int vbus_on_irq;
@@ -5583,11 +5254,8 @@ static int msm_hsusb_pmic_notif_init(void (*callback)(int online), int init)
 static struct android_pmem_platform_data android_pmem_pdata = {
 	.name = "pmem",
 	.allocator_type = PMEM_ALLOCATORTYPE_ALLORNOTHING,
-	/*< DTS2011040201879   songxiaoming 20110505 begin */
-/* <DTS2010120101602 penghai 20101231 begin */
 	.cached = 1,
-/* DTS2010120101602 penghai 20101231 end> */
-    /* DTS2011040201879   songxiaoming 20110505 end > */
+	.memory_type = MEMTYPE_EBI0,
 };
 
 static struct platform_device android_pmem_device = {
@@ -5596,6 +5264,54 @@ static struct platform_device android_pmem_device = {
 	.dev = { .platform_data = &android_pmem_pdata },
 };
 
+#ifndef CONFIG_SPI_QSD
+static int lcdc_gpio_array_num[] = {
+				45, /* spi_clk */
+				46, /* spi_cs  */
+				47, /* spi_mosi */
+				48, /* spi_miso */
+				};
+
+static struct msm_gpio lcdc_gpio_config_data[] = {
+	{ GPIO_CFG(45, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_clk" },
+	{ GPIO_CFG(46, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_cs0" },
+	{ GPIO_CFG(47, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_mosi" },
+	{ GPIO_CFG(48, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "spi_miso" },
+};
+
+static void lcdc_config_gpios(int enable)
+{
+	if (enable) {
+		msm_gpios_request_enable(lcdc_gpio_config_data,
+					      ARRAY_SIZE(
+						      lcdc_gpio_config_data));
+	} else
+		msm_gpios_disable_free(lcdc_gpio_config_data,
+					    ARRAY_SIZE(
+						    lcdc_gpio_config_data));
+}
+#endif
+
+static struct msm_panel_common_pdata lcdc_sharp_panel_data = {
+#ifndef CONFIG_SPI_QSD
+	.panel_config_gpio = lcdc_config_gpios,
+	.gpio_num          = lcdc_gpio_array_num,
+#endif
+	.gpio = 2, 	/* LPG PMIC_GPIO26 channel number */
+};
+
+static struct platform_device lcdc_sharp_panel_device = {
+	.name   = "lcdc_sharp_wvga",
+	.id     = 0,
+	.dev    = {
+		.platform_data = &lcdc_sharp_panel_data,
+	}
+};
+
+static struct msm_gpio dtv_panel_irq_gpios[] = {
+	{ GPIO_CFG(18, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
+		"hdmi_int" },
+};
 
 static struct msm_gpio dtv_panel_gpios[] = {
 	{ GPIO_CFG(120, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_4MA), "wca_mclk" },
@@ -5637,6 +5353,164 @@ static struct msm_gpio dtv_panel_gpios[] = {
 static unsigned dtv_reset_gpio =
 	GPIO_CFG(37, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
 #endif
+
+static struct regulator_bulk_data hdmi_core_regs[] = {
+	{ .supply = "ldo8",  .min_uV = 1800000, .max_uV = 1800000 },
+};
+
+static struct regulator_bulk_data hdmi_comm_regs[] = {
+	{ .supply = "ldo8",  .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "ldo10", .min_uV = 2600000, .max_uV = 2600000 },
+};
+
+static struct regulator_bulk_data hdmi_cec_regs[] = {
+	{ .supply = "ldo17", .min_uV = 2600000, .max_uV = 2600000 },
+};
+
+static int __init hdmi_init_regs(void)
+{
+	int rc;
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(hdmi_core_regs),
+			hdmi_core_regs);
+
+	if (rc) {
+		pr_err("%s: could not get %s regulators: %d\n",
+				__func__, "core", rc);
+		goto out;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(hdmi_core_regs),
+			hdmi_core_regs);
+
+	if (rc) {
+		pr_err("%s: could not set %s voltages: %d\n",
+				__func__, "core", rc);
+		goto free_core;
+	}
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(hdmi_comm_regs),
+			hdmi_comm_regs);
+
+	if (rc) {
+		pr_err("%s: could not get %s regulators: %d\n",
+				__func__, "comm", rc);
+		goto free_core;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(hdmi_comm_regs),
+			hdmi_comm_regs);
+
+	if (rc) {
+		pr_err("%s: could not set %s voltages: %d\n",
+				__func__, "comm", rc);
+		goto free_comm;
+	}
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(hdmi_cec_regs),
+			hdmi_cec_regs);
+
+	if (rc) {
+		pr_err("%s: could not get %s regulators: %d\n",
+				__func__, "cec", rc);
+		goto free_comm;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(hdmi_cec_regs),
+			hdmi_cec_regs);
+
+	if (rc) {
+		pr_err("%s: could not set %s voltages: %d\n",
+				__func__, "cec", rc);
+		goto free_cec;
+	}
+
+	return 0;
+
+free_cec:
+	regulator_bulk_free(ARRAY_SIZE(hdmi_cec_regs), hdmi_cec_regs);
+free_comm:
+	regulator_bulk_free(ARRAY_SIZE(hdmi_comm_regs), hdmi_comm_regs);
+free_core:
+	regulator_bulk_free(ARRAY_SIZE(hdmi_core_regs), hdmi_core_regs);
+out:
+	return rc;
+}
+
+static int hdmi_init_irq(void)
+{
+	int rc = msm_gpios_enable(dtv_panel_irq_gpios,
+			ARRAY_SIZE(dtv_panel_irq_gpios));
+	if (rc < 0) {
+		pr_err("%s: gpio enable failed: %d\n", __func__, rc);
+		return rc;
+	}
+	pr_info("%s\n", __func__);
+
+	return 0;
+}
+
+static int hdmi_enable_5v(int on)
+{
+	int pmic_gpio_hdmi_5v_en ;
+
+	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa() ||
+						machine_is_msm7x30_fluid())
+		pmic_gpio_hdmi_5v_en = PMIC_GPIO_HDMI_5V_EN_V2 ;
+	else
+		pmic_gpio_hdmi_5v_en = PMIC_GPIO_HDMI_5V_EN_V3 ;
+
+	pr_info("%s: %d\n", __func__, on);
+	if (on) {
+		int rc;
+		rc = gpio_request(PM8058_GPIO_PM_TO_SYS(pmic_gpio_hdmi_5v_en),
+			"hdmi_5V_en");
+		if (rc) {
+			pr_err("%s PMIC_GPIO_HDMI_5V_EN gpio_request failed\n",
+				__func__);
+			return rc;
+		}
+		gpio_set_value_cansleep(
+			PM8058_GPIO_PM_TO_SYS(pmic_gpio_hdmi_5v_en), 1);
+	} else {
+		gpio_set_value_cansleep(
+			PM8058_GPIO_PM_TO_SYS(pmic_gpio_hdmi_5v_en), 0);
+		gpio_free(PM8058_GPIO_PM_TO_SYS(pmic_gpio_hdmi_5v_en));
+	}
+	return 0;
+}
+
+static int hdmi_comm_power(int on, int show)
+{
+	if (show)
+		pr_info("%s: i2c comm: %d <LDO8+LDO10>\n", __func__, on);
+	return on ?
+		regulator_bulk_enable(ARRAY_SIZE(hdmi_comm_regs),
+				hdmi_comm_regs) :
+		regulator_bulk_disable(ARRAY_SIZE(hdmi_comm_regs),
+				hdmi_comm_regs);
+}
+
+static int hdmi_core_power(int on, int show)
+{
+	if (show)
+		pr_info("%s: %d <LDO8>\n", __func__, on);
+	return on ?
+		regulator_bulk_enable(ARRAY_SIZE(hdmi_core_regs),
+				hdmi_core_regs) :
+		regulator_bulk_disable(ARRAY_SIZE(hdmi_core_regs),
+				hdmi_core_regs);
+}
+
+static int hdmi_cec_power(int on)
+{
+	pr_info("%s: %d <LDO17>\n", __func__, on);
+	return on ? regulator_bulk_enable(ARRAY_SIZE(hdmi_cec_regs),
+				hdmi_cec_regs) :
+		regulator_bulk_disable(ARRAY_SIZE(hdmi_cec_regs),
+				hdmi_cec_regs);
+}
+
 #if defined(CONFIG_FB_MSM_HDMI_ADV7520_PANEL) || defined(CONFIG_BOSCH_BMA150)
 /* there is an i2c address conflict between adv7520 and bma150 sensor after
  * power up on fluid. As a solution, the default address of adv7520's packet
@@ -5649,7 +5523,6 @@ static int __init fluid_i2c_address_fixup(void)
 	struct i2c_msg msgs[3];
 	int res;
 	int rc = -EINVAL;
-	struct vreg *vreg_ldo8;
 	struct i2c_adapter *adapter;
 
 	if (machine_is_msm7x30_fluid()) {
@@ -5660,22 +5533,11 @@ static int __init fluid_i2c_address_fixup(void)
 		}
 
 		/* turn on LDO8 */
-		vreg_ldo8 = vreg_get(NULL, "gp7");
-		if (!vreg_ldo8) {
-			pr_err("%s: VREG L8 get failed\n", __func__);
+		rc = hdmi_core_power(1, 0);
+		if (rc) {
+			pr_err("%s: could not enable hdmi core regs: %d",
+					__func__, rc);
 			goto adapter_put;
-		}
-
-		rc = vreg_set_level(vreg_ldo8, 1800);
-		if (rc) {
-			pr_err("%s: VREG L8 set failed\n", __func__);
-			goto ldo8_put;
-		}
-
-		rc = vreg_enable(vreg_ldo8);
-		if (rc) {
-			pr_err("%s: VREG L8 enable failed\n", __func__);
-			goto ldo8_put;
 		}
 
 		/* change packet memory address to 0x74 */
@@ -5735,16 +5597,21 @@ static int __init fluid_i2c_address_fixup(void)
 	return 0;
 
 ldo8_disable:
-	vreg_disable(vreg_ldo8);
-ldo8_put:
-	vreg_put(vreg_ldo8);
+	hdmi_core_power(0, 0);
 adapter_put:
 	i2c_put_adapter(adapter);
 	return rc;
 }
-subsys_initcall_sync(fluid_i2c_address_fixup);
+fs_initcall_sync(fluid_i2c_address_fixup);
 #endif
 
+static bool hdmi_check_hdcp_hw_support(void)
+{
+	if (machine_is_msm7x30_fluid())
+		return false;
+	else
+		return true;
+}
 
 static int dtv_panel_power(int on)
 {
@@ -5809,7 +5676,9 @@ static struct lcdc_platform_data dtv_pdata = {
 
 /* < DTS2011041200623 xuhui 20110412 begin */
 /*disable QC's In Band Sleep mode with BCM4329 bluetooth chip*/
-#ifndef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
+/* DTS2012020604357 zhangyun 20120206 end > */
 static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
        .inject_rx_on_wakeup = 1,
        .rx_to_inject = 0xFD,
@@ -5825,11 +5694,19 @@ static struct resource msm_fb_resources[] = {
 
 static int msm_fb_detect_panel(const char *name)
 {
-	/* <DTS2010072202961 hufeng 20100722 begin */
-	if (!strcmp(name, "mddi_orise"))
-		return -EPERM;
-	/* DTS2010072202961 hufeng 20100722 end> */
-
+	if (machine_is_msm7x30_fluid()) {
+		if (!strcmp(name, "lcdc_sharp_wvga_pt"))
+			return 0;
+	} else {
+		if (!strncmp(name, "mddi_toshiba_wvga_pt", 20))
+			return -EPERM;
+		else if (!strncmp(name, "lcdc_toshiba_wvga_pt", 20))
+			return 0;
+		else if (!strcmp(name, "mddi_orise"))
+			return -EPERM;
+		else if (!strcmp(name, "mddi_quickvx"))
+			return -EPERM;
+	}
 	return -ENODEV;
 }
 
@@ -5853,33 +5730,18 @@ static struct platform_device msm_migrate_pages_device = {
 	.id     = -1,
 };
 
-static struct android_pmem_platform_data android_pmem_kernel_ebi1_pdata = {
-       .name = PMEM_KERNEL_EBI1_DATA_NAME,
-	/* if no allocator_type, defaults to PMEM_ALLOCATORTYPE_BITMAP,
-	* the only valid choice at this time. The board structure is
-	* set to all zeros by the C runtime initialization and that is now
-	* the enum value of PMEM_ALLOCATORTYPE_BITMAP, now forced to 0 in
-	* include/linux/android_pmem.h.
-	*/
-       .cached = 0,
-};
-
 static struct android_pmem_platform_data android_pmem_adsp_pdata = {
        .name = "pmem_adsp",
        .allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
        .cached = 0,
+	.memory_type = MEMTYPE_EBI0,
 };
 
 static struct android_pmem_platform_data android_pmem_audio_pdata = {
        .name = "pmem_audio",
        .allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
        .cached = 0,
-};
-
-static struct platform_device android_pmem_kernel_ebi1_device = {
-       .name = "android_pmem",
-       .id = 1,
-       .dev = { .platform_data = &android_pmem_kernel_ebi1_pdata },
+	.memory_type = MEMTYPE_EBI0,
 };
 
 static struct platform_device android_pmem_adsp_device = {
@@ -5894,83 +5756,6 @@ static struct platform_device android_pmem_audio_device = {
        .dev = { .platform_data = &android_pmem_audio_pdata },
 };
 
-static struct kgsl_platform_data kgsl_pdata = {
-#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
-	/* NPA Flow IDs */
-	.high_axi_3d = MSM_AXI_FLOW_3D_GPU_HIGH,
-	.high_axi_2d = MSM_AXI_FLOW_2D_GPU_HIGH,
-#else
-	/* AXI rates in KHz */
-	.high_axi_3d = 192000,
-	.high_axi_2d = 192000,
-#endif
-	.max_grp2d_freq = 0,
-	.min_grp2d_freq = 0,
-	.set_grp2d_async = NULL, /* HW workaround, run Z180 SYNC @ 192 MHZ */
-	.max_grp3d_freq = 245760000,
-	.min_grp3d_freq = 192 * 1000*1000,
-	.set_grp3d_async = set_grp3d_async,
-	.imem_clk_name = "imem_clk",
-	.grp3d_clk_name = "grp_clk",
-	.grp3d_pclk_name = "grp_pclk",
-#ifdef CONFIG_MSM_KGSL_2D
-	.grp2d0_clk_name = "grp_2d_clk",
-	.grp2d0_pclk_name = "grp_2d_pclk",
-#else
-	.grp2d0_clk_name = NULL,
-#endif
-	.idle_timeout_3d = HZ/20,
-	.idle_timeout_2d = HZ/10,
-	.nap_allowed = true,
-
-#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
-	.pt_va_size = SZ_32M,
-	/* Maximum of 32 concurrent processes */
-	.pt_max_count = 32,
-#else
-	.pt_va_size = SZ_128M,
-	/* We only ever have one pagetable for everybody */
-	.pt_max_count = 1,
-#endif
-};
-
-static struct resource kgsl_resources[] = {
-	{
-		.name = "kgsl_reg_memory",
-		.start = 0xA3500000, /* 3D GRP address */
-		.end = 0xA351ffff,
-		.flags = IORESOURCE_MEM,
-	},
-	{
-		.name = "kgsl_yamato_irq",
-		.start = INT_GRP_3D,
-		.end = INT_GRP_3D,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.name = "kgsl_2d0_reg_memory",
-		.start = 0xA3900000, /* Z180 base address */
-		.end = 0xA3900FFF,
-		.flags = IORESOURCE_MEM,
-	},
-	{
-		.name  = "kgsl_2d0_irq",
-		.start = INT_GRP_2D,
-		.end = INT_GRP_2D,
-		.flags = IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device msm_device_kgsl = {
-	.name = "kgsl",
-	.id = -1,
-	.num_resources = ARRAY_SIZE(kgsl_resources),
-	.resource = kgsl_resources,
-	.dev = {
-		.platform_data = &kgsl_pdata,
-	},
-};
-
 #if defined(CONFIG_CRYPTO_DEV_QCRYPTO) || \
 		defined(CONFIG_CRYPTO_DEV_QCRYPTO_MODULE) || \
 		defined(CONFIG_CRYPTO_DEV_QCEDEV) || \
@@ -5980,11 +5765,43 @@ static struct platform_device msm_device_kgsl = {
 #define QCE_0_BASE		0xA8400000
 
 #define QCE_HW_KEY_SUPPORT	1
-
+#define QCE_SHA_HMAC_SUPPORT	0
 #define QCE_SHARE_CE_RESOURCE	0
 #define QCE_CE_SHARED		0
 
-static struct resource qce_resources[] = {
+static struct resource qcrypto_resources[] = {
+	[0] = {
+		.start = QCE_0_BASE,
+		.end = QCE_0_BASE + QCE_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.name = "crypto_channels",
+		.start = DMOV_CE_IN_CHAN,
+		.end = DMOV_CE_OUT_CHAN,
+		.flags = IORESOURCE_DMA,
+	},
+	[2] = {
+		.name = "crypto_crci_in",
+		.start = DMOV_CE_IN_CRCI,
+		.end = DMOV_CE_IN_CRCI,
+		.flags = IORESOURCE_DMA,
+	},
+	[3] = {
+		.name = "crypto_crci_out",
+		.start = DMOV_CE_OUT_CRCI,
+		.end = DMOV_CE_OUT_CRCI,
+		.flags = IORESOURCE_DMA,
+	},
+	[4] = {
+		.name = "crypto_crci_hash",
+		.start = DMOV_CE_HASH_CRCI,
+		.end = DMOV_CE_HASH_CRCI,
+		.flags = IORESOURCE_DMA,
+	},
+};
+
+static struct resource qcedev_resources[] = {
 	[0] = {
 		.start = QCE_0_BASE,
 		.end = QCE_0_BASE + QCE_SIZE - 1,
@@ -6025,13 +5842,14 @@ static struct msm_ce_hw_support qcrypto_ce_hw_suppport = {
 	.ce_shared = QCE_CE_SHARED,
 	.shared_ce_resource = QCE_SHARE_CE_RESOURCE,
 	.hw_key_support = QCE_HW_KEY_SUPPORT,
+	.sha_hmac = QCE_SHA_HMAC_SUPPORT,
 };
 
 static struct platform_device qcrypto_device = {
 	.name		= "qcrypto",
 	.id		= 0,
-	.num_resources	= ARRAY_SIZE(qce_resources),
-	.resource	= qce_resources,
+	.num_resources	= ARRAY_SIZE(qcrypto_resources),
+	.resource	= qcrypto_resources,
 	.dev		= {
 		.coherent_dma_mask = DMA_BIT_MASK(32),
 		.platform_data = &qcrypto_ce_hw_suppport,
@@ -6046,12 +5864,13 @@ static struct msm_ce_hw_support qcedev_ce_hw_suppport = {
 	.ce_shared = QCE_CE_SHARED,
 	.shared_ce_resource = QCE_SHARE_CE_RESOURCE,
 	.hw_key_support = QCE_HW_KEY_SUPPORT,
+	.sha_hmac = QCE_SHA_HMAC_SUPPORT,
 };
 static struct platform_device qcedev_device = {
 	.name		= "qce",
 	.id		= 0,
-	.num_resources	= ARRAY_SIZE(qce_resources),
-	.resource	= qce_resources,
+	.num_resources	= ARRAY_SIZE(qcedev_resources),
+	.resource	= qcedev_resources,
 	.dev		= {
 		.coherent_dma_mask = DMA_BIT_MASK(32),
 		.platform_data = &qcedev_ce_hw_suppport,
@@ -6059,26 +5878,343 @@ static struct platform_device qcedev_device = {
 };
 #endif
 
-/* <DTS2010072202961 hufeng 20100722 begin */
-/* removed several lines */
-/* DTS2010072202961 hufeng 20100722 end> */
-
-/* < BU5D10320 lijianzhao 20100521 begin */
-        /*delete some lines*/
-/*In the modem side ,LCD have been power on*/
-static int display_common_power(int on)
+static int mddi_toshiba_pmic_bl(int level)
 {
+	int ret = -EPERM;
+
+	ret = pmic_set_led_intensity(LED_LCD, level);
+
+	if (ret)
+		printk(KERN_WARNING "%s: can't set lcd backlight!\n",
+					__func__);
+	return ret;
+}
+
+static struct msm_panel_common_pdata mddi_toshiba_pdata = {
+	.pmic_backlight = mddi_toshiba_pmic_bl,
+};
+
+static struct platform_device mddi_toshiba_device = {
+	.name   = "mddi_toshiba",
+	.id     = 0,
+	.dev    = {
+		.platform_data = &mddi_toshiba_pdata,
+	}
+};
+
+static unsigned wega_reset_gpio =
+	GPIO_CFG(180, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
+
+static struct msm_gpio fluid_vee_reset_gpio[] = {
+	{ GPIO_CFG(20, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), "vee_reset" },
+};
+
+static unsigned char quickvx_mddi_client = 1, other_mddi_client = 1;
+static unsigned char quickvx_ldo_enabled;
+
+static unsigned quickvx_vlp_gpio =
+	GPIO_CFG(97, 0, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL,	GPIO_CFG_2MA);
+
+static struct pm8xxx_gpio_init_info pmic_quickvx_clk_gpio = {
+	PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_QUICKVX_CLK),
+	{
+		.direction      = PM_GPIO_DIR_OUT,
+		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
+		.output_value   = 1,
+		.pull           = PM_GPIO_PULL_NO,
+		.vin_sel        = PM8058_GPIO_VIN_S3,
+		.out_strength   = PM_GPIO_STRENGTH_HIGH,
+		.function       = PM_GPIO_FUNC_2,
+	},
+};
+
+static struct regulator *mddi_ldo20;
+static struct regulator *mddi_ldo12;
+static struct regulator *mddi_ldo16;
+static struct regulator *mddi_ldo6;
+static struct regulator *mddi_lcd;
+
+static int display_common_init(void)
+{
+	struct regulator_bulk_data regs[5] = {
+		{ .supply = "ldo20", /* voltage set in display_common_power */},
+		{ .supply = "ldo12", .min_uV = 1800000, .max_uV = 1800000 },
+		{ .supply = "ldo6",  .min_uV = 3075000, .max_uV = 3400000 },
+		{ .supply = "ldo16", .min_uV = 2600000, .max_uV = 2600000 },
+		{ .supply = NULL,    /* mddi_lcd, initialized below */ },
+	};
+
 	int rc = 0;
-    if (on) 
-    {
-        /*pmapp_display_clock_config(1);*/
-    } else 
-    {
-        /*pmapp_display_clock_config(0);*/
-    }
+
+	if (machine_is_msm7x30_fluid()) {
+		/* lcd: LDO8 @1.8V */
+		regs[4].supply = "ldo8";
+		regs[4].min_uV = 1800000;
+		regs[4].max_uV = 1800000;
+	} else {
+		/* lcd: LDO15 @3.1V */
+		regs[4].supply = "ldo15";
+		regs[4].min_uV = 3100000;
+		regs[4].max_uV = 3100000;
+	}
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs), regs);
+	if (rc) {
+		pr_err("%s: regulator_bulk_get failed: %d\n",
+				__func__, rc);
+		goto bail;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs), regs);
+	if (rc) {
+		pr_err("%s: regulator_bulk_set_voltage failed: %d\n",
+				__func__, rc);
+		goto put_regs;
+	}
+
+	mddi_ldo20 = regs[0].consumer;
+	mddi_ldo12 = regs[1].consumer;
+	mddi_ldo6  = regs[2].consumer;
+	mddi_ldo16 = regs[3].consumer;
+	mddi_lcd   = regs[4].consumer;
+
+	return rc;
+
+put_regs:
+	regulator_bulk_free(ARRAY_SIZE(regs), regs);
+bail:
 	return rc;
 }
-/* BU5D10320 lijianzhao 20100521 end > */
+
+/*< DTS2012052303745 zhongjinrong 20120523 begin */
+/* sync G verson problem to I verson */
+#ifndef CONFIG_HUAWEI_KERNEL
+static int display_common_power(int on)
+{
+	int rc = 0, flag_on = !!on;
+	static int display_common_power_save_on;
+	static bool display_regs_initialized;
+	/* delete some line */
+	if (display_common_power_save_on == flag_on)
+		return 0;
+
+	display_common_power_save_on = flag_on;
+
+	if (unlikely(!display_regs_initialized)) {
+		rc = display_common_init();
+		if (rc) {
+			pr_err("%s: regulator init failed: %d\n",
+					__func__, rc);
+			return rc;
+		}
+		display_regs_initialized = true;
+	}
+
+
+	if (on) {
+		/* reset Toshiba WeGA chip -- toggle reset pin -- gpio_180 */
+		rc = gpio_tlmm_config(wega_reset_gpio, GPIO_CFG_ENABLE);
+		if (rc) {
+			pr_err("%s: gpio_tlmm_config(%#x)=%d\n",
+				       __func__, wega_reset_gpio, rc);
+			return rc;
+		}
+
+		/* bring reset line low to hold reset*/
+		gpio_set_value(180, 0);
+
+		if (quickvx_mddi_client) {
+			/* QuickVX chip -- VLP pin -- gpio 97 */
+			rc = gpio_tlmm_config(quickvx_vlp_gpio,
+				GPIO_CFG_ENABLE);
+			if (rc) {
+				pr_err("%s: gpio_tlmm_config(%#x)=%d\n",
+					__func__, quickvx_vlp_gpio, rc);
+				return rc;
+			}
+
+			/* bring QuickVX VLP line low */
+			gpio_set_value(97, 0);
+
+			rc = pm8xxx_gpio_config(pmic_quickvx_clk_gpio.gpio,
+						&pmic_quickvx_clk_gpio.config);
+			if (rc) {
+				pr_err("%s: pm8xxx_gpio_config(%#x)=%d\n",
+					__func__, pmic_quickvx_clk_gpio.gpio,
+					rc);
+				return rc;
+			}
+
+			gpio_set_value_cansleep(PM8058_GPIO_PM_TO_SYS(
+				PMIC_GPIO_QUICKVX_CLK), 0);
+		}
+	}
+
+	if (quickvx_mddi_client)
+		rc = regulator_set_voltage(mddi_ldo20, 1800000, 1800000);
+	else
+		rc = regulator_set_voltage(mddi_ldo20, 1500000, 1500000);
+
+	if (rc) {
+		pr_err("%s: could not set voltage for ldo20: %d\n",
+				__func__, rc);
+		return rc;
+	}
+
+	if (on) {
+		rc = regulator_enable(mddi_ldo20);
+		if (rc) {
+			pr_err("%s: LDO20 regulator enable failed (%d)\n",
+			       __func__, rc);
+			return rc;
+		}
+
+		rc = regulator_enable(mddi_ldo12);
+		if (rc) {
+			pr_err("%s: LDO12 regulator enable failed (%d)\n",
+			       __func__, rc);
+			return rc;
+		}
+
+		if (other_mddi_client) {
+			rc = regulator_enable(mddi_ldo16);
+			if (rc) {
+				pr_err("%s: LDO16 regulator enable failed (%d)\n",
+					   __func__, rc);
+				return rc;
+			}
+		}
+
+		if (quickvx_ldo_enabled) {
+			/* Disable LDO6 during display ON */
+			rc = regulator_disable(mddi_ldo6);
+			if (rc) {
+				pr_err("%s: LDO6 regulator disable failed (%d)\n",
+					   __func__, rc);
+				return rc;
+			}
+			quickvx_ldo_enabled = 0;
+		}
+
+		rc = regulator_enable(mddi_lcd);
+		if (rc) {
+			pr_err("%s: LCD regulator enable failed (%d)\n",
+				__func__, rc);
+			return rc;
+		}
+
+		mdelay(5);		/* ensure power is stable */
+
+		if (machine_is_msm7x30_fluid()) {
+			rc = msm_gpios_request_enable(fluid_vee_reset_gpio,
+					ARRAY_SIZE(fluid_vee_reset_gpio));
+			if (rc)
+				pr_err("%s gpio_request_enable failed rc=%d\n",
+							__func__, rc);
+			else {
+				/* assert vee reset_n */
+				gpio_set_value(20, 1);
+				gpio_set_value(20, 0);
+				mdelay(1);
+				gpio_set_value(20, 1);
+			}
+		}
+
+		gpio_set_value(180, 1); /* bring reset line high */
+		mdelay(10);	/* 10 msec before IO can be accessed */
+
+		if (quickvx_mddi_client) {
+			gpio_set_value(97, 1);
+			msleep(2);
+			gpio_set_value_cansleep(PM8058_GPIO_PM_TO_SYS(
+				PMIC_GPIO_QUICKVX_CLK), 1);
+			msleep(2);
+		}
+
+		rc = pmapp_display_clock_config(1);
+		if (rc) {
+			pr_err("%s pmapp_display_clock_config rc=%d\n",
+					__func__, rc);
+			return rc;
+		}
+
+	} else {
+		rc = regulator_disable(mddi_ldo20);
+		if (rc) {
+			pr_err("%s: LDO20 regulator disable failed (%d)\n",
+			       __func__, rc);
+			return rc;
+		}
+
+
+		if (other_mddi_client) {
+			rc = regulator_disable(mddi_ldo16);
+			if (rc) {
+				pr_err("%s: LDO16 regulator disable failed (%d)\n",
+					   __func__, rc);
+				return rc;
+			}
+		}
+
+		if (quickvx_mddi_client && !quickvx_ldo_enabled) {
+			/* Enable LDO6 during display OFF for
+			   Quicklogic chip to sleep with data retention */
+			rc = regulator_enable(mddi_ldo6);
+			if (rc) {
+				pr_err("%s: LDO6 regulator enable failed (%d)\n",
+					   __func__, rc);
+				return rc;
+			}
+			quickvx_ldo_enabled = 1;
+		}
+
+		gpio_set_value(180, 0); /* bring reset line low */
+
+		if (quickvx_mddi_client) {
+			gpio_set_value(97, 0);
+			gpio_set_value_cansleep(PM8058_GPIO_PM_TO_SYS(
+				PMIC_GPIO_QUICKVX_CLK), 0);
+		}
+
+		rc = regulator_disable(mddi_lcd);
+		if (rc) {
+			pr_err("%s: LCD regulator disable failed (%d)\n",
+				__func__, rc);
+			return rc;
+		}
+
+		mdelay(5);	/* ensure power is stable */
+
+		rc = regulator_disable(mddi_ldo12);
+		if (rc) {
+			pr_err("%s: LDO12 regulator disable failed (%d)\n",
+			       __func__, rc);
+			return rc;
+		}
+
+		if (machine_is_msm7x30_fluid()) {
+			msm_gpios_disable_free(fluid_vee_reset_gpio,
+					ARRAY_SIZE(fluid_vee_reset_gpio));
+		}
+
+		rc = pmapp_display_clock_config(0);
+		if (rc) {
+			pr_err("%s pmapp_display_clock_config rc=%d\n",
+					__func__, rc);
+			return rc;
+		}
+	}
+
+	return rc;
+}
+#else
+static int display_common_power(int on)
+{
+	return 0;
+}
+#endif
+/* DTS2012052303745 zhongjinrong 20120523 end >*/
+
 static int msm_fb_mddi_sel_clk(u32 *clk_rate)
 {
 	*clk_rate *= 2;
@@ -6090,51 +6226,19 @@ static int msm_fb_mddi_client_power(u32 client_id)
 /*< DTS2011041700393 lijianzhao 20110417 begin */
 /* modify for 4125 baseline */
 #ifndef CONFIG_HUAWEI_KERNEL
-	struct vreg *vreg_ldo20, *vreg_ldo16;
-	int rc;
-
 	printk(KERN_NOTICE "\n client_id = 0x%x", client_id);
 	/* Check if it is Quicklogic client */
 	if (client_id == 0xc5835800) {
 		printk(KERN_NOTICE "\n Quicklogic MDDI client");
 		other_mddi_client = 0;
-		vreg_ldo16 = vreg_get(NULL, "gp10");
-
-		if (IS_ERR(vreg_ldo16)) {
-			rc = PTR_ERR(vreg_ldo16);
-			pr_err("%s: gp10 vreg get failed (%d)\n",
-				   __func__, rc);
-			return rc;
-		}
-
-		rc = vreg_disable(vreg_ldo16);
-		if (rc) {
-			pr_err("%s: LDO16 vreg enable failed (%d)\n",
-				   __func__, rc);
-			return rc;
-		}
 	} else {
 		printk(KERN_NOTICE "\n Non-Quicklogic MDDI client");
 		quickvx_mddi_client = 0;
 		gpio_set_value(97, 0);
 		gpio_set_value_cansleep(PM8058_GPIO_PM_TO_SYS(
 			PMIC_GPIO_QUICKVX_CLK), 0);
-
-		vreg_ldo20 = vreg_get(NULL, "gp13");
-
-		if (IS_ERR(vreg_ldo20)) {
-			rc = PTR_ERR(vreg_ldo20);
-			pr_err("%s: gp13 vreg get failed (%d)\n",
-				   __func__, rc);
-			return rc;
-		}
-		rc = vreg_set_level(vreg_ldo20, 1500);
-		if (rc) {
-			pr_err("%s: vreg LDO20 set level failed (%d)\n",
-			       __func__, rc);
-			return rc;
-		}
 	}
+
 	#endif
 /* DTS2011041700393 lijianzhao 20110417 end >*/	
 	return 0;
@@ -6149,7 +6253,7 @@ static struct mddi_platform_data mddi_pdata = {
 int mdp_core_clk_rate_table[] = {
 	122880000,
 	122880000,
-	122880000,
+	192000000,
 	192000000,
 };
 
@@ -6159,53 +6263,72 @@ static struct msm_panel_common_pdata mdp_pdata = {
 	.mdp_core_clk_rate = 122880000,
 	.mdp_core_clk_table = mdp_core_clk_rate_table,
 	.num_mdp_clk = ARRAY_SIZE(mdp_core_clk_rate_table),
+	.mdp_rev = MDP_REV_40,
 };
 
 /* <DTS2010072202961 hufeng 20100722 begin */
 /* removed several lines */
 /* DTS2010072202961 hufeng 20100722 end> */
 /*< DTS2010082601848 lijianzhao 20100826 begin */
+
+static struct regulator *atv_s4, *atv_ldo9;
+
+static int __init atv_dac_power_init(void)
+{
+	int rc;
+	struct regulator_bulk_data regs[] = {
+		{ .supply = "smps4", .min_uV = 2200000, .max_uV = 2200000 },
+		{ .supply = "ldo9",  .min_uV = 2050000, .max_uV = 2050000 },
+	};
+
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs), regs);
+
+	if (rc) {
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		goto bail;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs), regs);
+
+	if (rc) {
+		pr_err("%s: could not set voltages: %d\n", __func__, rc);
+		goto reg_free;
+	}
+
+	atv_s4   = regs[0].consumer;
+	atv_ldo9 = regs[1].consumer;
+
+reg_free:
+	regulator_bulk_free(ARRAY_SIZE(regs), regs);
+bail:
+	return rc;
+}
+
 static int atv_dac_power(int on)
 {
 	int rc = 0;
-	struct vreg *vreg_s4, *vreg_ldo9;
-
-	vreg_s4 = vreg_get(NULL, "s4");
-	if (IS_ERR(vreg_s4)) {
-		rc = PTR_ERR(vreg_s4);
-		pr_err("%s: s4 vreg get failed (%d)\n",
-			__func__, rc);
-		return -1;
-	}
-	vreg_ldo9 = vreg_get(NULL, "gp1");
-	if (IS_ERR(vreg_ldo9)) {
-		rc = PTR_ERR(vreg_ldo9);
-		pr_err("%s: ldo9 vreg get failed (%d)\n",
-			__func__, rc);
-		return rc;
-	}
 
 	if (on) {
-		rc = vreg_enable(vreg_s4);
+		rc = regulator_enable(atv_s4);
 		if (rc) {
 			pr_err("%s: s4 vreg enable failed (%d)\n",
 				__func__, rc);
 			return rc;
 		}
-		rc = vreg_enable(vreg_ldo9);
+		rc = regulator_enable(atv_ldo9);
 		if (rc) {
 			pr_err("%s: ldo9 vreg enable failed (%d)\n",
 				__func__, rc);
 			return rc;
 		}
 	} else {
-		rc = vreg_disable(vreg_ldo9);
+		rc = regulator_disable(atv_ldo9);
 		if (rc) {
 			pr_err("%s: ldo9 vreg disable failed (%d)\n",
 				   __func__, rc);
 			return rc;
 		}
-		rc = vreg_disable(vreg_s4);
+		rc = regulator_disable(atv_s4);
 		if (rc) {
 			pr_err("%s: s4 vreg disable failed (%d)\n",
 				   __func__, rc);
@@ -6243,7 +6366,9 @@ static void __init msm_fb_add_devices(void)
 
 /*< DTS2011012004291 xuhui 20110120 begin */
 //delete QC's bt code
-#ifndef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
+/* DTS2012020604357 zhangyun 20120206 end > */
 #if defined(CONFIG_MARIMBA_CORE) && \
    (defined(CONFIG_MSM_BT_POWER) || defined(CONFIG_MSM_BT_POWER_MODULE))
 static struct platform_device msm_bt_power_device = {
@@ -6280,23 +6405,30 @@ static struct msm_gpio bt_config_power_off[] = {
 		"UART1DM_Tx" }
 };
 
-static const char *vregs_bt_marimba_name[] = {
-	"s3",
-	"s2",
-	"gp16",
-	"wlan"
-};
-static struct vreg *vregs_bt_marimba[ARRAY_SIZE(vregs_bt_marimba_name)];
-
-static const char *vregs_bt_bahama_name[] = {
-	"s3",
-	"usb2",
-	"s2",
-	"wlan"
-};
-static struct vreg *vregs_bt_bahama[ARRAY_SIZE(vregs_bt_bahama_name)];
-
 static u8 bahama_version;
+
+static struct regulator_bulk_data regs_bt_marimba[] = {
+	{ .supply = "smps3", .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "smps2", .min_uV = 1300000, .max_uV = 1300000 },
+	{ .supply = "ldo24", .min_uV = 1200000, .max_uV = 1200000 },
+	{ .supply = "ldo13", .min_uV = 2900000, .max_uV = 2900000 },
+};
+
+static struct regulator_bulk_data regs_bt_bahama_v1[] = {
+	{ .supply = "smps3", .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "ldo7",  .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "smps2", .min_uV = 1300000, .max_uV = 1300000 },
+	{ .supply = "ldo13", .min_uV = 2900000, .max_uV = 2900000 },
+};
+
+static struct regulator_bulk_data regs_bt_bahama_v2[] = {
+	{ .supply = "smps3", .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "ldo7",  .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "ldo13", .min_uV = 2900000, .max_uV = 2900000 },
+};
+
+static struct regulator_bulk_data *regs_bt;
+static int regs_bt_count;
 
 static int marimba_bt(int on)
 {
@@ -6517,19 +6649,8 @@ static int bahama_bt(int on)
 
 	u8 offset = 0; /* index into bahama configs */
 
-	/* Init mutex to get/set FM/BT status respectively */
-	mutex_init(&config.xfer_lock);
-
 	on = on ? 1 : 0;
 
-	bahama_version = read_bahama_ver();
-
-	if (bahama_version == VER_UNSUPPORTED) {
-		dev_err(&msm_bt_power_device.dev,
-			"%s: unsupported version\n",
-			__func__);
-		return -EIO;
-	}
 
 	if (bahama_version == VER_2_0) {
 		if (marimba_get_fm_status(&config))
@@ -6565,72 +6686,62 @@ static int bahama_bt(int on)
 	else
 		marimba_set_bt_status(&config, false);
 
-	/* Destory mutex */
-	mutex_destroy(&config.xfer_lock);
-
-	if (bahama_version == VER_2_0 && on) { /* variant of bahama v2 */
-		/* Disable s2 as bahama v2 uses internal LDO regulator */
-		for (i = 0; i < ARRAY_SIZE(vregs_bt_bahama_name); i++) {
-			if (!strcmp(vregs_bt_bahama_name[i], "s2")) {
-				rc = vreg_disable(vregs_bt_bahama[i]);
-				if (rc < 0) {
-					printk(KERN_ERR
-						"%s: vreg %s disable "
-						"failed (%d)\n",
-						__func__,
-						vregs_bt_bahama_name[i], rc);
-					return -EIO;
-				}
-				rc = pmapp_vreg_level_vote("BTPW",
-								PMAPP_VREG_S2,
-								0);
-				if (rc < 0) {
-					printk(KERN_ERR "%s: vreg "
-						"level off failed (%d)\n",
-						__func__, rc);
-					return -EIO;
-				}
-				printk(KERN_INFO "%s: vreg disable & "
-					"level off successful (%d)\n",
-					__func__, rc);
-			}
-		}
-	}
-
 	return 0;
 }
 
-static int bluetooth_power_regulators(int on, int bahama_not_marimba)
+static int bluetooth_regs_init(int bahama_not_marimba)
 {
-	int i, rc;
-	const char **vregs_name;
-	struct vreg **vregs;
-	int vregs_size;
+	int rc = 0;
+	struct device *const dev = &msm_bt_power_device.dev;
 
 	if (bahama_not_marimba) {
-		vregs_name = vregs_bt_bahama_name;
-		vregs = vregs_bt_bahama;
-		vregs_size = ARRAY_SIZE(vregs_bt_bahama_name);
+		bahama_version = read_bahama_ver();
+
+		switch (bahama_version) {
+		case VER_1_0:
+			regs_bt = regs_bt_bahama_v1;
+			regs_bt_count = ARRAY_SIZE(regs_bt_bahama_v1);
+			break;
+		case VER_2_0:
+			regs_bt = regs_bt_bahama_v2;
+			regs_bt_count = ARRAY_SIZE(regs_bt_bahama_v2);
+			break;
+		case VER_UNSUPPORTED:
+		default:
+			dev_err(dev,
+				"%s: i2c failure or unsupported version: %d\n",
+				__func__, bahama_version);
+			rc = -EIO;
+			goto out;
+		}
 	} else {
-		vregs_name = vregs_bt_marimba_name;
-		vregs = vregs_bt_marimba;
-		vregs_size = ARRAY_SIZE(vregs_bt_marimba_name);
+		regs_bt = regs_bt_marimba;
+		regs_bt_count = ARRAY_SIZE(regs_bt_marimba);
 	}
 
-	for (i = 0; i < vregs_size; i++) {
-		if (bahama_not_marimba && (bahama_version == VER_2_0) &&
-			!on && !strcmp(vregs_bt_bahama_name[i], "s2"))
-			continue;
-		rc = on ? vreg_enable(vregs[i]) :
-			  vreg_disable(vregs[i]);
-		if (rc < 0) {
-			printk(KERN_ERR "%s: vreg %s %s failed (%d)\n",
-				__func__, vregs_name[i],
-			       on ? "enable" : "disable", rc);
-			return -EIO;
-		}
+	rc = regulator_bulk_get(&msm_bt_power_device.dev,
+			regs_bt_count, regs_bt);
+	if (rc) {
+		dev_err(dev, "%s: could not get regulators: %d\n",
+				__func__, rc);
+		goto out;
 	}
+
+	rc = regulator_bulk_set_voltage(regs_bt_count, regs_bt);
+	if (rc) {
+		dev_err(dev, "%s: could not set voltages: %d\n",
+				__func__, rc);
+		goto reg_free;
+	}
+
 	return 0;
+
+reg_free:
+	regulator_bulk_free(regs_bt_count, regs_bt);
+out:
+	regs_bt_count = 0;
+	regs_bt = NULL;
+	return rc;
 }
 
 static int bluetooth_power(int on)
@@ -6646,17 +6757,16 @@ static int bluetooth_power(int on)
 		return -ENODEV;
 	}
 
-	if (on) {
-		rc = pmapp_vreg_level_vote(id, PMAPP_VREG_S2, 1300);
-		if (rc < 0) {
-			printk(KERN_ERR "%s: vreg level on failed (%d)\n",
-				__func__, rc);
+	if (unlikely(regs_bt_count == 0)) {
+		rc = bluetooth_regs_init(bahama_not_marimba);
+		if (rc)
 			return rc;
-		}
+	}
 
-		rc = bluetooth_power_regulators(on, bahama_not_marimba);
-		if (rc < 0)
-			return -EIO;
+	if (on) {
+		rc = regulator_bulk_enable(regs_bt_count, regs_bt);
+		if (rc)
+			return rc;
 
 		rc = pmapp_clock_vote(id, PMAPP_CLOCK_ID_DO,
 					  PMAPP_CLOCK_VOTE_ON);
@@ -6713,18 +6823,10 @@ static int bluetooth_power(int on)
 		if (rc < 0)
 			return -EIO;
 
-		rc = bluetooth_power_regulators(on, bahama_not_marimba);
-		if (rc < 0)
-			return -EIO;
+		rc = regulator_bulk_disable(regs_bt_count, regs_bt);
+		if (rc)
+			return rc;
 
-		if (bahama_version == VER_1_0) {
-			rc = pmapp_vreg_level_vote(id, PMAPP_VREG_S2, 0);
-			if (rc < 0) {
-				printk(KERN_ERR "%s: vreg level off failed "
-				"(%d)\n", __func__, rc);
-				return -EIO;
-			}
-		}
 	}
 
 out:
@@ -6735,29 +6837,7 @@ out:
 
 static void __init bt_power_init(void)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(vregs_bt_marimba_name); i++) {
-		vregs_bt_marimba[i] = vreg_get(NULL, vregs_bt_marimba_name[i]);
-		if (IS_ERR(vregs_bt_marimba[i])) {
-			printk(KERN_ERR "%s: vreg get %s failed (%ld)\n",
-			       __func__, vregs_bt_marimba_name[i],
-			       PTR_ERR(vregs_bt_marimba[i]));
-			return;
-		}
-	}
-
-	for (i = 0; i < ARRAY_SIZE(vregs_bt_bahama_name); i++) {
-		vregs_bt_bahama[i] = vreg_get(NULL, vregs_bt_bahama_name[i]);
-		if (IS_ERR(vregs_bt_bahama[i])) {
-			printk(KERN_ERR "%s: vreg get %s failed (%ld)\n",
-			       __func__, vregs_bt_bahama_name[i],
-			       PTR_ERR(vregs_bt_bahama[i]));
-			return;
-		}
-	}
-
-    msm_bt_power_device.dev.platform_data = &bluetooth_power;
+	msm_bt_power_device.dev.platform_data = &bluetooth_power;
 }
 #else
 #define bt_power_init(x) do {} while (0)
@@ -6765,7 +6845,9 @@ static void __init bt_power_init(void)
 
 #endif
 /*do all bt ops here:*/
-#ifdef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BTLA_VER30) && defined(CONFIG_HUAWEI_KERNEL))
+/* DTS2012020604357 zhangyun 20120206 end > */
 static struct platform_device msm_bt_power_device = {
     .name = "bt_power",
     .id     = -1
@@ -6834,7 +6916,10 @@ static const char *vregs_bt_bcm4329_name[] = {
     "s3"
 };
 
-static struct vreg *vregs_bt_bcm4329[ARRAY_SIZE(vregs_bt_bcm4329_name)];
+/* < DTS2012020604357 zhangyun 20120206 begin */
+/* updated for regulator interface */
+static struct regulator *vregs_bt_bcm4329[ARRAY_SIZE(vregs_bt_bcm4329_name)];
+/* DTS2012020604357 zhangyun 20120206 end > */
 
 /* put power on for bt*/
 static int bluetooth_bcm4329_power_regulators(int on)
@@ -6843,8 +6928,11 @@ static int bluetooth_bcm4329_power_regulators(int on)
     int rc = 0;
 
     for (i = 0; i < ARRAY_SIZE(vregs_bt_bcm4329_name); i++) {
-        rc = on ? vreg_enable(vregs_bt_bcm4329[i]) :
-            vreg_disable(vregs_bt_bcm4329[i]);
+        /* < DTS2012020604357 zhangyun 20120206 begin */
+        /* updated for regulator interface */
+        rc = on ? regulator_enable(vregs_bt_bcm4329[i]) :
+            regulator_disable(vregs_bt_bcm4329[i]);
+        /* DTS2012020604357 zhangyun 20120206 end > */
         if (rc < 0) {
         printk(KERN_ERR "%s: vreg %s %s failed (%d)\n",
             __func__, vregs_bt_bcm4329_name[i],
@@ -7033,10 +7121,11 @@ static void __init bt_bcm4329_power_init(void)
     /*step1: here will check the power, */
     int i = 0;
     int rc = -1;
-
+    /* < DTS2012020604357 zhangyun 20120206 begin */
+    /* updated for regulator interface */
     for (i = 0; i < ARRAY_SIZE(vregs_bt_bcm4329_name); i++)
     {
-        vregs_bt_bcm4329[i] = vreg_get(NULL, vregs_bt_bcm4329_name[i]);
+        vregs_bt_bcm4329[i] = regulator_get(NULL, vregs_bt_bcm4329_name[i]);
         if (IS_ERR(vregs_bt_bcm4329[i])) 
         {
             printk(KERN_ERR "%s: vreg get %s failed (%ld)\n",
@@ -7044,7 +7133,14 @@ static void __init bt_bcm4329_power_init(void)
                 PTR_ERR(vregs_bt_bcm4329[i]));
         return;
         }
+
+        rc = regulator_set_voltage(vregs_bt_bcm4329[i], VREG_S3_VOLTAGE_VALUE, VREG_S3_VOLTAGE_VALUE);
+		if (rc) {
+		    printk("%s: regulator_s3  regulator_set_voltage failed\n", __func__);
+            return;
+	    }
     }
+    /* DTS2012020604357 zhangyun 20120206 end > */
    
     //handle bt power control: becareful
     rc = msm_gpios_request_enable(bt_config_power_control,
@@ -7206,7 +7302,7 @@ static struct sdio_al_platform_data sdio_al_pdata = {
 	.peer_sdioc_version_minor = 0x0001,
 	.peer_sdioc_version_major = 0x0003,
 	.peer_sdioc_boot_version_minor = 0x0001,
-	.peer_sdioc_boot_version_major = 0x0002,
+	.peer_sdioc_boot_version_major = 0x0003,
 };
 
 struct platform_device msm_device_sdio_al = {
@@ -7219,36 +7315,89 @@ struct platform_device msm_device_sdio_al = {
 
 #endif /* CONFIG_MSM_SDIO_AL */
 
+#ifdef CONFIG_ION_MSM
+struct ion_platform_data ion_pdata = {
+    .nr = MSM_ION_HEAP_NUM,
+    .heaps = {
+        {
+            .id = ION_HEAP_SYSTEM_ID,
+            .type   = ION_HEAP_TYPE_SYSTEM,
+            .name   = ION_VMALLOC_HEAP_NAME,
+        },
+        {
+            .id = ION_HEAP_SYSTEM_CONTIG_ID,
+            .type   = ION_HEAP_TYPE_SYSTEM_CONTIG,
+            .name   = ION_KMALLOC_HEAP_NAME,
+        },
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+        {
+            .id = ION_HEAP_EBI_ID,
+            .type   = ION_HEAP_TYPE_CARVEOUT,
+            .name   = ION_EBI1_HEAP_NAME,
+            .size   = MSM_ION_EBI_SIZE,
+            .memory_type = ION_EBI_TYPE,
+        },
+        {
+            .id = ION_HEAP_ADSP_ID,
+            .type   = ION_HEAP_TYPE_CARVEOUT,
+            .name   = ION_ADSP_HEAP_NAME,
+            .size   = MSM_ION_ADSP_SIZE,
+            .memory_type = ION_EBI_TYPE,
+        },
+        {
+            .id = ION_HEAP_SMI_ID,
+            .type   = ION_HEAP_TYPE_CARVEOUT,
+            .name   = ION_SMI_HEAP_NAME,
+            .size   = MSM_ION_SMI_SIZE,
+            .memory_type = ION_SMI_TYPE,
+        },
+#endif
+    }
+};
+
+struct platform_device ion_dev = {
+    .name = "ion-msm",
+    .id = 1,
+    .dev = { .platform_data = &ion_pdata },
+};
+#endif
+
+
 static struct platform_device *devices[] __initdata = {
 #if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
 	&msm_device_uart2,
 #endif
+#ifdef CONFIG_MSM_PROC_COMM_REGULATOR
+	&msm_proccomm_regulator_dev,
+#endif
+	&asoc_msm_pcm,
+	&asoc_msm_dai0,
+	&asoc_msm_dai1,
+#if defined (CONFIG_SND_MSM_MVS_DAI_SOC)
+	&asoc_msm_mvs,
+	&asoc_mvs_dai0,
+	&asoc_mvs_dai1,
+#endif
 	&msm_device_smd,
 	&msm_device_dmov,
-	/* <DTS2010072202961 hufeng 20100722 begin */
-	/* removed several lines */
-	/* DTS2010072202961 hufeng 20100722 end> */
-#ifdef CONFIG_USB_FUNCTION
-	&msm_device_hsusb_peripheral,
-	&mass_storage_device,
-#endif
+	&smc91x_device,
+	&smsc911x_device,
+	&msm_device_nand,
 #ifdef CONFIG_USB_MSM_OTG_72K
 	&msm_device_otg,
 #ifdef CONFIG_USB_GADGET
 	&msm_device_gadget_peripheral,
 #endif
 #endif
-#ifdef CONFIG_USB_ANDROID
-	&usb_mass_storage_device,
-	&rndis_device,
-#ifdef CONFIG_USB_ANDROID_DIAG
-	&usb_diag_device,
-#endif
+#ifdef CONFIG_USB_G_ANDROID
 	&android_usb_device,
 #endif
 	&qsd_device_spi,
+
+#ifdef CONFIG_MSM_SSBI
+	&msm_device_ssbi_pmic1,
+#endif
 #ifdef CONFIG_I2C_SSBI
-	&msm_device_ssbi6,
 	&msm_device_ssbi7,
 #endif
 	&android_pmem_device,
@@ -7260,10 +7409,6 @@ static struct platform_device *devices[] __initdata = {
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
 #endif
-	/* <DTS2010072202961 hufeng 20100722 begin */
-	/* removed several lines */
-	/* DTS2010072202961 hufeng 20100722 end> */
-	&android_pmem_kernel_ebi1_device,
 	&android_pmem_adsp_device,
 	&android_pmem_audio_device,
 	&msm_device_i2c,
@@ -7280,7 +7425,9 @@ static struct platform_device *devices[] __initdata = {
 	&qup_device_i2c,
 
 /*< DTS2011012004291 xuhui 20110120 begin */
-#ifndef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
+/* DTS2012020604357 zhangyun 20120206 end > */
 #if defined(CONFIG_MARIMBA_CORE) && \
    (defined(CONFIG_MSM_BT_POWER) || defined(CONFIG_MSM_BT_POWER_MODULE))
 	&msm_bt_power_device,
@@ -7293,7 +7440,8 @@ static struct platform_device *devices[] __initdata = {
 #endif
 /* DTS2011012004291 xuhui 20110120 end >*/
 
-	&msm_device_kgsl,
+	&msm_kgsl_3d0,
+	&msm_kgsl_2d0,
 #ifdef CONFIG_MT9T013
 	&msm_camera_sensor_mt9t013,
 #endif
@@ -7306,16 +7454,18 @@ static struct platform_device *devices[] __initdata = {
     &msm_camera_sensor_hi701,
 #endif 
 /* DTS2011051400258   songxiaoming 20110514 end > */
+/* <DTS2012041003722 sibingsong 20120410 begin */
 /*<  DTS2011101000840   yuguangcai 20111010 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_S5K5CA
+#ifdef CONFIG_HUAWEI_CAMERA_SENSOR_S5K5CA
 	&msm_camera_sensor_s5k5ca,
 #endif
 /* DTS2011101000840   yuguangcai 20111010 end > */
 /*< DTS2011102805854 yuguangcai 20111029 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_MT9T113
+#ifdef CONFIG_HUAWEI_CAMERA_SENSOR_MT9T113
 	&msm_camera_sensor_mt9t113,
 #endif
 /* DTS2011102805854 yuguangcai 20111029 end > */
+/* DTS2012041003722 sibingsong 20120410 end> */
 /*< DTS2011072600848   songxiaoming 20110726 begin */
 #ifdef CONFIG_HUAWEI_SENSOR_OV7736	
     &msm_camera_sensor_ov7736,
@@ -7348,15 +7498,12 @@ static struct platform_device *devices[] __initdata = {
 /* DTS2011061801881 zhangyu 20110620 END > */ 
 
 /*<BU5D08116, lijuan 00152865, 20100419 begin*/
-#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX
-	&msm_camera_sensor_s5k4e1gx,
+/* <DTS2012032603420 sibingsong 20120326 begin */
+#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1
+	&msm_camera_sensor_s5k4e1,
+/* DTS2012032603420 sibingsong 20120326 end> */
 #endif
 /* < DTS2011090701903 zhangyu 20110907 begin */
-/* < DTS2011100802746 zhangyu 20111010 begin */
-#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX_P
-	&msm_camera_sensor_s5k4e1gx_p,
-#endif
-/* DTS2011100802746 zhangyu 20111010 end > */ 
 #ifdef CONFIG_HUAWEI_SENSOR_MT9P017
 	&msm_camera_sensor_mt9p017,
 #endif
@@ -7367,7 +7514,11 @@ static struct platform_device *devices[] __initdata = {
 	&msm_camera_sensor_ov5647_sunny,
 #endif
 /* BU5D09497  lijuan 00152865  20100514 end> */
-
+/* < DTS2012041003147 liuxin 20120223 begin */
+#ifdef CONFIG_HUAWEI_SENSOR_S5K4E1GX_P
+	&msm_camera_sensor_s5k4e1gx_p,
+#endif
+/* DTS2012041003147 liuxin 20120223 end > */
 /*<DTS2011042704563 penghai 20110427 begin*/
 #ifdef CONFIG_HUAWEI_SENSOR_MT9E013
 	&msm_camera_sensor_mt9e013,
@@ -7412,11 +7563,11 @@ static struct platform_device *devices[] __initdata = {
 		defined(CONFIG_CRYPTO_DEV_QCEDEV_MODULE)
 	&qcedev_device,
 #endif
-/*< DTS2011092601370 zhongjinrong 20110926 begin */
+/*< DTS2012052303745 zhongjinrong 20120523 begin */
 #ifdef CONFIG_HUAWEI_KEYBOARD_LEDS
 	&msm_device_pmic_keyboard_leds,
 #endif
-/* DTS2011092601370 zhongjinrong 20119026 end >*/	
+/* DTS2012052303745 zhongjinrong 20120523 end >*/
 
 	&msm_batt_device,
 	&msm_adc_device,
@@ -7442,6 +7593,10 @@ static struct platform_device *devices[] __initdata = {
     /* <DTS2011032104626 shenjinming 20110321 begin */
     &huawei_device_detect,
     /* <DTS2011032104626 shenjinming 20110321 end> */
+
+#ifdef CONFIG_ION_MSM
+    &ion_dev,
+#endif
 
 };
 
@@ -7480,7 +7635,7 @@ msm_i2c_gpio_config(int adap_id, int config_type)
 }
 /*This needs to be enabled only for OEMS*/
 #ifndef CONFIG_QUP_EXCLUSIVE_TO_CAMERA
-static struct vreg *qup_vreg;
+static struct regulator *qup_vreg;
 #endif
 static void
 qup_i2c_gpio_config(int adap_id, int config_type)
@@ -7499,15 +7654,10 @@ qup_i2c_gpio_config(int adap_id, int config_type)
 		printk(KERN_ERR "QUP GPIO enable failed: %d\n", rc);
 	/*This needs to be enabled only for OEMS*/
 #ifndef CONFIG_QUP_EXCLUSIVE_TO_CAMERA
-	if (qup_vreg) {
-		int rc = vreg_set_level(qup_vreg, 1800);
+	if (!IS_ERR_OR_NULL(qup_vreg)) {
+		rc = regulator_enable(qup_vreg);
 		if (rc) {
-			pr_err("%s: vreg LVS1 set level failed (%d)\n",
-			__func__, rc);
-		}
-		rc = vreg_enable(qup_vreg);
-		if (rc) {
-			pr_err("%s: vreg_enable() = %d \n",
+			pr_err("%s: regulator_enable failed: %d\n",
 			__func__, rc);
 		}
 	}
@@ -7552,7 +7702,6 @@ static void __init msm_device_i2c_2_init(void)
 /* < DTS2011061801881 zhangyu 20110620 BEGIN */
 static struct msm_i2c_platform_data qup_i2c_pdata = {
 	.clk_freq = 100000,
-	.pclk = "camif_pad_pclk",
 	.msm_i2c_config_gpio = qup_i2c_gpio_config,
 };
 /* DTS2011061801881 zhangyu 20110620 END > */ 
@@ -7565,42 +7714,31 @@ static void __init qup_device_i2c_init(void)
 	qup_device_i2c.dev.platform_data = &qup_i2c_pdata;
 	/*This needs to be enabled only for OEMS*/
 #ifndef CONFIG_QUP_EXCLUSIVE_TO_CAMERA
-	qup_vreg = vreg_get(NULL, "lvsw1");
+	qup_vreg = regulator_get(&qup_device_i2c.dev, "lvsw1");
 	if (IS_ERR(qup_vreg)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
+		dev_err(&qup_device_i2c.dev,
+			"%s: regulator_get failed: %ld\n",
 			__func__, PTR_ERR(qup_vreg));
 	}
 #endif
 }
 
 #ifdef CONFIG_I2C_SSBI
-static struct msm_ssbi_platform_data msm_i2c_ssbi6_pdata = {
-	.rsl_id = "D:PMIC_SSBI",
-	.controller_type = MSM_SBI_CTRL_SSBI2,
-};
-
-static struct msm_ssbi_platform_data msm_i2c_ssbi7_pdata = {
+static struct msm_i2c_ssbi_platform_data msm_i2c_ssbi7_pdata = {
 	.rsl_id = "D:CODEC_SSBI",
 	.controller_type = MSM_SBI_CTRL_SSBI,
 };
 #endif
-
-static struct msm_acpu_clock_platform_data msm7x30_clock_data = {
-	.acpu_switch_time_us = 50,
-	.vdd_switch_time_us = 62,
-};
 
 static void __init msm7x30_init_irq(void)
 {
 	msm_init_irq();
 }
 
-/* <DTS2010072202961 hufeng 20100722 begin */
-/* removed several lines */
-/* DTS2010072202961 hufeng 20100722 end> */
-
-struct vreg *vreg_s3;
-struct vreg *vreg_mmc;
+static struct msm_gpio msm_nand_ebi2_cfg_data[] = {
+	{GPIO_CFG(86, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "ebi2_cs1"},
+	{GPIO_CFG(115, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "ebi2_busy1"},
+};
 
 #if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
@@ -7626,6 +7764,29 @@ static struct msm_gpio sdc1_cfg_data[] = {
 	{GPIO_CFG(43, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc1_dat_0"},
 };
 
+/*< DTS2012052308313 chendeng 20120621 begin */
+/*
+ * We have the external pull up on data and cmd lines.
+ * Qualcomm requests to disable the internal pull up when have external pull up.
+ * Change sd card data and cmd lines pull up to no pull.
+ */
+#ifdef CONFIG_HUAWEI_KERNEL
+static struct msm_gpio sdc2_cfg_data[] = {
+	{GPIO_CFG(64, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc2_clk"},
+	{GPIO_CFG(65, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_cmd"},
+	{GPIO_CFG(66, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_dat_3"},
+	{GPIO_CFG(67, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_dat_2"},
+	{GPIO_CFG(68, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_dat_1"},
+	{GPIO_CFG(69, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_dat_0"},
+
+#ifdef CONFIG_MMC_MSM_SDC2_8_BIT_SUPPORT
+	{GPIO_CFG(115, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_dat_4"},
+	{GPIO_CFG(114, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_dat_5"},
+	{GPIO_CFG(113, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_dat_6"},
+	{GPIO_CFG(112, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc2_dat_7"},
+#endif
+};
+#else
 static struct msm_gpio sdc2_cfg_data[] = {
 	{GPIO_CFG(64, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc2_clk"},
 	{GPIO_CFG(65, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_cmd"},
@@ -7641,6 +7802,8 @@ static struct msm_gpio sdc2_cfg_data[] = {
 	{GPIO_CFG(112, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_7"},
 #endif
 };
+#endif
+/* DTS2012052308313 chendeng 20120621 end>*/
 
 static struct msm_gpio sdc3_cfg_data[] = {
 	{GPIO_CFG(110, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc3_clk"},
@@ -7666,6 +7829,22 @@ static struct msm_gpio sdc3_sleep_cfg_data[] = {
 			"sdc3_dat_0"},
 };
 
+/*< DTS2012052308313 chendeng 20120621 begin */
+/*
+ * We have the external pull up on data and cmd lines.
+ * Qualcomm requests to disable the internal pull up when have external pull up.
+ * Change sd card data and cmd lines pull up to no pull.
+ */
+#ifdef CONFIG_HUAWEI_KERNEL
+static struct msm_gpio sdc4_cfg_data[] = {
+	{GPIO_CFG(58, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc4_clk"},
+	{GPIO_CFG(59, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc4_cmd"},
+	{GPIO_CFG(60, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc4_dat_3"},
+	{GPIO_CFG(61, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc4_dat_2"},
+	{GPIO_CFG(62, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc4_dat_1"},
+	{GPIO_CFG(63, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA), "sdc4_dat_0"},
+};
+#else
 static struct msm_gpio sdc4_cfg_data[] = {
 	{GPIO_CFG(58, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc4_clk"},
 	{GPIO_CFG(59, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc4_cmd"},
@@ -7674,6 +7853,8 @@ static struct msm_gpio sdc4_cfg_data[] = {
 	{GPIO_CFG(62, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc4_dat_1"},
 	{GPIO_CFG(63, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc4_dat_0"},
 };
+#endif
+/* DTS2012052308313 chendeng 20120621 end>*/
 
 static struct sdcc_gpio sdcc_cfg_data[] = {
 	{
@@ -7698,12 +7879,7 @@ static struct sdcc_gpio sdcc_cfg_data[] = {
 	},
 };
 
-struct sdcc_vreg {
-	struct vreg *vreg_data;
-	unsigned level;
-};
-
-static struct sdcc_vreg sdcc_vreg_data[4];
+static struct regulator *sdcc_vreg_data[ARRAY_SIZE(sdcc_cfg_data)];
 
 static unsigned long vreg_sts, gpio_sts;
 
@@ -7739,37 +7915,36 @@ static uint32_t msm_sdcc_setup_gpio(int dev_id, unsigned int enable)
 static uint32_t msm_sdcc_setup_vreg(int dev_id, unsigned int enable)
 {
 	int rc = 0;
-	struct sdcc_vreg *curr;
+	struct regulator *curr = sdcc_vreg_data[dev_id - 1];
 	static int enabled_once[] = {0, 0, 0, 0};
 
-	curr = &sdcc_vreg_data[dev_id - 1];
-
-	if (!(test_bit(dev_id, &vreg_sts)^enable))
+	if (test_bit(dev_id, &vreg_sts) == enable)
 		return rc;
 
 	if (!enable || enabled_once[dev_id - 1])
 		return 0;
 
+	if (!curr)
+		return -ENODEV;
+
+	if (IS_ERR(curr))
+		return PTR_ERR(curr);
+
 	if (enable) {
 		set_bit(dev_id, &vreg_sts);
-		rc = vreg_set_level(curr->vreg_data, curr->level);
-		if (rc) {
-			printk(KERN_ERR "%s: vreg_set_level() = %d \n",
+
+		rc = regulator_enable(curr);
+		if (rc)
+			pr_err("%s: could not enable regulator: %d\n",
 					__func__, rc);
-		}
-		rc = vreg_enable(curr->vreg_data);
-		if (rc) {
-			printk(KERN_ERR "%s: vreg_enable() = %d \n",
-					__func__, rc);
-		}
 		enabled_once[dev_id - 1] = 1;
 	} else {
 		clear_bit(dev_id, &vreg_sts);
-		rc = vreg_disable(curr->vreg_data);
-		if (rc) {
-			printk(KERN_ERR "%s: vreg_disable() = %d \n",
+
+		rc = regulator_disable(curr);
+		if (rc)
+			pr_err("%s: could not disable regulator: %d\n",
 					__func__, rc);
-		}
 	}
 	return rc;
 }
@@ -7840,109 +8015,76 @@ static int mbp_config_gpios_pre_init(int enable)
 	return rc;
 }
 
-static int mbp_setup_rf_vregs(int state)
+static struct regulator_bulk_data mbp_regs_io[2];
+static struct regulator_bulk_data mbp_regs_rf[2];
+static struct regulator_bulk_data mbp_regs_adc[1];
+static struct regulator_bulk_data mbp_regs_core[1];
+
+static int mbp_init_regs(struct device *dev)
 {
-	struct vreg *vreg_rf = NULL;
-	struct vreg *vreg_rf_switch	= NULL;
+	struct regulator_bulk_data regs[] = {
+		/* Analog and I/O regs */
+		{ .supply = "gp4",  .min_uV = 2600000, .max_uV = 2600000 },
+		{ .supply = "s3",   .min_uV = 1800000, .max_uV = 1800000 },
+		/* RF regs */
+		{ .supply = "s2",   .min_uV = 1300000, .max_uV = 1300000 },
+		{ .supply = "rf",   .min_uV = 2600000, .max_uV = 2600000 },
+		/* ADC regs */
+		{ .supply = "s4",   .min_uV = 2200000, .max_uV = 2200000 },
+		/* Core regs */
+		{ .supply = "gp16", .min_uV = 1200000, .max_uV = 1200000 },
+	};
+
+	struct regulator_bulk_data *regptr = regs;
 	int rc;
 
-	vreg_rf = vreg_get(NULL, "s2");
-	if (IS_ERR(vreg_rf)) {
-		pr_err("%s: s2 vreg get failed (%ld)",
-				__func__, PTR_ERR(vreg_rf));
-		return -EFAULT;
-	}
-	vreg_rf_switch = vreg_get(NULL, "rf");
-	if (IS_ERR(vreg_rf_switch)) {
-		pr_err("%s: rf vreg get failed (%ld)",
-				__func__, PTR_ERR(vreg_rf_switch));
-		return -EFAULT;
+	rc = regulator_bulk_get(dev, ARRAY_SIZE(regs), regs);
+
+	if (rc) {
+		dev_err(dev, "%s: could not get regulators: %d\n",
+				__func__, rc);
+		goto out;
 	}
 
-	if (state) {
-		rc = vreg_set_level(vreg_rf, 1300);
-		if (rc) {
-			pr_err("%s: vreg s2 set level failed (%d)\n",
-					__func__, rc);
-			return rc;
-		}
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs), regs);
 
-		rc = vreg_enable(vreg_rf);
-		if (rc) {
-			printk(KERN_ERR "%s: vreg_enable(s2) = %d\n",
-					__func__, rc);
-		}
-
-		rc = vreg_set_level(vreg_rf_switch, 2600);
-		if (rc) {
-			pr_err("%s: vreg rf switch set level failed (%d)\n",
-					__func__, rc);
-			return rc;
-		}
-		rc = vreg_enable(vreg_rf_switch);
-		if (rc) {
-			printk(KERN_ERR "%s: vreg_enable(rf) = %d\n",
-					__func__, rc);
-		}
-	} else {
-		(void) vreg_disable(vreg_rf);
-		(void) vreg_disable(vreg_rf_switch);
+	if (rc) {
+		dev_err(dev, "%s: could not set voltages: %d\n",
+				__func__, rc);
+		goto reg_free;
 	}
+
+	memcpy(mbp_regs_io, regptr, sizeof(mbp_regs_io));
+	regptr += ARRAY_SIZE(mbp_regs_io);
+
+	memcpy(mbp_regs_rf, regptr, sizeof(mbp_regs_rf));
+	regptr += ARRAY_SIZE(mbp_regs_rf);
+
+	memcpy(mbp_regs_adc, regptr, sizeof(mbp_regs_adc));
+	regptr += ARRAY_SIZE(mbp_regs_adc);
+
+	memcpy(mbp_regs_core, regptr, sizeof(mbp_regs_core));
+
 	return 0;
+
+reg_free:
+	regulator_bulk_free(ARRAY_SIZE(regs), regs);
+out:
+	return rc;
+}
+
+static int mbp_setup_rf_vregs(int state)
+{
+	return state ?
+		regulator_bulk_enable(ARRAY_SIZE(mbp_regs_rf), mbp_regs_rf) :
+		regulator_bulk_disable(ARRAY_SIZE(mbp_regs_rf), mbp_regs_rf);
 }
 
 static int mbp_setup_vregs(int state)
 {
-	struct vreg *vreg_analog = NULL;
-	struct vreg *vreg_io = NULL;
-	int rc;
-
-	vreg_analog = vreg_get(NULL, "gp4");
-	if (IS_ERR(vreg_analog)) {
-		pr_err("%s: gp4 vreg get failed (%ld)",
-				__func__, PTR_ERR(vreg_analog));
-		return -EFAULT;
-	}
-	vreg_io = vreg_get(NULL, "s3");
-	if (IS_ERR(vreg_io)) {
-		pr_err("%s: s3 vreg get failed (%ld)",
-				__func__, PTR_ERR(vreg_io));
-		return -EFAULT;
-	}
-	if (state) {
-		rc = vreg_set_level(vreg_analog, 2600);
-		if (rc) {
-			pr_err("%s: vreg_set_level failed (%d)",
-					__func__, rc);
-		}
-		rc = vreg_enable(vreg_analog);
-		if (rc) {
-			pr_err("%s: analog vreg enable failed (%d)",
-					__func__, rc);
-		}
-		rc = vreg_set_level(vreg_io, 1800);
-		if (rc) {
-			pr_err("%s: vreg_set_level failed (%d)",
-					__func__, rc);
-		}
-		rc = vreg_enable(vreg_io);
-		if (rc) {
-			pr_err("%s: io vreg enable failed (%d)",
-					__func__, rc);
-		}
-	} else {
-		rc = vreg_disable(vreg_analog);
-		if (rc) {
-			pr_err("%s: analog vreg disable failed (%d)",
-					__func__, rc);
-		}
-		rc = vreg_disable(vreg_io);
-		if (rc) {
-			pr_err("%s: io vreg disable failed (%d)",
-					__func__, rc);
-		}
-	}
-	return rc;
+	return state ?
+		regulator_bulk_enable(ARRAY_SIZE(mbp_regs_io), mbp_regs_io) :
+		regulator_bulk_disable(ARRAY_SIZE(mbp_regs_io), mbp_regs_io);
 }
 
 static int mbp_set_tcxo_en(int enable)
@@ -7958,16 +8100,6 @@ static int mbp_set_tcxo_en(int enable)
 			__func__, enable ? "" : "de-");
 		return -EIO;
 	}
-	if (!enable) {
-		vreg_analog = vreg_get(NULL, "gp4");
-		if (IS_ERR(vreg_analog)) {
-			pr_err("%s: gp4 vreg get failed (%ld)",
-					__func__, PTR_ERR(vreg_analog));
-			return -EFAULT;
-		}
-
-		(void) vreg_disable(vreg_analog);
-	}
 	return rc;
 }
 
@@ -7981,28 +8113,20 @@ static void mbp_set_freeze_io(int state)
 
 static int mbp_set_core_voltage_en(int enable)
 {
-	int rc;
-	struct vreg *vreg_core1p2 = NULL;
+	static bool is_enabled;
+	int rc = 0;
 
-	vreg_core1p2 = vreg_get(NULL, "gp16");
-	if (IS_ERR(vreg_core1p2)) {
-		pr_err("%s: gp16 vreg get failed (%ld)",
-				__func__, PTR_ERR(vreg_core1p2));
-		return -EFAULT;
-	}
-	if (enable) {
-		rc = vreg_set_level(vreg_core1p2, 1200);
+	if (enable && !is_enabled) {
+		rc = regulator_bulk_enable(ARRAY_SIZE(mbp_regs_core),
+				mbp_regs_core);
 		if (rc) {
-			pr_err("%s: vreg_set_level failed (%d)",
+			pr_err("%s: could not enable regulators: %d\n",
 					__func__, rc);
+		} else {
+			is_enabled = true;
 		}
-		(void) vreg_enable(vreg_core1p2);
-
-		return 80;
-	} else {
-		gpio_set_value(85, 1);
-		return 0;
 	}
+
 	return rc;
 }
 
@@ -8033,34 +8157,9 @@ static int mbp_config_interface_mode(int state)
 
 static int mbp_setup_adc_vregs(int state)
 {
-	struct vreg *vreg_adc = NULL;
-	int rc;
-
-	vreg_adc = vreg_get(NULL, "s4");
-	if (IS_ERR(vreg_adc)) {
-		pr_err("%s: s4 vreg get failed (%ld)",
-				__func__, PTR_ERR(vreg_adc));
-		return -EFAULT;
-	}
-	if (state) {
-		rc = vreg_set_level(vreg_adc, 2200);
-		if (rc) {
-			pr_err("%s: vreg_set_level failed (%d)",
-					__func__, rc);
-		}
-		rc = vreg_enable(vreg_adc);
-		if (rc) {
-			pr_err("%s: enable vreg adc failed (%d)",
-					__func__, rc);
-		}
-	} else {
-		rc = vreg_disable(vreg_adc);
-		if (rc) {
-			pr_err("%s: disable vreg adc failed (%d)",
-					__func__, rc);
-		}
-	}
-	return rc;
+	return state ?
+		regulator_bulk_enable(ARRAY_SIZE(mbp_regs_adc), mbp_regs_adc) :
+		regulator_bulk_disable(ARRAY_SIZE(mbp_regs_adc), mbp_regs_adc);
 }
 
 static int mbp_power_up(void)
@@ -8125,14 +8224,6 @@ exit:
 static int mbp_power_down(void)
 {
 	int rc;
-	struct vreg *vreg_adc = NULL;
-
-	vreg_adc = vreg_get(NULL, "s4");
-	if (IS_ERR(vreg_adc)) {
-		pr_err("%s: s4 vreg get failed (%ld)",
-				__func__, PTR_ERR(vreg_adc));
-		return -EFAULT;
-	}
 
 	mbp_set_reset(MBP_ON);
 	pr_debug("%s: mbp_set_reset(MBP_ON) done\n", __func__);
@@ -8162,12 +8253,15 @@ static int mbp_power_down(void)
 		goto exit;
 	pr_debug("%s: mbp_set_core_voltage_en(MBP_OFF) done\n", __func__);
 
-	gpio_set_value(85, 1);
-
 	rc = mbp_set_tcxo_en(MBP_OFF);
 	if (rc)
 		goto exit;
 	pr_debug("%s: mbp_set_tcxo_en(MBP_OFF) done\n", __func__);
+
+	rc = mbp_setup_vregs(MBP_OFF);
+	if (rc)
+		goto exit;
+	pr_debug("%s: mbp_setup_vregs(MBP_OFF) done\n", __func__);
 
 	rc = mbp_config_gpios_pre_init(MBP_OFF);
 	if (rc)
@@ -8230,6 +8324,12 @@ static uint32_t msm_sdcc_setup_power_mbp(struct device *dv, unsigned int vdd)
 		goto out;
 	}
 	if (!mbp_power_init_done) {
+		rc = mbp_init_regs(dv);
+		if (rc) {
+			dev_err(dv, "%s: regulator init failed: %d\n",
+					__func__, rc);
+			goto out;
+		}
 		mbp_setup_power(dv, 1);
 		mbp_setup_power(dv, 0);
 		mbp_power_init_done = 1;
@@ -8259,42 +8359,11 @@ out:
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 static unsigned int msm7x30_sdcc_slot_status(struct device *dev)
 {
-/* < DTS2011092803933  sunhonghui 20110928 begin */
-/*change for u8860 use the different pin to detect sd card*/
-#ifdef CONFIG_HUAWEI_KERNEL
-    if(machine_is_msm8255_u8860_51())
-    {
-        return (unsigned int)
-            gpio_get_value_cansleep(
-                PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET_PMICGPIO21_INTERUPT - 1));
-    }
-	/* < DTS2011102401822 liwei 20111024 begin */
-    else if(machine_is_msm8255_u8680()
-	    || machine_is_msm8255_u8667()
-	    || machine_is_msm8255_u8730())
-	/* DTS2011102401822 liwei 20111024 end > */
-    {
-        return (unsigned int)
-            gpio_get_value_cansleep(
-                PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET_PMICGPIO36_INTERUPT - 1));
-    }
-    else
-    {
-        return 0;
-    }
-#else
-    return (unsigned int)
-        gpio_get_value_cansleep(
-            PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET_PMICGPIO36_INTERUPT - 1));
-#endif
-/* DTS2011092803933  sunhonghui 20110928 end > */
+	return (unsigned int)
+		gpio_get_value_cansleep(
+			PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_SD_DET - 1));
 }
 #endif
-
-static void msm_sdcc_sdio_lpm_gpio(struct device *dv, unsigned int active)
-{
-	pr_debug("%s not implemented\n", __func__);
-}
 
 /* < BU5D09338 durui 20100506 begin*/
 #ifndef CONFIG_HUAWEI_KERNEL
@@ -8335,9 +8404,6 @@ static struct mmc_platform_data msm7x30_sdc1_data = {
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
 	.status	        = mbp_status,
 	.register_status_notify = mbp_register_status_notify,
-#ifdef CONFIG_MMC_MSM_SDC1_DUMMY52_REQUIRED
-	.dummy52_required = 1,
-#endif
 	.msmsdcc_fmin	= 144000,
 	.msmsdcc_fmid	= 24576000,
 	.msmsdcc_fmax	= 24576000,
@@ -8348,9 +8414,6 @@ static struct mmc_platform_data msm7x30_sdc1_data = {
 	.ocr_mask	= MMC_VDD_165_195,
 	.translate_vdd	= msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
-#ifdef CONFIG_MMC_MSM_SDC1_DUMMY52_REQUIRED
-	.dummy52_required = 1,
-#endif
 	.msmsdcc_fmin	= 144000,
 	.msmsdcc_fmid	= 24576000,
 	.msmsdcc_fmax	= 49152000,
@@ -8405,15 +8468,13 @@ static struct mmc_platform_data msm7x30_sdc3_data = {
 #endif
 
 #ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
-/* < DTS2011092803933  sunhonghui 20110928 begin */
-/*this is used only by UE who's sdcard interupt pin is pmicgpio21*/
 static struct mmc_platform_data msm7x30_sdc4_data = {
 	.ocr_mask	= MMC_VDD_27_28 | MMC_VDD_28_29,
 	.translate_vdd	= msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	.status      = msm7x30_sdcc_slot_status,
-	.status_irq  = PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, PMIC_GPIO_SD_DET_PMICGPIO21_INTERUPT - 1),
+	.status_irq  = PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, PMIC_GPIO_SD_DET - 1),
 	.irq_flags   = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 #endif
 /* < BU5D09338 durui 20100506 begin*/
@@ -8439,39 +8500,35 @@ static struct mmc_platform_data msm7x30_sdc4_data = {
 /* DTS2010102201246 genghua 20101022 end >*/
 	.nonremovable	= 0,
 };
-/* DTS2011092803933  sunhonghui 20110928 end > */
 #endif
-
-/* < DTS2011092803933  sunhonghui 20110928 begin */
-#ifdef CONFIG_HUAWEI_KERNEL
-static struct mmc_platform_data msm7x30_sdc4_data_no_detect = {
-	.ocr_mask	= MMC_VDD_27_28 | MMC_VDD_28_29,
-	.translate_vdd	= msm_sdcc_setup_power,
-	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
-#ifdef CONFIG_MMC_MSM_SDC4_DUMMY52_REQUIRED
-	.dummy52_required = 1,
-#endif
-	.msmsdcc_fmin	= 144000,
-	.msmsdcc_fmid	= 24576000,
-	.msmsdcc_fmax	= 40960000,
-	.nonremovable	= 0,
-};
-#endif
-/* DTS2011092803933  sunhonghui 20110928 end > */
 
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
-static void msm_sdc1_lvlshft_enable(void)
+static int msm_sdc1_lvlshft_enable(void)
 {
+	static struct regulator *ldo5;
 	int rc;
 
 	/* Enable LDO5, an input to the FET that powers slot 1 */
-	rc = vreg_set_level(vreg_mmc, 2850);
-	if (rc)
-		printk(KERN_ERR "%s: vreg_set_level() = %d \n",	__func__, rc);
 
-	rc = vreg_enable(vreg_mmc);
-	if (rc)
-		printk(KERN_ERR "%s: vreg_enable() = %d \n", __func__, rc);
+	ldo5 = regulator_get(NULL, "ldo5");
+
+	if (IS_ERR(ldo5)) {
+		rc = PTR_ERR(ldo5);
+		pr_err("%s: could not get ldo5: %d\n", __func__, rc);
+		goto out;
+	}
+
+	rc = regulator_set_voltage(ldo5, 2850000, 2850000);
+	if (rc) {
+		pr_err("%s: could not set ldo5 voltage: %d\n", __func__, rc);
+		goto ldo5_free;
+	}
+
+	rc = regulator_enable(ldo5);
+	if (rc) {
+		pr_err("%s: could not enable ldo5: %d\n", __func__, rc);
+		goto ldo5_free;
+	}
 
 	/* Enable GPIO 35, to turn on the FET that powers slot 1 */
 	rc = msm_gpios_request_enable(sdc1_lvlshft_cfg_data,
@@ -8483,6 +8540,14 @@ static void msm_sdc1_lvlshft_enable(void)
 				1);
 	if (rc)
 		printk(KERN_ERR "%s: Failed to turn on GPIO 35\n", __func__);
+
+	return 0;
+
+ldo5_free:
+	regulator_put(ldo5);
+out:
+	ldo5 = NULL;
+	return rc;
 }
 #endif
 
@@ -8532,6 +8597,9 @@ static struct msm_gpio wlan_wakes_msm_18[] = {
 #define WLAN_REG 162								/*WLAN_REG is available in U8860 / C8860 / Asura / Phoenix*/
 #define WLAN_PWR 164								/*WLAN_OWR is available in U8860 / C8860 , but we still request and use it in Ausra / Phoenix*/
 /* DTS2011090203253 xuke 20110902 end > */
+/* < DTS2012020402114 zhuwenying 20120206 begin */
+extern int sdcc_wifi_slot;
+/* DTS2012020402114 zhuwenying 20120206 end > */
 
 static struct msm_gpio wifi_config_init[] = {
     { GPIO_CFG(WLAN_REG, WLAN_GPIO_FUNC_0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
@@ -8564,6 +8632,7 @@ static void *bcm_wifi_mem_prealloc(int section, unsigned long size)
 	return wifi_mem_array[section].mem_ptr;
 }
 
+/* < DTS2012020402114 zhuwenying 20120206 begin */
 /* < DTS2011110105497 zhuwenying 20111117 begin */
 static int bcm_wifi_set_power_4330(int enable)
 {
@@ -8595,6 +8664,7 @@ static int bcm_wifi_set_power_4330(int enable)
 	return ret;
 }
 /* DTS2011110105497 zhuwenying 20111117 end > */
+/* DTS2012020402114 zhuwenying 20120206 end > */
 
 
 static int bcm_wifi_set_power(int enable)
@@ -8741,13 +8811,14 @@ int bcm_detect_chip_type( void )
 	if((machine_is_msm8255_u8860()) 		
 	|| (machine_is_msm8255_c8860()) 		
 	|| (machine_is_msm8255_u8860lp())		
-	|| (machine_is_msm8255_u8860_92())
-/*<DTS2011100803656 liyuping 20111008 begin*/
-//Add three products,all of them use BCM4329 chip.
-	|| (machine_is_msm7x30_u8800_51())
+    /* < DTS2012022905490 ganfan 20120301 begin */
+    || machine_is_msm8255_u8860_r()
+    /* DTS2012022905490 ganfan 20120301 end > */
+	|| (machine_is_msm8255_u8860_92())	
+/* < DTS2012032104459 xiedayong 20120322 begin */
+/* add msm8255_u8800_pro proudct,it uses BCM4329 chip */
 	|| (machine_is_msm8255_u8800_pro())
-	|| (machine_is_msm7x30_u8820())	
-/* DTS2011100803656 liyuping 20111008 end >*/
+/* DTS2012032104459 xiedayong 20120322 end > */
 /*<DTS2011091502092 liyuping 20110915 begin */
 	|| (machine_is_msm8255_u8860_51()))
 /* DTS2011091502092 liyuping 20110915 end> */ 
@@ -8790,6 +8861,7 @@ static struct platform_device bcm_wifi_device = {
                 .platform_data = &bcm_wifi_control,
         },
 };
+/* < DTS2012020402114 zhuwenying 20120206 begin */
 /* < DTS2011110105497 zhuwenying 20111117 begin */
 
 static struct wifi_platform_data bcm_wifi_control_4330 = {
@@ -8811,6 +8883,7 @@ static struct platform_device bcm_wifi_device_4330 = {
 /* DTS2011090203253 xuke 20110902 end > */
 #endif
 /* DTS2011110105497 zhuwenying 20111117 end > */
+/* DTS2012020402114 zhuwenying 20120206 end > */
 
 /* DTS2010111804286  hanshirong 20101118 end > */
 
@@ -8891,7 +8964,13 @@ static void __init virtualkeys_init(void)
         		       "\n");
         }
     }
-    else if (machine_is_msm8255_u8860lp())
+    else if (machine_is_msm8255_u8860lp()
+        /* < DTS2012030800733 ganfan 20120308 begin */
+        /* < DTS2012022905490 ganfan 20120301 begin */
+        /* delete one line */
+        /* DTS2012022905490 ganfan 20120301 end > */
+        /* DTS2012030800733 ganfan 20120308 end > */
+    )
     {
         if (HW_VER_SUB_VA == get_hw_sub_board_id())
         {
@@ -8912,6 +8991,80 @@ static void __init virtualkeys_init(void)
         		       "\n");
         }
     }
+    /* < DTS2012030800733 ganfan 20120308 begin */
+    else if (machine_is_msm8255_u8860_r())
+    {
+        if (HW_VER_SUB_VA == get_hw_sub_board_id())
+        {
+            buf_vkey_size = sprintf(buf_virtualkey,
+                        __stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":50:930:112:80"
+                        ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":180:930:112:80"
+                        ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":300:930:112:80"
+                        ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":430:930:112:80"
+                        "\n");
+        }
+        else
+        {
+            buf_vkey_size = sprintf(buf_virtualkey,
+                        __stringify(EV_KEY) ":" __stringify(KEY_HOME)  ":50:930:112:80"
+                        ":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":180:930:112:80"
+                        ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":300:930:112:80"
+                        ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":430:930:112:80"
+                        "\n");
+        }
+    }
+    /* DTS2012030800733 ganfan 20120308 end > */
+	/* < DTS2012020907660 sunlibin 20120213 begin */
+	/*< DTS2012052903868 houming 20120529 begin */
+	/* Change KEY_GENIUSBUTTON to KEY_SEARCH */
+	else if (machine_is_msm8255_u8680())
+    {
+	    /* U8680 Ver.A & Ver.B virtualkey map: HOME MENU BACK SERACH */
+        if (HW_VER_SUB_VA == get_hw_sub_board_id() || HW_VER_SUB_VB == get_hw_sub_board_id())
+        {
+    	    buf_vkey_size = sprintf(buf_virtualkey,
+        			    __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":50:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":180:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":300:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":430:840:112:70"
+        		       "\n");
+        }
+		/* U8680 Ver.C virtualkey map: MENU HOME BACK SERACH */
+        else
+        {
+    	    buf_vkey_size = sprintf(buf_virtualkey,
+        			    __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":50:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":180:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":300:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":430:840:112:70"
+        		       "\n");
+        }
+    }
+    /* DTS2012052903868 houming 20120529 end >*/
+	else if (machine_is_msm8255_u8730())
+    {
+	    /* U8730 Ver.A virtualkey map: HOME MENU BACK GENIUS */
+        if (HW_VER_SUB_VA == get_hw_sub_board_id())
+        {
+    	    buf_vkey_size = sprintf(buf_virtualkey,
+        			    __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":50:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":180:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":300:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_GENIUSBUTTON) ":430:840:112:70"
+        		       "\n");
+        }
+		/* U8680 Ver.B virtualkey map: MENU HOME BACK GENIUS */
+        else
+        {
+    	    buf_vkey_size = sprintf(buf_virtualkey,
+        			    __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":50:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":180:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":300:840:112:70"
+        		       ":" __stringify(EV_KEY) ":" __stringify(KEY_GENIUSBUTTON) ":430:840:112:70"
+        		       "\n");
+        }
+    }
+	/* DTS2012020907660 sunlibin 20120213 end > */
     else if (machine_is_msm8255_u8860_92()
             ||machine_is_msm8255_u8860())
     {
@@ -8943,21 +9096,19 @@ static void __init virtualkeys_init(void)
         		   "\n");
     }
     /*< DTS2011091902006 duanfei 20110919 begin*/
-    /* <DTS2011091200073 zhangbo 20110912 begin */
-    /* < DTS2011102401822 liwei 20111024 begin */
-    else if (machine_is_msm8255_u8680()
-        || machine_is_msm8255_u8667()
-		|| machine_is_msm8255_u8730())
-    /* DTS2011102401822 liwei 20111024 end > */
-    /* DTS2011091200073 zhangbo 20110912 end> */
+	/* < DTS2012020907660 sunlibin 20120213 begin */
+    /* move U8680 & U8730 virtualkey map above */
+    /* Add U8667 virtualkey map */
+    else if (machine_is_msm8255_u8667())
     {
-    	buf_vkey_size = sprintf(buf_virtualkey,
-        			__stringify(EV_KEY) ":" __stringify(KEY_HOME)        ":50:840:112:70"
-        		   ":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)         ":180:840:112:70"
-        		   ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)         ":300:840:112:70"
-        		   ":" __stringify(EV_KEY) ":" __stringify(KEY_GENIUSBUTTON) ":430:840:112:70"  /*special key for a certain apk*/
+        buf_vkey_size = sprintf(buf_virtualkey,
+        			__stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":35:520:70:60"  
+        		   ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":118:520:70:60"
+        		   ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK) ":205:520:70:60"
+        		   ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":285:520:70:60"
         		   "\n");
     }
+	/* DTS2012020907660 sunlibin 20120213 end > */
     /* DTS2011091902006 duanfei 20110919 end >*/
     /*< DTS2011093000343 duanfei 20110930 begin */
     else
@@ -8983,35 +9134,45 @@ static void __init virtualkeys_init(void)
 
 /*DTS2011042602009 fengwei 20110426 end>*/
 
+static int mmc_regulator_init(int sdcc_no, const char *supply, int uV)
+{
+	int rc;
+
+	BUG_ON(sdcc_no < 1 || sdcc_no > 4);
+
+	sdcc_no--;
+
+	sdcc_vreg_data[sdcc_no] = regulator_get(NULL, supply);
+
+	if (IS_ERR(sdcc_vreg_data[sdcc_no])) {
+		rc = PTR_ERR(sdcc_vreg_data[sdcc_no]);
+		pr_err("%s: could not get regulator \"%s\": %d\n",
+				__func__, supply, rc);
+		goto out;
+	}
+
+	rc = regulator_set_voltage(sdcc_vreg_data[sdcc_no], uV, uV);
+
+	if (rc) {
+		pr_err("%s: could not set voltage for \"%s\" to %d uV: %d\n",
+				__func__, supply, uV, rc);
+		goto reg_free;
+	}
+
+	return rc;
+
+reg_free:
+	regulator_put(sdcc_vreg_data[sdcc_no]);
+out:
+	sdcc_vreg_data[sdcc_no] = NULL;
+	return rc;
+}
 
 static void __init msm7x30_init_mmc(void)
 {
-	vreg_s3 = vreg_get(NULL, "s3");
-	if (IS_ERR(vreg_s3)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
-		       __func__, PTR_ERR(vreg_s3));
-		return;
-	}
-
-	vreg_mmc = vreg_get(NULL, "mmc");
-	if (IS_ERR(vreg_mmc)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
-		       __func__, PTR_ERR(vreg_mmc));
-		return;
-	}
-
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
-/*< DTS2010092400487  lijianzhao 20100924 begin */
-	/*< DTS2010112702297 wangquanli 201001125 begin */
-	/*< DTS2011030202729  liliang 20110302  begin */	
-	/*< DTS2011042703705 zhangbo 20110422 begin */
-	/* <DTS2011050700551 zhangbo 20110505 begin */
-    /* <DTS2011062600102 sunhonghui 20110626 begin */
-    /* <DTS2011071600361 liyuping 20110716 begin */
-	/* < DTS2011082302564 liwei 20110823 begin */
-	/* <DTS2011091200073 zhangbo 20110912 begin */
-	/*<DTS2011091502092 liyuping 20110915 begin */
-	/* < DTS2011102401822 liwei 20111024 begin */
+	if (mmc_regulator_init(1, "s3", 1800000))
+		goto out1;
 	if ( machine_is_msm7x30_fluid() 
 	|| (machine_is_msm7x30_u8800()) 
 	|| (machine_is_msm7x30_u8820()) 
@@ -9020,51 +9181,48 @@ static void __init msm7x30_init_mmc(void)
 	|| (machine_is_msm8255_u8860())
 	|| (machine_is_msm8255_c8860())
     || (machine_is_msm8255_u8860lp())
+    /* < DTS2012022905490 ganfan 20120301 begin */
+    || machine_is_msm8255_u8860_r()
+    /* DTS2012022905490 ganfan 20120301 end > */
     || (machine_is_msm8255_u8860_92())
 	|| (machine_is_msm8255_u8680())
-    || machine_is_msm8255_u8667()
 	|| (machine_is_msm8255_u8860_51())
 	|| (machine_is_msm8255_u8730()))
     {
-	/* DTS2011102401822 liwei 20111024 end > */
-    /* DTS2011091502092 liyuping 20110915 end> */
-  /* DTS2011091200073 zhangbo 20110912 end> */
-	/* DTS2011082302564 liwei 20110823 end > */
-	/* DTS2011071600361 liyuping 20110716 end> */
-    /* DTS2011062600102 sunhonghui 20110626 end> */
-	/* DTS2011050700551 zhangbo 20110505 end> */
-	/* DTS2011042703705 zhangbo 20110422 end >*/
-	/* DTS2011030202729  liliang 20110302 end >*/
-	/* DTS2010112702297 wangquanli 201001125 end >*/
+
 		msm7x30_sdc1_data.ocr_mask =  MMC_VDD_27_28 | MMC_VDD_28_29;
-		msm_sdc1_lvlshft_enable();
+		if (msm_sdc1_lvlshft_enable()) {
+			pr_err("%s: could not enable level shift\n");
+			goto out1;
+		}
 	}
-/* DTS2010092400487  lijianzhao 20100924 end >*/
-	sdcc_vreg_data[0].vreg_data = vreg_s3;
-	sdcc_vreg_data[0].level = 1800;
+
 	msm_add_sdcc(1, &msm7x30_sdc1_data);
+out1:
 #endif
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+	if (mmc_regulator_init(2, "s3", 1800000))
+		goto out2;
+
 	if (machine_is_msm8x55_svlte_surf())
 		msm7x30_sdc2_data.msmsdcc_fmax =  24576000;
 	if (machine_is_msm8x55_svlte_surf() ||
 			machine_is_msm8x55_svlte_ffa()) {
-		msm7x30_sdc2_data.sdio_lpm_gpio_setup = msm_sdcc_sdio_lpm_gpio;
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 		msm7x30_sdc2_data.sdiowakeup_irq = MSM_GPIO_TO_INT(68);
-#ifdef CONFIG_MSM_SDIO_AL
 		msm7x30_sdc2_data.is_sdio_al_client = 1;
-#endif
-#endif
 	}
-	sdcc_vreg_data[1].vreg_data = vreg_s3;
-	sdcc_vreg_data[1].level = 1800;
+
 	msm_add_sdcc(2, &msm7x30_sdc2_data);
+out2:
 #endif
 #ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
-	sdcc_vreg_data[2].vreg_data = vreg_s3;
-	sdcc_vreg_data[2].level = 1800;
+	if (mmc_regulator_init(3, "s3", 1800000))
+		goto out3;
+
 	msm_sdcc_setup_gpio(3, 1);
+/* < DTS2012020402114 zhuwenying 20120206 begin */
+	sdcc_wifi_slot = 3;
+/* DTS2012020402114 zhuwenying 20120206 end > */
 	msm_add_sdcc(3, &msm7x30_sdc3_data);
 /* < DTS2010111804286  hanshirong 20101118 begin */
 #ifdef CONFIG_HUAWEI_WIFI_SDCC
@@ -9076,42 +9234,37 @@ static void __init msm7x30_init_mmc(void)
 /* DTS2011090203253 xuke 20110902 end > */
 #endif
 /* DTS2010111804286  hanshirong 20101118 end > */
+out3:
 #endif
 #ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
-	sdcc_vreg_data[3].vreg_data = vreg_mmc;
-	sdcc_vreg_data[3].level = 2850;
-	
-    /* < DTS2011092803933  sunhonghui 20110928 begin */
-    /*change for u8860lp use the different pin to detect sd card*/
-#ifdef CONFIG_HUAWEI_KERNEL
-    if(machine_is_msm8255_u8860_51())
-    {
-        msm_add_sdcc(4, &msm7x30_sdc4_data);
-    }
-	/* < DTS2011102401822 liwei 20111024 begin */
-    else if(machine_is_msm8255_u8680()
-	    || machine_is_msm8255_u8667()
-	    || machine_is_msm8255_u8730())
-    /* DTS2011102401822 liwei 20111024 end > */
-    {
-        msm7x30_sdc4_data.status_irq  = PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, PMIC_GPIO_SD_DET_PMICGPIO36_INTERUPT - 1),
-        msm_add_sdcc(4, &msm7x30_sdc4_data);
-    }
-    else
-    {
-        msm_add_sdcc(4, &msm7x30_sdc4_data_no_detect);
-    }
-#else
-    msm_add_sdcc(4, &msm7x30_sdc4_data);
-#endif
-    /* DTS2011092803933  sunhonghui 20110928 end > */
+	if (mmc_regulator_init(4, "mmc", 2850000))
+		return;
+
+	msm_add_sdcc(4, &msm7x30_sdc4_data);
 #endif
 
 }
 
-/* <DTS2010072202961 hufeng 20100722 begin */
-/* removed several lines */
-/* DTS2010072202961 hufeng 20100722 end> */
+static void __init msm7x30_init_nand(void)
+{
+	char *build_id;
+	struct flash_platform_data *plat_data;
+
+	build_id = socinfo_get_build_id();
+	if (build_id == NULL) {
+		pr_err("%s: Build ID not available from socinfo\n", __func__);
+		return;
+	}
+
+	if (build_id[8] == 'C' &&
+			!msm_gpios_request_enable(msm_nand_ebi2_cfg_data,
+			ARRAY_SIZE(msm_nand_ebi2_cfg_data))) {
+		plat_data = msm_device_nand.dev.platform_data;
+		plat_data->interleave = 1;
+		printk(KERN_INFO "%s: Interleave mode Build ID found\n",
+			__func__);
+	}
+}
 
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 static struct msm_gpio uart2_config_data[] = {
@@ -9147,30 +9300,20 @@ static const struct msm_gpio tsif_gpios[] = {
 static struct msm_tsif_platform_data tsif_platform_data = {
 	.num_gpios = ARRAY_SIZE(tsif_gpios),
 	.gpios = tsif_gpios,
-	.tsif_pclk = "tsif_pclk",
-	.tsif_ref_clk = "tsif_ref_clk",
+	.tsif_pclk = "iface_clk",
+	.tsif_ref_clk = "ref_clk",
 };
 #endif /* defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE) */
 /* TSIF end   */
 
 static void __init pmic8058_leds_init(void)
 {
-	if (machine_is_msm7x30_surf()) {
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].platform_data
-			= &pm8058_surf_leds_data;
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].data_size
-			= sizeof(pm8058_surf_leds_data);
-	} else if (!machine_is_msm7x30_fluid()) {
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].platform_data
-			= &pm8058_ffa_leds_data;
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].data_size
-			= sizeof(pm8058_ffa_leds_data);
-	} else if (machine_is_msm7x30_fluid()) {
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].platform_data
-			= &pm8058_fluid_leds_data;
-		pm8058_7x30_data.sub_devices[PM8058_SUBDEV_LED].data_size
-			= sizeof(pm8058_fluid_leds_data);
-	}
+	if (machine_is_msm7x30_surf())
+		pm8058_7x30_data.leds_pdata = &pm8058_surf_leds_data;
+	else if (!machine_is_msm7x30_fluid())
+		pm8058_7x30_data.leds_pdata = &pm8058_ffa_leds_data;
+	else if (machine_is_msm7x30_fluid())
+		pm8058_7x30_data.leds_pdata = &pm8058_fluid_leds_data;
 }
 
 static struct msm_spm_platform_data msm_spm_data __initdata = {
@@ -9208,68 +9351,50 @@ static struct msm_gpio tsc2007_config_data[] = {
 	"tsc2007_irq" },
 };
 
-static struct vreg *vreg_tsc_s3;
-static struct vreg *vreg_tsc_s2;
+static struct regulator_bulk_data tsc2007_regs[] = {
+	{ .supply = "s3", .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "s2", .min_uV = 1300000, .max_uV = 1300000 },
+};
 
 static int tsc2007_init(void)
 {
 	int rc;
 
-	vreg_tsc_s3 = vreg_get(NULL, "s3");
-	if (IS_ERR(vreg_tsc_s3)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
-		       __func__, PTR_ERR(vreg_tsc_s3));
-		return -ENODEV;
-	}
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(tsc2007_regs), tsc2007_regs);
 
-	rc = vreg_set_level(vreg_tsc_s3, 1800);
 	if (rc) {
-		pr_err("%s: vreg_set_level failed \n", __func__);
-		goto fail_vreg_set_level;
+		pr_err("%s: could not get regulators: %d\n", __func__, rc);
+		goto out;
 	}
 
-	rc = vreg_enable(vreg_tsc_s3);
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(tsc2007_regs), tsc2007_regs);
+
 	if (rc) {
-		pr_err("%s: vreg_enable failed \n", __func__);
-		goto fail_vreg_set_level;
+		pr_err("%s: could not set voltages: %d\n", __func__, rc);
+		goto reg_free;
 	}
 
-	vreg_tsc_s2 = vreg_get(NULL, "s2");
-	if (IS_ERR(vreg_tsc_s2)) {
-		printk(KERN_ERR "%s: vreg get failed (%ld)\n",
-		       __func__, PTR_ERR(vreg_tsc_s2));
-		goto fail_vreg_get;
-	}
+	rc = regulator_bulk_enable(ARRAY_SIZE(tsc2007_regs), tsc2007_regs);
 
-	rc = vreg_set_level(vreg_tsc_s2, 1300);
 	if (rc) {
-		pr_err("%s: vreg_set_level failed \n", __func__);
-		goto fail_vreg_s2_level;
-	}
-
-	rc = vreg_enable(vreg_tsc_s2);
-	if (rc) {
-		pr_err("%s: vreg_enable failed \n", __func__);
-		goto fail_vreg_s2_level;
+		pr_err("%s: could not enable regulators: %d\n", __func__, rc);
+		goto reg_free;
 	}
 
 	rc = msm_gpios_request_enable(tsc2007_config_data,
 			ARRAY_SIZE(tsc2007_config_data));
 	if (rc) {
 		pr_err("%s: Unable to request gpios\n", __func__);
-		goto fail_gpio_req;
+		goto reg_disable;
 	}
 
 	return 0;
 
-fail_gpio_req:
-	vreg_disable(vreg_tsc_s2);
-fail_vreg_s2_level:
-	vreg_put(vreg_tsc_s2);
-fail_vreg_get:
-	vreg_disable(vreg_tsc_s3);
-fail_vreg_set_level:
-	vreg_put(vreg_tsc_s3);
+reg_disable:
+	regulator_bulk_disable(ARRAY_SIZE(tsc2007_regs), tsc2007_regs);
+reg_free:
+	regulator_bulk_free(ARRAY_SIZE(tsc2007_regs), tsc2007_regs);
+out:
 	return rc;
 }
 
@@ -9289,10 +9414,9 @@ static int tsc2007_get_pendown_state(void)
 
 static void tsc2007_exit(void)
 {
-	vreg_disable(vreg_tsc_s3);
-	vreg_put(vreg_tsc_s3);
-	vreg_disable(vreg_tsc_s2);
-	vreg_put(vreg_tsc_s2);
+
+	regulator_bulk_disable(ARRAY_SIZE(tsc2007_regs), tsc2007_regs);
+	regulator_bulk_free(ARRAY_SIZE(tsc2007_regs), tsc2007_regs);
 
 	msm_gpios_disable_free(tsc2007_config_data,
 		ARRAY_SIZE(tsc2007_config_data));
@@ -9302,40 +9426,29 @@ static int tsc2007_power_shutdown(bool enable)
 {
 	int rc;
 
-	if (enable == false) {
-		rc = vreg_enable(vreg_tsc_s2);
-		if (rc) {
-			pr_err("%s: vreg_enable failed\n", __func__);
-			return rc;
-		}
-		rc = vreg_enable(vreg_tsc_s3);
-		if (rc) {
-			pr_err("%s: vreg_enable failed\n", __func__);
-			vreg_disable(vreg_tsc_s2);
-			return rc;
-		}
-		/* Voltage settling delay */
-		msleep(20);
-	} else {
-		rc = vreg_disable(vreg_tsc_s2);
-		if (rc) {
-			pr_err("%s: vreg_disable failed\n", __func__);
-			return rc;
-		}
-		rc = vreg_disable(vreg_tsc_s3);
-		if (rc) {
-			pr_err("%s: vreg_disable failed\n", __func__);
-			vreg_enable(vreg_tsc_s2);
-			return rc;
-		}
+	rc = (enable == false) ?
+		regulator_bulk_enable(ARRAY_SIZE(tsc2007_regs), tsc2007_regs) :
+		regulator_bulk_disable(ARRAY_SIZE(tsc2007_regs), tsc2007_regs);
+
+	if (rc) {
+		pr_err("%s: could not %sable regulators: %d\n",
+				__func__, enable ? "dis" : "en", rc);
+		return rc;
 	}
 
-	return rc;
+	if (enable == false)
+		msleep(20);
+
+	return 0;
 }
 
 static struct tsc2007_platform_data tsc2007_ts_data = {
 	.model = 2007,
 	.x_plate_ohms = 300,
+	.min_x		= 210,
+	.max_x		= 3832,
+	.min_y		= 150,
+	.max_y		= 3936,
 	.irq_flags    = IRQF_TRIGGER_LOW,
 	.init_platform_hw = tsc2007_init,
 	.exit_platform_hw = tsc2007_exit,
@@ -9357,67 +9470,65 @@ static struct i2c_board_info tsc_i2c_board_info[] = {
 };
 #endif
 
-static const char *vregs_isa1200_name[] = {
-	"gp7",
-	"gp10",
+static struct regulator_bulk_data regs_isa1200[] = {
+	{ .supply = "gp7",  .min_uV = 1800000, .max_uV = 1800000 },
+	{ .supply = "gp10", .min_uV = 2600000, .max_uV = 2600000 },
 };
-
-static const int vregs_isa1200_val[] = {
-	1800,
-	2600,
-};
-static struct vreg *vregs_isa1200[ARRAY_SIZE(vregs_isa1200_name)];
 
 static int isa1200_power(int vreg_on)
 {
-	int i, rc = 0;
+	int rc = 0;
 
-	for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++) {
-		if (!vregs_isa1200[i]) {
-			pr_err("%s: vreg_get %s failed (%d)\n",
-				__func__, vregs_isa1200_name[i], rc);
-			goto vreg_fail;
-		}
+	rc = vreg_on ?
+		regulator_bulk_enable(ARRAY_SIZE(regs_isa1200), regs_isa1200) :
+		regulator_bulk_disable(ARRAY_SIZE(regs_isa1200), regs_isa1200);
 
-		rc = vreg_on ? vreg_enable(vregs_isa1200[i]) :
-			  vreg_disable(vregs_isa1200[i]);
-		if (rc < 0) {
-			pr_err("%s: vreg %s %s failed (%d)\n",
-				__func__, vregs_isa1200_name[i],
-			       vreg_on ? "enable" : "disable", rc);
-			goto vreg_fail;
-		}
+	if (rc) {
+		pr_err("%s: could not %sable regulators: %d\n",
+				__func__, vreg_on ? "en" : "dis", rc);
+		goto out;
 	}
+
+	/* vote for DO buffer */
+	rc = pmapp_clock_vote("VIBR", PMAPP_CLOCK_ID_DO,
+		vreg_on ? PMAPP_CLOCK_VOTE_ON : PMAPP_CLOCK_VOTE_OFF);
+	if (rc)	{
+		pr_err("%s: unable to %svote for d0 clk\n",
+			__func__, vreg_on ? "" : "de-");
+		goto vreg_fail;
+	}
+
 	return 0;
 
 vreg_fail:
-	while (i)
-		vreg_disable(vregs_isa1200[--i]);
+	if (vreg_on)
+		regulator_bulk_disable(ARRAY_SIZE(regs_isa1200), regs_isa1200);
+	else
+		regulator_bulk_enable(ARRAY_SIZE(regs_isa1200), regs_isa1200);
+out:
 	return rc;
 }
 
 static int isa1200_dev_setup(bool enable)
 {
-	int i, rc;
+	int rc;
 
 	if (enable == true) {
-		for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++) {
-			vregs_isa1200[i] = vreg_get(NULL,
-						vregs_isa1200_name[i]);
-			if (IS_ERR(vregs_isa1200[i])) {
-				pr_err("%s: vreg get %s failed (%ld)\n",
-					__func__, vregs_isa1200_name[i],
-					PTR_ERR(vregs_isa1200[i]));
-				rc = PTR_ERR(vregs_isa1200[i]);
-				goto vreg_get_fail;
-			}
-			rc = vreg_set_level(vregs_isa1200[i],
-					vregs_isa1200_val[i]);
-			if (rc) {
-				pr_err("%s: vreg_set_level() = %d\n",
+		rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs_isa1200),
+				regs_isa1200);
+
+		if (rc) {
+			pr_err("%s: could not get regulators: %d\n",
 					__func__, rc);
-				goto vreg_get_fail;
-			}
+			goto out;
+		}
+
+		rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs_isa1200),
+				regs_isa1200);
+		if (rc) {
+			pr_err("%s: could not set voltages: %d\n",
+					__func__, rc);
+			goto reg_free;
 		}
 
 		rc = gpio_tlmm_config(GPIO_CFG(HAP_LVL_SHFT_MSM_GPIO, 0,
@@ -9426,28 +9537,27 @@ static int isa1200_dev_setup(bool enable)
 		if (rc) {
 			pr_err("%s: Could not configure gpio %d\n",
 					__func__, HAP_LVL_SHFT_MSM_GPIO);
-			goto vreg_get_fail;
+			goto reg_free;
 		}
 
 		rc = gpio_request(HAP_LVL_SHFT_MSM_GPIO, "haptics_shft_lvl_oe");
 		if (rc) {
 			pr_err("%s: unable to request gpio %d (%d)\n",
 					__func__, HAP_LVL_SHFT_MSM_GPIO, rc);
-			goto vreg_get_fail;
+			goto reg_free;
 		}
 
 		gpio_set_value(HAP_LVL_SHFT_MSM_GPIO, 1);
 	} else {
-		for (i = 0; i < ARRAY_SIZE(vregs_isa1200_name); i++)
-			vreg_put(vregs_isa1200[i]);
-
+		regulator_bulk_free(ARRAY_SIZE(regs_isa1200), regs_isa1200);
 		gpio_free(HAP_LVL_SHFT_MSM_GPIO);
 	}
 
 	return 0;
-vreg_get_fail:
-	while (i)
-		vreg_put(vregs_isa1200[--i]);
+
+reg_free:
+	regulator_bulk_free(ARRAY_SIZE(regs_isa1200), regs_isa1200);
+out:
 	return rc;
 }
 static struct isa1200_platform_data isa1200_1_pdata = {
@@ -9457,6 +9567,7 @@ static struct isa1200_platform_data isa1200_1_pdata = {
 	.pwm_ch_id = 1, /*channel id*/
 	/*gpio to enable haptic*/
 	.hap_en_gpio = PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_HAP_ENABLE),
+	.hap_len_gpio = -1,
 	.max_timeout = 15000,
 	.mode_ctrl = PWM_GEN_MODE,
 	.pwm_fd = {
@@ -9488,8 +9599,14 @@ static struct i2c_board_info tps61310_board_info[] = {
 
 static int kp_flip_mpp_config(void)
 {
-	return pm8058_mpp_config_digital_in(PM_FLIP_MPP,
-		PM8058_MPP_DIG_LEVEL_S3, PM_MPP_DIN_TO_INT);
+	struct pm8xxx_mpp_config_data kp_flip_mpp = {
+		.type = PM8XXX_MPP_TYPE_D_INPUT,
+		.level = PM8018_MPP_DIG_LEVEL_S3,
+		.control = PM8XXX_MPP_DIN_TO_INT,
+	};
+
+	return pm8xxx_mpp_config(PM8058_MPP_PM_TO_SYS(PM_FLIP_MPP),
+						&kp_flip_mpp);
 }
 
 static struct flip_switch_pdata flip_switch_data = {
@@ -9510,69 +9627,48 @@ static struct platform_device flip_switch_device = {
 	}
 };
 
-static const char *vregs_tma300_name[] = {
-	"gp6",
-	"gp7",
+static struct regulator_bulk_data regs_tma300[] = {
+	{ .supply = "gp6", .min_uV = 3050000, .max_uV = 3100000 },
+	{ .supply = "gp7", .min_uV = 1800000, .max_uV = 1800000 },
 };
-
-static const int vregs_tma300_val[] = {
-	3050,
-	1800,
-};
-static struct vreg *vregs_tma300[ARRAY_SIZE(vregs_tma300_name)];
 
 static int tma300_power(int vreg_on)
 {
-	int i, rc = -EINVAL;
+	int rc;
 
-	for (i = 0; i < ARRAY_SIZE(vregs_tma300_name); i++) {
-		/* Never disable gp6 for fluid as lcd has a problem with it */
-		if (!i && !vreg_on)
-			continue;
-		if (!vregs_tma300[i]) {
-			printk(KERN_ERR "%s: vreg_get %s failed (%d)\n",
-				__func__, vregs_tma300_name[i], rc);
-			return rc;
-		}
+	rc = vreg_on ?
+		regulator_bulk_enable(ARRAY_SIZE(regs_tma300), regs_tma300) :
+		regulator_bulk_disable(ARRAY_SIZE(regs_tma300), regs_tma300);
 
-		rc = vreg_on ? vreg_enable(vregs_tma300[i]) :
-			  vreg_disable(vregs_tma300[i]);
-		if (rc < 0) {
-			printk(KERN_ERR "%s: vreg %s %s failed (%d)\n",
-				__func__, vregs_tma300_name[i],
-			       vreg_on ? "enable" : "disable", rc);
-			return rc;
-		}
-	}
-
-	return 0;
+	if (rc)
+		pr_err("%s: could not %sable regulators: %d\n",
+				__func__, vreg_on ? "en" : "dis", rc);
+	return rc;
 }
 
 #define TS_GPIO_IRQ 150
 
 static int tma300_dev_setup(bool enable)
 {
-	int i, rc;
+	int rc;
 
 	if (enable) {
-		/* get voltage sources */
-		for (i = 0; i < ARRAY_SIZE(vregs_tma300_name); i++) {
-			vregs_tma300[i] = vreg_get(NULL, vregs_tma300_name[i]);
-			if (IS_ERR(vregs_tma300[i])) {
-				pr_err("%s: vreg get %s failed (%ld)\n",
-					__func__, vregs_tma300_name[i],
-					PTR_ERR(vregs_tma300[i]));
-				rc = PTR_ERR(vregs_tma300[i]);
-				goto vreg_get_fail;
-			}
-			rc = vreg_set_level(vregs_tma300[i],
-					vregs_tma300_val[i]);
-			if (rc) {
-				pr_err("%s: vreg_set_level() = %d\n",
+		rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs_tma300),
+				regs_tma300);
+
+		if (rc) {
+			pr_err("%s: could not get regulators: %d\n",
 					__func__, rc);
-				i++;
-				goto vreg_get_fail;
-			}
+			goto out;
+		}
+
+		rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs_tma300),
+				regs_tma300);
+
+		if (rc) {
+			pr_err("%s: could not set voltages: %d\n",
+					__func__, rc);
+			goto reg_free;
 		}
 
 		/* enable interrupt gpio */
@@ -9581,7 +9677,7 @@ static int tma300_dev_setup(bool enable)
 		if (rc) {
 			pr_err("%s: Could not configure gpio %d\n",
 					__func__, TS_GPIO_IRQ);
-			goto vreg_get_fail;
+			goto reg_free;
 		}
 
 		/* virtual keys */
@@ -9589,23 +9685,20 @@ static int tma300_dev_setup(bool enable)
 		properties_kobj = kobject_create_and_add("board_properties",
 					NULL);
 		if (!properties_kobj) {
-			pr_err("%s: failed to create a kobject"
-					"for board_properites\n", __func__);
+			pr_err("%s: failed to create a kobject "
+					"for board_properties\n", __func__);
 			rc = -ENOMEM;
-			goto vreg_get_fail;
+			goto reg_free;
 		}
 		rc = sysfs_create_group(properties_kobj,
 				&tma300_properties_attr_group);
 		if (rc) {
 			pr_err("%s: failed to create a sysfs entry %s\n",
 					__func__, tma300_vkeys_attr.attr.name);
-			kobject_put(properties_kobj);
-			goto vreg_get_fail;
+			goto kobj_free;
 		}
 	} else {
-		/* put voltage sources */
-		for (i = 0; i < ARRAY_SIZE(vregs_tma300_name); i++)
-			vreg_put(vregs_tma300[i]);
+		regulator_bulk_free(ARRAY_SIZE(regs_tma300), regs_tma300);
 		/* destroy virtual keys */
 		if (properties_kobj) {
 			sysfs_remove_group(properties_kobj,
@@ -9615,9 +9708,12 @@ static int tma300_dev_setup(bool enable)
 	}
 	return 0;
 
-vreg_get_fail:
-	while (i)
-		vreg_put(vregs_tma300[--i]);
+kobj_free:
+	kobject_put(properties_kobj);
+	properties_kobj = NULL;
+reg_free:
+	regulator_bulk_free(ARRAY_SIZE(regs_tma300), regs_tma300);
+out:
 	return rc;
 }
 
@@ -9649,253 +9745,6 @@ static struct i2c_board_info cy8ctma300_board_info[] = {
 		.platform_data = &cy8ctma300_pdata,
 	}
 };
-/* < DTS2010090300591 luojianhong 201000903 begin*/
-#ifdef CONFIG_HUAWEI_U8800PP1_WIFI_LOW_CONSUME
-/* < DTS2010090700733 luojianhong 201000908 begin*/
-/*delete other powers except "wlan2"*/
-void __init config_wifi_for_low_consume(void)
-{
-	
-	int rc;
-	struct vreg *vreg_wlan2 = NULL;
-	vreg_wlan2 = vreg_get(NULL, "wlan2");
-	if (IS_ERR(vreg_wlan2)) {
-		printk(KERN_ERR "%s: vreg_get failed wlan2\n",
-			__func__);
-		return;
-	}
-
-	// Power up 2.5v Analog
-	rc = vreg_set_level(vreg_wlan2, 2500);
-	rc = vreg_enable(vreg_wlan2);
-	
-	msleep(10);
-
-   //shut down this power after WIFI is initialised.   
-
-	rc = vreg_disable(vreg_wlan2);
-	if (rc) {
-		printk(KERN_ERR "%s: vreg_disable failed vreg_wlan2\n",
-			__func__);
-	}
-}
-/*  DTS2010090700733 luojianhong 201000908 end > */
-#endif
-/*  DTS2010090300591 luojianhong 201000903 end > */
-
-#ifdef CONFIG_USB_AUTO_INSTALL
-/* provide a method to map pid_index to usb_pid, 
- * pid_index is kept in NV(4526). 
- * At power up, pid_index is read in modem and transfer to app in share memory.
- * pid_index can be modified through write file fixusb(msm_hsusb_store_fixusb).
-*/
-u16 pid_index_to_pid(u32 pid_index)
-{
-    u16 usb_pid = 0xFFFF;
-    
-    switch(pid_index)
-    {
-        case CDROM_INDEX:
-        /*< DTS2011062501797 zhangyancun 20110728 begin */
-        /* merge DTS2011050604512 */
-        case SLATE_TEST_INDEX:
-        /* DTS2011062501797 zhangyancun 20110728 end >*/ 
-            usb_pid = curr_usb_pid_ptr->cdrom_pid;
-            break;
-        case NORM_INDEX:
-            usb_pid = curr_usb_pid_ptr->norm_pid;
-            break;
-        case AUTH_INDEX:
-            usb_pid = curr_usb_pid_ptr->auth_pid;
-            break;
-        case GOOGLE_INDEX:
-            usb_pid = curr_usb_pid_ptr->google_pid;
-            break;
-        
-        case GOOGLE_WLAN_INDEX:
-            usb_pid = curr_usb_pid_ptr->wlan_pid;
-        /* set the USB pid to multiport when the index is 0
-           This is happened when the NV is not set or set 
-           to zero 
-        */
-        case ORI_INDEX:
-        default:
-            usb_pid = curr_usb_pid_ptr->norm_pid;
-            break;
-    }
-
-    USB_PR("lxy: %s, pid_index=%d, usb_pid=0x%x\n", __func__, pid_index, usb_pid);
-    return usb_pid;
-}
-
-void set_usb_device_name(void)
-{
-  memset(manufacturer_name, 0, MAX_NAME_LEN);
-  memset(product_name, 0, MAX_NAME_LEN);
-  memset(vendor_name, 0, MAX_NAME_LEN);
-  
-  strcpy(manufacturer_name, "Huawei Incorporated");
-  /*< DTS2011082402558 zhangyancun 20110824 begin */
-  /* modify the product name of USB */
-  strcpy(product_name, "Android Adapter");
-  /* DTS2011082402558 zhangyancun 20110824 end >*/
-}
-
-/* add new pid config for google */
-void set_usb_pid_sn(u32 pid_index)
-{
-    switch(pid_index)
-    {
-        /* new requirement: usb tethering */
-        case GOOGLE_WLAN_INDEX:
-            USB_PR("lxy: set pid=0x%x, sn=NULL\n", GOOGLE_WLAN_INDEX);
-            android_set_product_id(PID_WLAN);
-            set_usb_sn(NULL);
-            break;
-        case GOOGLE_INDEX:
-            USB_PR("lxy: set pid=0x%x, sn=%s\n", PID_GOOGLE_MS, usb_para_data.usb_para.usb_serial);
-            android_set_product_id(PID_GOOGLE_MS);
-            set_usb_sn(usb_para_data.usb_para.usb_serial);
-            break;
-            
-        case NORM_INDEX:
-            USB_PR("lxy: set pid=0x%x, sn=%s\n", curr_usb_pid_ptr->norm_pid, USB_SN_STRING);
-            android_set_product_id(curr_usb_pid_ptr->norm_pid);
-            set_usb_sn(USB_SN_STRING);
-            break;
-        /*< DTS2011062501797 zhangyancun 20110728 begin */
-        /* merge DTS2011050604512 */
-        case SLATE_TEST_INDEX:
-        /* DTS2011062501797 zhangyancun 20110728 end >*/ 
-        case CDROM_INDEX:
-            USB_PR("lxy: set pid=0x%x, sn=%s\n", curr_usb_pid_ptr->cdrom_pid, "");
-            android_set_product_id(curr_usb_pid_ptr->cdrom_pid);
-            set_usb_sn(NULL);
-            break;
-            
-        case ORI_INDEX:
-            USB_PR("lxy: set pid=0x%x, sn=%s\n", curr_usb_pid_ptr->norm_pid, "");
-            android_set_product_id(curr_usb_pid_ptr->norm_pid);
-            set_usb_sn(NULL);
-            break;
-            
-        case AUTH_INDEX:
-            USB_PR("lxy: set pid=0x%x, sn=%s\n", curr_usb_pid_ptr->auth_pid, "");
-            android_set_product_id(curr_usb_pid_ptr->auth_pid);
-            set_usb_sn(NULL);
-            break;
-            
-        default:
-            USB_PR("lxy: set pid=0x%x, sn=%s\n", curr_usb_pid_ptr->norm_pid, "");
-            android_set_product_id(curr_usb_pid_ptr->norm_pid);
-            set_usb_sn(NULL);
-            break;
-    }
-
-}
-
-
-/*  
- * Get usb parameter from share memory and set usb serial number accordingly.
- */
-static void proc_usb_para(void)
-{
-    smem_huawei_vender *usb_para_ptr;
-    char *vender_name="t-mobile";
-
-    USB_PR("lxy: < %s\n", __func__);
-
-    /* initialize */
-    usb_para_info.usb_pid_index = 0;
-    usb_para_info.usb_pid = PID_NORMAL;
-
-    set_usb_device_name();
-    
-    /* now the smem_id_vendor0 smem id is a new struct */
-    usb_para_ptr = (smem_huawei_vender*)smem_alloc(SMEM_ID_VENDOR0, sizeof(smem_huawei_vender));
-    if (!usb_para_ptr)
-    {
-      USB_PR("lxy: %s: Can't find usb parameter\n", __func__);
-        return;
-    }
-
-    USB_PR("lxy: vendor:%s,country:%s\n", usb_para_ptr->vender_para.vender_name, usb_para_ptr->vender_para.
-country_name);
-
-    memcpy(&usb_para_data, usb_para_ptr, sizeof(smem_huawei_vender));
-    
-    /* decide usb pid array according to the vender name */
-    if(!memcmp(usb_para_ptr->vender_para.vender_name, vender_name, strlen(vender_name)))
-    {
-        curr_usb_pid_ptr = &usb_pid_array[1];
-        USB_PR("lxy: USB setting is TMO\n");
-    }
-    else
-    {
-        curr_usb_pid_ptr = &usb_pid_array[0];
-        USB_PR("lxy: USB setting is NORMAL\n");
-    }
-
-    USB_PR("lxy: smem usb_serial=%s, usb_pid_index=%d\n", usb_para_ptr->usb_para.usb_serial, usb_para_ptr->usb_para.
-usb_pid_index);
-
-    /* when manufacture, we need to use the diag. so if the usb_serial is null
-       and the nv value is google index, we set the ports to normal.
-    */
-    if (0 == usb_para_data.usb_para.usb_serial[0] 
-      && GOOGLE_INDEX == usb_para_ptr->usb_para.usb_pid_index)
-    {
-      USB_PR("%s usb serial number is null in google mode. so switch to original mode\n", __func__);
-      usb_para_ptr->usb_para.usb_pid_index = ORI_INDEX;
-    }
-
-    usb_para_info.usb_pid_index = usb_para_ptr->usb_para.usb_pid_index;
-    
-    usb_para_info.usb_pid = pid_index_to_pid(usb_para_ptr->usb_para.usb_pid_index);
-
-    /* add new pid config for google */
-    set_usb_pid_sn(usb_para_info.usb_pid_index);
-    
-    /* < DTS2011092003743 liwei 20111006 begin */
-    /* the vendor emobile in japan doesn't need cdrom driver */
-    if ((0 == memcmp(usb_para_data.vender_para.vender_name, VENDOR_EMOBILE, strlen(VENDOR_EMOBILE)))
-        && (0 == memcmp(usb_para_data.vender_para.country_name, COUNTRY_JAPAN, strlen(COUNTRY_JAPAN))))
-    {
-        u16 index = 0;
-		
-        /* find the google mode from the products array */ 
-        for (; index < android_usb_pdata.num_products; index++)
-        {
-            if (PID_GOOGLE == android_usb_pdata.products[index].adb_product_id)
-            {
-                /* set the nluns to 2 from 3, del the cdrom */
-                android_usb_pdata.products[index].nluns = 2;         /* 2 means two udisk */
-                android_usb_pdata.products[index].cdrom_index = -1;  /* -1 means not support cdrom */
-
-                USB_PR("%s %s%s doesn't need the cdrom. nluns=%d, cdrom_index=%d\n",
-                       __func__, 
-					   usb_para_data.vender_para.country_name, 
-					   usb_para_data.vender_para.vender_name,
-                       android_usb_pdata.products[index].nluns, 
-					   android_usb_pdata.products[index].cdrom_index);
-            }  
-        }  
-    }
-    /* DTS2011092003743 liwei 20111006 end > */
-	
-    USB_PR("lxy: curr_usb_pid_ptr: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n", 
-        curr_usb_pid_ptr->cdrom_pid, 
-        curr_usb_pid_ptr->norm_pid, 
-        curr_usb_pid_ptr->udisk_pid,
-        curr_usb_pid_ptr->auth_pid,
-        curr_usb_pid_ptr->google_pid);
-    USB_PR("lxy: usb_para_info: usb_pid_index=%d, usb_pid = 0x%x>\n", 
-        usb_para_info.usb_pid_index, 
-        usb_para_info.usb_pid);
-}
-#endif  /* CONFIG_USB_AUTO_INSTALL */
-/* BU5D00386 lixiangyu 20100105 end > */
-
 
 static void __init msm7x30_init(void)
 {
@@ -9908,31 +9757,23 @@ static void __init msm7x30_init(void)
 						GPIO_CFG_2MA);
 	uint32_t soc_version = 0;
 
-	if (socinfo_init() < 0)
-		printk(KERN_ERR "%s: socinfo_init() failed!\n",
-		       __func__);
-
 	soc_version = socinfo_get_version();
 
-	msm_clock_init(msm_clocks_7x30, msm_num_clocks_7x30);
+	msm_clock_init(&msm7x30_clock_init_data);
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 	msm7x30_init_uart2();
 #endif
 	msm_spm_init(&msm_spm_data, 1);
-	msm_acpu_clock_init(&msm7x30_clock_data);
+	acpuclk_init(&acpuclk_7x30_soc_data);
 	/* <DTS2010072202961 hufeng 20100722 begin */
 	/* removed several lines */
 	/* DTS2010072202961 hufeng 20100722 end> */
-#ifdef CONFIG_USB_FUNCTION
-	msm_hsusb_pdata.swfi_latency =
-		msm_pm_data
-		[MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT].latency;
-	msm_device_hsusb_peripheral.dev.platform_data = &msm_hsusb_pdata;
-#endif
 
-#ifdef CONFIG_USB_AUTO_INSTALL
-    proc_usb_para();
-#endif  /* #ifdef CONFIG_USB_AUTO_INSTALL */
+    /*< DTS2012011801998 chenxi 20120203 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+    import_kernel_cmdline();
+#endif
+    /* DTS2012011801998 chenxi 20120203 end >*/
 
 #ifdef CONFIG_USB_MSM_OTG_72K
 	if (SOCINFO_VERSION_MAJOR(soc_version) >= 2 &&
@@ -9951,7 +9792,9 @@ static void __init msm7x30_init(void)
 #endif
 /* < DTS2011041200623 xuhui 20110412 begin */
 /*disable QC's In Band Sleep mode with BCM4329 bluetooth chip*/
-#ifndef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
+/* DTS2012020604357 zhangyun 20120206 end > */
 	msm_uart_dm1_pdata.wakeup_irq = gpio_to_irq(136);
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
 #endif
@@ -9966,18 +9809,18 @@ static void __init msm7x30_init(void)
 		msm_adc_pdata.dev_names = msm_adc_surf_device_names;
 		msm_adc_pdata.num_adc = ARRAY_SIZE(msm_adc_surf_device_names);
 	}
-#ifdef CONFIG_USB_ANDROID
-#ifndef CONFIG_HUAWEI_KERNEL
-	if (machine_is_msm8x55_svlte_surf() ||
-		machine_is_msm8x55_svlte_ffa()) {
-		android_usb_pdata.product_id = 0x9028;
-		android_usb_pdata.num_products =
-			ARRAY_SIZE(fusion_usb_products);
-		android_usb_pdata.products = fusion_usb_products;
-	}
-#endif
+
+	pmic8058_leds_init();
+
+	buses_init();
+
+#ifdef CONFIG_MSM_SSBI
+	msm_device_ssbi_pmic1.dev.platform_data =
+				&msm7x30_ssbi_pm8058_pdata;
 #endif
 
+	platform_add_devices(msm_footswitch_devices,
+			     msm_num_footswitch_devices);
 	platform_add_devices(devices, ARRAY_SIZE(devices));
     /* <BU5D08126 duangan 2010-4-24 begin */
 	#ifdef CONFIG_HUAWEI_FEATURE_OEMINFO
@@ -9990,26 +9833,40 @@ static void __init msm7x30_init(void)
     hw_extern_sdcard_add_device();
 #endif
 /* DTS2010092002892 duangan 20100926 end> */
-#ifdef CONFIG_USB_EHCI_MSM
+#ifdef CONFIG_USB_EHCI_MSM_72K
 	msm_add_host(0, &msm_usb_host_pdata);
 #endif
 	msm7x30_init_mmc();
 	/* <DTS2010072202961 hufeng 20100722 begin */
 	/* removed several lines */
+	(void)lcdc_sharp_panel_device;
+	(void)msm_camera_sensor_mt9e013;
 	/* DTS2010072202961 hufeng 20100722 end> */
 	msm_qsd_spi_init();
 
+#ifdef CONFIG_SPI_QSD
+	if (machine_is_msm7x30_fluid())
+		spi_register_board_info(lcdc_sharp_spi_board_info,
+			ARRAY_SIZE(lcdc_sharp_spi_board_info));
+	else
+		spi_register_board_info(lcdc_toshiba_spi_board_info,
+			ARRAY_SIZE(lcdc_toshiba_spi_board_info));
+#endif
 
+	atv_dac_power_init();
+	sensors_ldo_init();
+	hdmi_init_regs();
 	msm_fb_add_devices();
 	msm_pm_set_platform_data(msm_pm_data, ARRAY_SIZE(msm_pm_data));
+	BUG_ON(msm_pm_boot_init(&msm_pm_boot_pdata));
 	msm_device_i2c_init();
 	msm_device_i2c_2_init();
 	qup_device_i2c_init();
-	buses_init();
 	msm7x30_init_marimba();
 /* BU5D08419 haoqingtao 20100424 end>*/    
 #ifdef CONFIG_MSM7KV2_AUDIO
 	snddev_poweramp_gpio_init();
+	snddev_hsed_voltage_init();
 	aux_pcm_gpio_init();
     /*<DTS2011060201308 yanghaimin 20110602, begin*/
     /* u8860 add hac gpio ctl */
@@ -10025,12 +9882,17 @@ static void __init msm7x30_init(void)
 	i2c_register_board_info(0, msm_i2c_board_info,
 			ARRAY_SIZE(msm_i2c_board_info));
 
-	if (!machine_is_msm8x55_svlte_ffa())
+	if (!machine_is_msm8x55_svlte_ffa() && !machine_is_msm7x30_fluid())
 		marimba_pdata.tsadc = &marimba_tsadc_pdata;
 
 	if (machine_is_msm7x30_fluid())
 		i2c_register_board_info(0, cy8info,
 					ARRAY_SIZE(cy8info));
+#ifdef CONFIG_BOSCH_BMA150
+	if (machine_is_msm7x30_fluid())
+		i2c_register_board_info(0, bma150_board_info,
+					ARRAY_SIZE(bma150_board_info));
+#endif
 
 	i2c_register_board_info(2, msm_marimba_board_info,
 			ARRAY_SIZE(msm_marimba_board_info));
@@ -10047,14 +9909,15 @@ static void __init msm7x30_init(void)
 #endif
 /*  DTS2010092501047 luojianhong 201000926 end > */
 /*< DTS2011012004291 xuhui 20110120 begin */
-#ifdef CONFIG_HUAWEI_KERNEL
+/* < DTS2012020604357 zhangyun 20120206 begin */
+#if (defined(HUAWEI_BT_BTLA_VER30) && defined(CONFIG_HUAWEI_KERNEL))
+/* DTS2012020604357 zhangyun 20120206 end > */
         bt_bcm4329_power_init();
 #else
 	bt_power_init();
 #endif 
 /* DTS2011012004291 xuhui 20110120 end >*/
 #ifdef CONFIG_I2C_SSBI
-	msm_device_ssbi6.dev.platform_data = &msm_i2c_ssbi6_pdata;
 	msm_device_ssbi7.dev.platform_data = &msm_i2c_ssbi7_pdata;
 #endif
 	/*< DTS2010112702297 wangquanli 201001125 begin */
@@ -10081,7 +9944,12 @@ static void __init msm7x30_init(void)
 
 	if (machine_is_msm7x30_surf())
 		platform_device_register(&flip_switch_device);
-	pmic8058_leds_init();
+
+	pm8058_gpios_init();
+
+	/*< DTS2012020400396 zhangyu 20120206 begin */
+	msm_camera_vreg_init();
+	/* DTS2012020400396 zhangyu 20120206 end > */
 
 	if (machine_is_msm7x30_fluid()) {
 		/* Initialize platform data for fluid v2 hardware */
@@ -10093,11 +9961,6 @@ static void __init msm7x30_init(void)
 		i2c_register_board_info(0, cy8ctma300_board_info,
 			ARRAY_SIZE(cy8ctma300_board_info));
 	}
-	/* < DTS2010090300591 luojianhong 201000903 begin*/
-	#ifdef CONFIG_HUAWEI_U8800PP1_WIFI_LOW_CONSUME
-	config_wifi_for_low_consume();
-	#endif
-	/*  DTS2010090300591 luojianhong 201000903 end > */
 
 	if (machine_is_msm8x55_svlte_surf() || machine_is_msm8x55_svlte_ffa()) {
 		rc = gpio_tlmm_config(usb_hub_gpio_cfg_value, GPIO_CFG_ENABLE);
@@ -10114,11 +9977,23 @@ static void __init msm7x30_init(void)
        virtualkeys_init();
 #endif
 	/*DTS2011042602009 fengwei 20110426 end>*/
+/*< DTS2012021602342 zhongjinrong 20120224 begin */
 /*< DTS2011093001643 lijianzhao 20110930 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 	add_slide_detect_device();
 #endif
 /* DTS2011093001643 lijianzhao 20110930 end >*/
+/* DTS2012021602342 zhongjinrong 20120224 end >*/
+
+/* < DTS2012022402932 gaolin 20120224 begin */
+#ifdef CONFIG_HUAWEI_KERNEL
+       if (machine_is_msm8255_u8730()
+	    || machine_is_msm8255_u8667())
+       {
+            snddev_silicon_mic_pmic_voltage_init();
+       }
+#endif
+/* DTS2012022402932 gaolin 20120224 end > */
 }
 
 static unsigned pmem_sf_size = MSM_PMEM_SF_SIZE;
@@ -10161,85 +10036,105 @@ static int __init pmem_audio_size_setup(char *p)
 }
 early_param("pmem_audio_size", pmem_audio_size_setup);
 
-static unsigned pmem_kernel_ebi1_size = PMEM_KERNEL_EBI1_SIZE;
-static int __init pmem_kernel_ebi1_size_setup(char *p)
+static unsigned pmem_kernel_ebi0_size = PMEM_KERNEL_EBI0_SIZE;
+static int __init pmem_kernel_ebi0_size_setup(char *p)
 {
-	pmem_kernel_ebi1_size = memparse(p, NULL);
+	pmem_kernel_ebi0_size = memparse(p, NULL);
 	return 0;
 }
-early_param("pmem_kernel_ebi1_size", pmem_kernel_ebi1_size_setup);
+early_param("pmem_kernel_ebi0_size", pmem_kernel_ebi0_size_setup);
 
-static void __init msm7x30_allocate_memory_regions(void)
+static struct memtype_reserve msm7x30_reserve_table[] __initdata = {
+	[MEMTYPE_SMI] = {
+	},
+	[MEMTYPE_EBI0] = {
+		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+	},
+	[MEMTYPE_EBI1] = {
+		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
+	},
+};
+
+static void __init size_pmem_devices(void)
 {
-	void *addr;
+#ifdef CONFIG_ANDROID_PMEM
 	unsigned long size;
-/*
-   Request allocation of Hardware accessible PMEM regions
-   at the beginning to make sure they are allocated in EBI-0.
-   This will allow 7x30 with two mem banks enter the second
-   mem bank into Self-Refresh State during Idle Power Collapse.
-
-    The current HW accessible PMEM regions are
-    1. Frame Buffer.
-       LCDC HW can access msm_fb_resources during Idle-PC.
-
-    2. Audio
-       LPA HW can access android_pmem_audio_pdata during Idle-PC.
-*/
-	size = fb_size ? : MSM_FB_SIZE;
-	addr = alloc_bootmem(size);
-	msm_fb_resources[0].start = __pa(addr);
-	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
-	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
-		size, addr, __pa(addr));
-
-	size = pmem_audio_size;
-	if (size) {
-		addr = alloc_bootmem(size);
-		android_pmem_audio_pdata.start = __pa(addr);
-		android_pmem_audio_pdata.size = size;
-		pr_info("allocating %lu bytes at %p (%lx physical) for audio "
-			"pmem arena\n", size, addr, __pa(addr));
-	}
-
-	size = pmem_kernel_ebi1_size;
-	if (size) {
-		addr = alloc_bootmem_aligned(size, 0x100000);
-		android_pmem_kernel_ebi1_pdata.start = __pa(addr);
-		android_pmem_kernel_ebi1_pdata.size = size;
-		pr_info("allocating %lu bytes at %p (%lx physical) for kernel"
-			" ebi1 pmem arena\n", size, addr, __pa(addr));
-	}
-
-	size = pmem_sf_size;
-	if (size) {
-		addr = alloc_bootmem(size);
-		android_pmem_pdata.start = __pa(addr);
-		android_pmem_pdata.size = size;
-		pr_info("allocating %lu bytes at %p (%lx physical) for sf "
-			"pmem arena\n", size, addr, __pa(addr));
-	}
 
 	if machine_is_msm7x30_fluid()
 		size = fluid_pmem_adsp_size;
 	else
 		size = pmem_adsp_size;
-	if (size) {
-		addr = alloc_bootmem(size);
-		android_pmem_adsp_pdata.start = __pa(addr);
-		android_pmem_adsp_pdata.size = size;
-		pr_info("allocating %lu bytes at %p (%lx physical) for adsp "
-			"pmem arena\n", size, addr, __pa(addr));
-	}
+	android_pmem_adsp_pdata.size = size;
+	android_pmem_audio_pdata.size = pmem_audio_size;
+	android_pmem_pdata.size = pmem_sf_size;
+#endif
+}
+
+static void __init reserve_memory_for(struct android_pmem_platform_data *p)
+{
+	msm7x30_reserve_table[p->memory_type].size += p->size;
+}
+
+static void __init reserve_pmem_memory(void)
+{
+#ifdef CONFIG_ANDROID_PMEM
+	reserve_memory_for(&android_pmem_adsp_pdata);
+	reserve_memory_for(&android_pmem_audio_pdata);
+	reserve_memory_for(&android_pmem_pdata);
+	msm7x30_reserve_table[MEMTYPE_EBI0].size += pmem_kernel_ebi0_size;
+#endif
+}
+
+static void __init msm7x30_calculate_reserve_sizes(void)
+{
+	size_pmem_devices();
+	reserve_pmem_memory();
+}
+
+static int msm7x30_paddr_to_memtype(unsigned int paddr)
+{
+	if (paddr < 0x40000000)
+		return MEMTYPE_EBI0;
+	if (paddr >= 0x40000000 && paddr < 0x80000000)
+		return MEMTYPE_EBI1;
+	return MEMTYPE_NONE;
+}
+
+static struct reserve_info msm7x30_reserve_info __initdata = {
+	.memtype_reserve_table = msm7x30_reserve_table,
+	.calculate_reserve_sizes = msm7x30_calculate_reserve_sizes,
+	.paddr_to_memtype = msm7x30_paddr_to_memtype,
+};
+
+static void __init msm7x30_reserve(void)
+{
+	reserve_info = &msm7x30_reserve_info;
+	msm_reserve();
+}
+
+static void __init msm7x30_allocate_memory_regions(void)
+{
+	void *addr;
+	unsigned long size;
+
+	size = fb_size ? : MSM_FB_SIZE;
+	addr = alloc_bootmem_align(size, 0x1000);
+	msm_fb_resources[0].start = __pa(addr);
+	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
+	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
+		size, addr, __pa(addr));
 }
 
 static void __init msm7x30_map_io(void)
 {
 	msm_shared_ram_phys = 0x00100000;
 	msm_map_msm7x30_io();
-	msm7x30_allocate_memory_regions();
+	if (socinfo_init() < 0)
+		printk(KERN_ERR "%s: socinfo_init() failed!\n",
+		       __func__);
 }
-
+/*< DTS2012011904543 lijianzhao 20120119 begin */
+#if 0
 /*< BU5D08419 haoqingtao 20100424 begin*/    
 #define ATAG_CAMERA_ID 0x4d534D74
 /* setup calls mach->fixup, then parse_tags, parse_cmdline
@@ -10372,149 +10267,142 @@ hw_ver_sub_type get_hw_sub_board_id(void)
 {
     return (hw_ver_sub_type)(sub_board_id&HW_VER_SUB_MASK);
 }
-
-/* <DTS2010071502918 shenjinming 20101008 begin */
-#ifdef CONFIG_HUAWEI_POWER_DOWN_CHARGE
-unsigned int get_charge_flag(void)
-{
-    return charge_flag;
-}
 #endif
-/* DTS2010071502918 shenjinming 20101008 end> */ 
+/* DTS2012011904543 lijianzhao 20120119 end >*/
+static void __init msm7x30_fixup(struct machine_desc *desc,
+                                 struct tag *tags,
+                                 char **cmdline,
+                                 struct meminfo *mi)
+{
+	return ;    
+}
+static void __init msm7x30_init_early(void)
+{
+	msm7x30_allocate_memory_regions();
+}
 
 MACHINE_START(MSM7X30_SURF, "QCT MSM7X30 SURF")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-	.boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PLAT_PHYS_OFFSET + 0x100,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 
 MACHINE_START(MSM7X30_FFA, "QCT MSM7X30 FFA")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-	.boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PLAT_PHYS_OFFSET + 0x100,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 
 MACHINE_START(MSM7X30_FLUID, "QCT MSM7X30 FLUID")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-	.boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PLAT_PHYS_OFFSET + 0x100,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 
 MACHINE_START(MSM8X55_SURF, "QCT MSM8X55 SURF")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
 	.boot_params = PHYS_OFFSET + 0x100,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 
 MACHINE_START(MSM8X55_FFA, "QCT MSM8X55 FFA")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
 	.boot_params = PHYS_OFFSET + 0x100,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8X55_SVLTE_SURF, "QCT MSM8X55 SVLTE SURF")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
 	.boot_params = PHYS_OFFSET + 0x100,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8X55_SVLTE_FFA, "QCT MSM8X55 SVLTE FFA")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
 	.boot_params = PHYS_OFFSET + 0x100,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 
 MACHINE_START(MSM7X30_U8800, "HUAWEI U8800 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
 	.boot_params = PHYS_OFFSET + 0x100,
 	.fixup = msm7x30_fixup,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /*< DTS2010092400487  lijianzhao 20100924 begin */
 MACHINE_START(MSM7X30_U8820, "HUAWEI U8820 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
 	.boot_params = PHYS_OFFSET + 0x100,
 	.fixup = msm7x30_fixup,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /*< DTS2010112702297 wangquanli 201001125 begin */
 MACHINE_START(MSM7X30_U8800_51, "HUAWEI U8800-51 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
 	.boot_params = PHYS_OFFSET + 0x100,
 	.fixup = msm7x30_fixup,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2010112702297 wangquanli 201001125 end >*/
 /*< DTS2011030202729  liliang 20110302  begin */
 MACHINE_START(MSM8255_U8800_PRO, "HUAWEI U8800-PRO BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io  = MSM_DEBUG_UART_PHYS,
-	.io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
 	.boot_params = PHYS_OFFSET + 0x100,
 	.fixup = msm7x30_fixup,
 	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
 	.init_irq = msm7x30_init_irq,
 	.init_machine = msm7x30_init,
 	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2011030202729  liliang 20110302 end >*/
 /* DTS2010092400487  lijianzhao 20100924 end >*/ 
@@ -10522,75 +10410,84 @@ MACHINE_END
 
 /* <DTS2011041501614 duangan 2011-4-18 begin */
 MACHINE_START(MSM8255_U8860, "HUAWEI U8860 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-    .phys_io  = MSM_DEBUG_UART_PHYS,
-    .io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-    .boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PHYS_OFFSET + 0x100,
     .fixup = msm7x30_fixup,
-    .map_io = msm7x30_map_io,
-    .init_irq = msm7x30_init_irq,
-    .init_machine = msm7x30_init,
-    .timer = &msm_timer,
+	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
+	.init_irq = msm7x30_init_irq,
+	.init_machine = msm7x30_init,
+	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2011041501614 duangan 2011-4-18 end> */
 
 /* <DTS2011050700551 zhangbo 20110505 begin */
 MACHINE_START(MSM8255_C8860, "HUAWEI C8860 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-    .phys_io  = MSM_DEBUG_UART_PHYS,
-    .io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-    .boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PHYS_OFFSET + 0x100,
     .fixup = msm7x30_fixup,
-    .map_io = msm7x30_map_io,
-    .init_irq = msm7x30_init_irq,
-    .init_machine = msm7x30_init,
-    .timer = &msm_timer,
+	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
+	.init_irq = msm7x30_init_irq,
+	.init_machine = msm7x30_init,
+	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2011050700551 zhangbo 20110505 end> */
 /* <DTS2011062600102 sunhonghui 20110626 begin */
 MACHINE_START(MSM8255_U8860LP, "HUAWEI U8860LP BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-    .phys_io  = MSM_DEBUG_UART_PHYS,
-    .io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-    .boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PHYS_OFFSET + 0x100,
     .fixup = msm7x30_fixup,
-    .map_io = msm7x30_map_io,
-    .init_irq = msm7x30_init_irq,
-    .init_machine = msm7x30_init,
-    .timer = &msm_timer,
+	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
+	.init_irq = msm7x30_init_irq,
+	.init_machine = msm7x30_init,
+	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2011062600102 sunhonghui 20110626 end> */
+/* < DTS2012022905490 ganfan 20120301 begin */
+MACHINE_START(MSM8255_U8860_R, "HUAWEI U8860-R BOARD")
+	.boot_params = PHYS_OFFSET + 0x100,
+    .fixup = msm7x30_fixup,
+	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
+	.init_irq = msm7x30_init_irq,
+	.init_machine = msm7x30_init,
+	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
+MACHINE_END
+/* DTS2012022905490 ganfan 20120301 end > */
 /* <DTS2011071600361 liyuping 20110716 begin */
 MACHINE_START(MSM8255_U8860_92, "HUAWEI U8860_92 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-    .phys_io  = MSM_DEBUG_UART_PHYS,
-    .io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-    .boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PHYS_OFFSET + 0x100,
     .fixup = msm7x30_fixup,
-    .map_io = msm7x30_map_io,
-    .init_irq = msm7x30_init_irq,
-    .init_machine = msm7x30_init,
-    .timer = &msm_timer,
+	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
+	.init_irq = msm7x30_init_irq,
+	.init_machine = msm7x30_init,
+	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2011071600361 liyuping 20110716 end> */
 /* < DTS2011082302564 liwei 20110823 begin */
 MACHINE_START(MSM8255_U8680, "HUAWEI U8680 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-    .phys_io  = MSM_DEBUG_UART_PHYS,
-    .io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-    .boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PHYS_OFFSET + 0x100,
     .fixup = msm7x30_fixup,
-    .map_io = msm7x30_map_io,
-    .init_irq = msm7x30_init_irq,
-    .init_machine = msm7x30_init,
-    .timer = &msm_timer,
+	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
+	.init_irq = msm7x30_init_irq,
+	.init_machine = msm7x30_init,
+	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2011082302564 liwei 20110823 end > */
+
 /* < DTS2011102401822 liwei 20111024 begin */
 MACHINE_START(MSM8255_U8667, "HUAWEI U8667 BOARD")
 #ifdef CONFIG_MSM_DEBUG_UART
@@ -10605,32 +10502,31 @@ MACHINE_START(MSM8255_U8667, "HUAWEI U8667 BOARD")
     .timer = &msm_timer,
 MACHINE_END
 /* DTS2011102401822 liwei 20111024 end > */
+
 /* <DTS2011091200073 zhangbo 20110912 begin */
 MACHINE_START(MSM8255_U8730, "HUAWEI U8730 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-    .phys_io  = MSM_DEBUG_UART_PHYS,
-    .io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-    .boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PHYS_OFFSET + 0x100,
     .fixup = msm7x30_fixup,
-    .map_io = msm7x30_map_io,
-    .init_irq = msm7x30_init_irq,
-    .init_machine = msm7x30_init,
-    .timer = &msm_timer,
+	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
+	.init_irq = msm7x30_init_irq,
+	.init_machine = msm7x30_init,
+	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2011091200073 zhangbo 20110912 end> */
 /*<DTS2011091502092 liyuping 20110915 begin */
 MACHINE_START(MSM8255_U8860_51, "HUAWEI U8860_51 BOARD")
-#ifdef CONFIG_MSM_DEBUG_UART
-    .phys_io  = MSM_DEBUG_UART_PHYS,
-    .io_pg_offst = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
-#endif
-    .boot_params = PHYS_OFFSET + 0x100,
+	.boot_params = PHYS_OFFSET + 0x100,
     .fixup = msm7x30_fixup,
-    .map_io = msm7x30_map_io,
-    .init_irq = msm7x30_init_irq,
-    .init_machine = msm7x30_init,
-    .timer = &msm_timer,
+	.map_io = msm7x30_map_io,
+	.reserve = msm7x30_reserve,
+	.init_irq = msm7x30_init_irq,
+	.init_machine = msm7x30_init,
+	.timer = &msm_timer,
+	.init_early = msm7x30_init_early,
+	.handle_irq = vic_handle_irq,
 MACHINE_END
 /* DTS2011091502092 liyuping 20110915 end> */ 
 

@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- *
  */
 
 #include <linux/module.h>
@@ -34,7 +29,6 @@
 #include <linux/uaccess.h>
 #include <linux/clk.h>
 #include <linux/platform_device.h>
-#include <mach/msm_reqs.h>
 
 #define TVENC_C
 #include "tvenc.h"
@@ -45,13 +39,9 @@
 #endif
 /* DTS2010082601848 lijianzhao 20100826 end >*/
 #include "mdp4.h"
-#ifdef CONFIG_MSM_NPA_SYSTEM_BUS
-/* NPA Flow ID */
-#define MSM_SYSTEM_BUS_RATE	MSM_AXI_FLOW_MDP_DTV_720P_2BPP
-#else
 /* AXI rate in KHz */
 #define MSM_SYSTEM_BUS_RATE	128000000
-#endif
+
 /*< DTS2010122805110 lijianzhao 20101229 begin */
 extern boolean tv_cable_connected;
 /* DTS2010122805110 lijianzhao 20101229 end >*/
@@ -260,7 +250,6 @@ static int tvenc_on(struct platform_device *pdev)
 	if (mfd->ebi1_clk)
 		clk_enable(mfd->ebi1_clk);
 #endif
-	mdp_set_core_clk(1);
 	mdp4_extn_disp = 1;
 	if (tvenc_pdata && tvenc_pdata->pm_vid_en)
 		ret = tvenc_pdata->pm_vid_en(1);

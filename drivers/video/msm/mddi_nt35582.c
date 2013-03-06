@@ -73,7 +73,7 @@
 #include "hw_backlight.h"
 /*< DTS2010122802758 lijianzhao 20101229 begin */
 #include "lcd_hw_debug.h"
-#include "hw_mddi_lcd.h"
+#include "hw_lcd_common.h"
 
 struct sequence* nt35582_wvga_init_table = NULL;
 static lcd_panel_type lcd_panel_wvga = LCD_NONE;
@@ -110,12 +110,12 @@ static int nt35582_lcd_on(struct platform_device *pdev)
 	/* If exist the init file ,then init lcd with it for debug */
     if( (TRUE == para_debug_flag)&&(NULL != nt35582_wvga_init_table))
     {
-		ret = process_lcd_table(nt35582_wvga_init_table, para_num, lcd_panel_wvga);
+		ret = process_mddi_table(nt35582_wvga_init_table, para_num, lcd_panel_wvga);
     }
     else
     {
 		/* Exit Standby Mode */
-		ret = process_lcd_table((struct sequence*)&nt35582_wvga_standby_exit_table, 
+		ret = process_mddi_table((struct sequence*)&nt35582_wvga_standby_exit_table, 
 			ARRAY_SIZE(nt35582_wvga_standby_exit_table), lcd_panel_wvga);
     }
        
@@ -125,7 +125,7 @@ static int nt35582_lcd_on(struct platform_device *pdev)
 		lcd_debug_free_para((void *)nt35582_wvga_init_table);
 	}
 	
-    MDDI_LCD_DEBUG("%s: nt35582_lcd exit sleep mode ,on_ret=%d\n",__func__,ret);
+    LCD_DEBUG("%s: nt35582_lcd exit sleep mode ,on_ret=%d\n",__func__,ret);
 	
 	return ret;
 }
@@ -133,9 +133,9 @@ static int nt35582_lcd_on(struct platform_device *pdev)
 static int nt35582_lcd_off(struct platform_device *pdev)
 {
 	int ret = 0;
-	ret = process_lcd_table((struct sequence*)&nt35582_wvga_standby_enter_table, 
+	ret = process_mddi_table((struct sequence*)&nt35582_wvga_standby_enter_table, 
     	      		ARRAY_SIZE(nt35582_wvga_standby_enter_table), lcd_panel_wvga);
-    MDDI_LCD_DEBUG("%s: nt35582_lcd enter sleep mode ,off_ret=%d\n",__func__,ret);
+    LCD_DEBUG("%s: nt35582_lcd enter sleep mode ,off_ret=%d\n",__func__,ret);
 	return ret;
 }
 /* DTS2010122802758 lijianzhao 20101229 end >*/
@@ -179,7 +179,7 @@ static int __init nt35582_init(void)
 	struct msm_panel_info *pinfo;
 	/*<BU5D09397 lijuan 00152865, 20100506 begin*/
 /*< DTS2010122802758 lijianzhao 20101229 begin */
-	lcd_panel_wvga=lcd_panel_probe();
+	lcd_panel_wvga=get_lcd_panel_type();
 	if((LCD_NT35582_TRULY_WVGA!=lcd_panel_wvga)&&
 		(LCD_NT35582_BYD_WVGA!=lcd_panel_wvga))
 	{
@@ -187,7 +187,7 @@ static int __init nt35582_init(void)
 	}
 /* DTS2010122802758 lijianzhao 20101229 end >*/
 	/*BU5D09397 lijuan 00152865, 20100506 end>*/
-	MDDI_LCD_DEBUG("------nt35582_init------\n");
+	LCD_DEBUG("------nt35582_init------\n");
 	
 	ret = platform_driver_register(&this_driver);
 	if (!ret) {
@@ -212,7 +212,7 @@ static int __init nt35582_init(void)
         pinfo->clk_rate = 192000000;
 	    pinfo->clk_min = 192000000;
 	    pinfo->clk_max = 192000000;
-        MDDI_LCD_DEBUG("%s: BYD LCD and Truly LCD,set MDDI_CLK=%d \n",__func__, pinfo->clk_rate);
+        LCD_DEBUG("%s: BYD LCD and Truly LCD,set MDDI_CLK=%d \n",__func__, pinfo->clk_rate);
 		pinfo->lcd.vsync_enable = TRUE;
 /*< DTS2010111203128 lijianzhao 20101112 begin */
 /* Reduce the fps,sync depend on the vsync signal*/
@@ -234,7 +234,7 @@ static int __init nt35582_init(void)
 		if (ret)
 			{
 			platform_driver_unregister(&this_driver);
-			MDDI_LCD_DEBUG("%s: Failed on platform_device_register(): rc=%d \n",__func__, ret);
+			LCD_DEBUG("%s: Failed on platform_device_register(): rc=%d \n",__func__, ret);
 			}
 		}
 

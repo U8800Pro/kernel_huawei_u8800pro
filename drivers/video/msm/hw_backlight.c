@@ -1,4 +1,3 @@
-/*< DTS2010120703279 lijianzhao 20101207 begin */
 /* drivers\video\msm\hw_backlight.c
  * backlight driver for 7x30 platform
  *
@@ -17,11 +16,14 @@
 #include <linux/gpio.h>
 #include <linux/pwm.h>
 #include <mach/pmic.h>
-/*< DTS2011081800466 pengyu 20110818 begin */
-/*< DTS2011070504600  sunhonghui 20110706 begin*/
-/* Delete 3 lines */
-/*DTS2011070504600  sunhonghui 20110706 end >*/
-/* DTS2011081800466 pengyu 20110818 end >*/
+#include <linux/earlysuspend.h>
+#include <linux/spinlock.h>
+#include <linux/semaphore.h>
+#include <linux/hardware_self_adapt.h>
+#include "hw_lcd_common.h"
+#include <mach/rpc_pmapp.h>
+
+/*CABC CTL MACRO , RANGE 0 to 255*/
 #define PWM_PERIOD ( NSEC_PER_SEC / ( 22 * 1000 ) )	/* ns, period of 22Khz */
 #define PWM_LEVEL 255
 #define PWM_DUTY_LEVEL (PWM_PERIOD / PWM_LEVEL)
@@ -30,13 +32,34 @@
 #define ADD_VALUE			4
 #define PWM_LEVEL_ADJUST	226
 #define BL_MIN_LEVEL 	    30
+
+/*< DTS2012051704510 houming 20120517 begin */
+#define PM8058_GPIO_PM_TO_SYS(pm_gpio)     (pm_gpio + NR_GPIO_IRQS)
+/* DTS2012051704510 houming 20120517 end >*/
+
+/*LPG CTL MACRO  range 0 to 100*/
+/*< DTS2012042605475 zhongjinrong 20120426 begin  */
+/*< DTS2012032101654 liweiwu 20120321 begin */
+#define PWM_LEVEL_ADJUST_LPG	100
+/* DTS2012032101654 liweiwu 20120321 end >*/
+/* DTS2012042605475 zhongjinrong 20120426 end >*/
+#define BL_MIN_LEVEL_LPG 	    10
 static struct pwm_device *bl_pwm;
-boolean first_set_bl = TRUE;
+/*< DTS2012012101194 lijianzhao 20120121 begin */
+/* move semaphore to msm_fb.c */
+/* DTS2012012101194 lijianzhao 20120121 end >*/
+/*< DTS2012022408079 zhongjinrong 20120306 begin */
+/*< DTS2011122704239 liuyuntao 20111229 begin */
+static struct msm_fb_data_type *mfd_local;
+static boolean backlight_set = FALSE;
+static atomic_t suspend_flag = ATOMIC_INIT(0);
+/* DTS2011122704239 liuyuntao 20111229 end >*/
+/* DTS2012022408079 zhongjinrong 20120306 end >*/
 
 int backlight_pwm_gpio_config(void)
 {
     int rc;
-	struct pm8058_gpio backlight_drv = 
+	struct pm_gpio backlight_drv = 
 	{
 		.direction      = PM_GPIO_DIR_OUT,
 		.output_buffer  = PM_GPIO_OUT_BUF_CMOS,
@@ -48,14 +71,6 @@ int backlight_pwm_gpio_config(void)
 		.inv_int_pol 	= 1,
 	};
 	/* U8800 use PM_GPIO25 as backlight's PWM,but U8820 use PM_GPIO26 */
-/*< DTS2011030202729  liliang 20110302  begin */
-/*< DTS2011042703705 zhangbo 20110422 begin */
-/* <DTS2011050700551 zhangbo 20110505 begin */
-/* <DTS2011062600102 sunhonghui 20110626 begin */
-/* <DTS2011071600361 liyuping 20110716 begin */
-/* < DTS2011082302564 liwei 20110823 begin */
-/*<DTS2011091502092 liyuping 20110915 begin */
-/* <DTS2011091200073 zhangbo 20110912 begin */
 /* < DTS2011102401822 liwei 20111024 begin */
     if(machine_is_msm7x30_u8800() 
 		|| machine_is_msm7x30_u8800_51() 
@@ -63,27 +78,25 @@ int backlight_pwm_gpio_config(void)
 		|| machine_is_msm8255_u8860() 
 		|| machine_is_msm8255_c8860() 
 		|| machine_is_msm8255_u8860lp()
+        /* < DTS2012022905490 ganfan 20120301 begin */
+        || machine_is_msm8255_u8860_r()
+        /* DTS2012022905490 ganfan 20120301 end > */
 		|| machine_is_msm8255_u8860_92()
 		|| machine_is_msm8255_u8680()
 		|| machine_is_msm8255_u8667()
 		|| machine_is_msm8255_u8860_51()
 		|| machine_is_msm8255_u8730())
 /* DTS2011102401822 liwei 20111024 end > */
-/* DTS2011091200073 zhangbo 20110912 end> */
-/* DTS2011091502092 liyuping 20110915 end> */
-/* DTS2011082302564 liwei 20110823 end > */
-/* DTS2011071600361 liyuping 20110716 end> */
-/* DTS2011062600102 sunhonghui 20110626 end> */
-/* DTS2011050700551 zhangbo 20110505 end> */
-/* DTS2011042703705 zhangbo 20110422 end >*/
-/* DTS2011030202729  liliang 20110302  end > */
+    /*< DTS2012051704510 houming 20120517 begin */
+    /* renew config the gpio value */
 	{
-        rc = pm8058_gpio_config( 24, &backlight_drv);
+        rc = pm8xxx_gpio_config( PM8058_GPIO_PM_TO_SYS(24), &backlight_drv);
     }
     else if(machine_is_msm7x30_u8820()) 
     {
-    	rc = pm8058_gpio_config( 25, &backlight_drv);
+    	rc = pm8xxx_gpio_config( PM8058_GPIO_PM_TO_SYS(25), &backlight_drv);
     }
+	/* DTS2012051704510 houming 20120517 end >*/
 	else
 	{
     	rc = -1;
@@ -96,85 +109,58 @@ int backlight_pwm_gpio_config(void)
 	}
     return 0;
 }
-#ifndef CONFIG_HUAWEI_LEDS_PMIC
-void touchkey_setbacklight(int level)
+/* use the mmp pin like three-leds */
+/*< DTS2012012101194 lijianzhao 20120121 begin */
+void msm_backlight_set(int level)
 {
-/*< DTS2011030202729  liliang 20110302  begin */
-/*< DTS2011042703705 zhangbo 20110422 begin */
-/* <DTS2011050700551 zhangbo 20110505 begin */
-/* <DTS2011062600102 sunhonghui 20110626 begin */
-/*< DTS2011070504600  sunhonhui 20110706 begin*/
-/* <DTS2011071600361 liyuping 20110716 begin */
-/* < DTS2011082302564 liwei 20110823 begin */
-/* <DTS2011091200073 zhangbo 20110912 begin */
-/* < DTS2011102401822 liwei 20111024 begin */
-    if(machine_is_msm7x30_u8800() 
-		|| machine_is_msm7x30_u8800_51() 
-		|| machine_is_msm8255_u8800_pro() 
-		|| machine_is_msm8255_u8860() 
-		|| machine_is_msm8255_c8860()
-		|| machine_is_msm8255_u8860_92()
-		|| machine_is_msm8255_u8680()
-		|| machine_is_msm8255_u8667()
-		|| machine_is_msm8255_u8730()) 
-/* DTS2011102401822 liwei 20111024 end > */
-/* DTS2011091200073 zhangbo 20110912 end> */
-/* DTS2011082302564 liwei 20110823 end > */
-/* DTS2011071600361 liyuping 20110716 end> */
-/*DTS2011070504600  sunhonghui 20110706 end >*/
-/* DTS2011062600102 sunhonghui 20110626 end> */
-/* DTS2011050700551 zhangbo 20110505 end> */
-/* DTS2011042703705 zhangbo 20110422 end >*/
-/* DTS2011030202729  liliang 20110302  end > */
+    static uint8 last_level = 0;
+	static boolean first_set_bl = TRUE;
+	/*< DTS2012042605475 zhongjinrong 20120426 begin  */
+	/*< DTS2012032101654 liweiwu 20120321 begin */
+	/* keep duty 10% < level < 100% */
+	/* DTS2012032101654 liweiwu 20120321 end >*/
+	/* DTS2012042605475 zhongjinrong 20120426 end >*/
+/*< DTS2012021602342 zhongjinrong 20120224 begin */
+#ifdef CONFIG_ARCH_MSM7X27A
+/* DTS2012021602342 zhongjinrong 20120224 end >*/
+	if(level)
 	{
-		pmic_set_led_intensity(LED_KEYPAD, level);
+		level = ((level * PWM_LEVEL_ADJUST_LPG) / PWM_LEVEL ); 
+		if (level < BL_MIN_LEVEL_LPG)        
+		{    
+			level = BL_MIN_LEVEL_LPG;      
+		}
 	}
-
-    if(machine_is_msm7x30_u8820())
-    {   
-		/*if the machine is U8820 use the mpp6 for touchkey backlight*/
-        pmic_set_mpp6_led_intensity(level);
+    if (last_level == level)
+    {
+        return ;
     }
-
-}
+    last_level = level;
+	pmapp_disp_backlight_set_brightness(last_level);
 #endif
-void pwm_set_backlight (struct msm_fb_data_type * mfd)
-{
-	int bl_level = mfd->bl_level;
-	/*config PM GPIO25 as PWM and request PWM*/
+
+#ifdef CONFIG_ARCH_MSM7X30
 	if(TRUE == first_set_bl)
 	{
-	    backlight_pwm_gpio_config();
+		backlight_pwm_gpio_config();
 		/* U8800 use PM_GPIO25 as backlight's PWM,but U8820 use PM_GPIO26 */
-/*< DTS2011030202729  liliang 20110302  begin */
-		/*< DTS2011042703705 zhangbo 20110422 begin */
-		/* <DTS2011050700551 zhangbo 20110505 begin */
-        /* <DTS2011062600102 sunhonghui 20110626 begin */		
-		/* <DTS2011071600361 liyuping 20110716 begin */
-		/* < DTS2011082302564 liwei 20110823 begin */
-		/*<DTS2011091502092 liyuping 20110915 begin */
-		/* <DTS2011091200073 zhangbo 20110912 begin */
-		/* < DTS2011102401822 liwei 20111024 begin */
-        if(machine_is_msm7x30_u8800() 
+/* < DTS2011102401822 liwei 20111024 begin */
+		if(machine_is_msm7x30_u8800() 
 			|| machine_is_msm7x30_u8800_51() 
 			|| machine_is_msm8255_u8800_pro()
 			|| machine_is_msm8255_u8860() 
 			|| machine_is_msm8255_c8860()
 			|| machine_is_msm8255_u8860lp()
+            /* < DTS2012022905490 ganfan 20120301 begin */
+            || machine_is_msm8255_u8860_r()
+            /* DTS2012022905490 ganfan 20120301 end > */
 			|| machine_is_msm8255_u8860_92()
 			|| machine_is_msm8255_u8680()
 			|| machine_is_msm8255_u8667()
 			|| machine_is_msm8255_u8860_51()
 			|| machine_is_msm8255_u8730())
-		/* DTS2011102401822 liwei 20111024 end > */
-		/* DTS2011091200073 zhangbo 20110912 end> */
-		/* DTS2011091502092 liyuping 20110915 end> */
-		/* DTS2011082302564 liwei 20110823 end > */
-		/* DTS2011071600361 liyuping 20110716 end> */
-        /* DTS2011062600102 sunhonghui 20110626 end> */
-		/* DTS2011050700551 zhangbo 20110505 end> */
-		/* DTS2011042703705 zhangbo 20110422 end >*/
-/* DTS2011030202729  liliang 20110302  end > */
+/* DTS2011102401822 liwei 20111024 end > */
+
 		{
 			bl_pwm = pwm_request(PM_GPIO25_PWM_ID, "backlight");
 		}
@@ -186,83 +172,171 @@ void pwm_set_backlight (struct msm_fb_data_type * mfd)
 		{
 			bl_pwm = NULL;
 		}
-		
-	    if (NULL == bl_pwm || IS_ERR(bl_pwm)) 
-		{
-	    	pr_err("%s: pwm_request() failed\n", __func__);
-	    	bl_pwm = NULL;
-	    }
-	    first_set_bl = FALSE;
 
-	}
-	if (bl_pwm) 
-	{
-		/* keep duty 10% < level < 90% */
-		if (bl_level)
+		if (NULL == bl_pwm || IS_ERR(bl_pwm)) 
 		{
-			bl_level = ((bl_level * PWM_LEVEL_ADJUST) / PWM_LEVEL + ADD_VALUE); 
-			if (bl_level < BL_MIN_LEVEL)
-			{
-				bl_level = BL_MIN_LEVEL;
-			}
+			pr_err("%s: pwm_request() failed\n", __func__);
+			bl_pwm = NULL;
 		}
-		pwm_config(bl_pwm, PWM_DUTY_LEVEL*bl_level/NSEC_PER_USEC, PWM_PERIOD/NSEC_PER_USEC);
+		first_set_bl = FALSE;
+	}
+	if (bl_pwm)
+	{
+		if(level)
+		{
+			level = ((level * PWM_LEVEL_ADJUST) / PWM_LEVEL + ADD_VALUE); 
+			if (level < BL_MIN_LEVEL)
+			{
+				level = BL_MIN_LEVEL;
+			}
+		}	
+	    if (last_level == level)
+	    {
+	        return ;
+	    }
+	    last_level = level;
+		pwm_config(bl_pwm, PWM_DUTY_LEVEL*level/NSEC_PER_USEC, PWM_PERIOD/NSEC_PER_USEC);
 		pwm_enable(bl_pwm);
 	}
-#ifndef CONFIG_HUAWEI_LEDS_PMIC
-	touchkey_setbacklight(!!bl_level);
+#endif
+}
+/* DTS2012012101194 lijianzhao 20120121 end >*/
+
+void cabc_backlight_set(struct msm_fb_data_type * mfd)
+{	     
+	struct msm_fb_panel_data *pdata = NULL;   
+	uint32 bl_level = mfd->bl_level;
+	/*< DTS2012042605475 zhongjinrong 20120426 begin  */
+	/*< DTS2012032101654 liweiwu 20120321 begin  */
+		/* keep duty 10% < level < 100% */
+	/* DTS2012032101654 liweiwu 20120321 end >*/
+	if (bl_level)    
+   	{   
+   	/*< DTS2012032101654 liweiwu 20120321 begin  */
+	/****delete one line codes for backlight*****/
+	/* DTS2012032101654 liweiwu 20120321 end >*/
+	/* DTS2012042605475 zhongjinrong 20120426 end >*/
+		if (bl_level < BL_MIN_LEVEL)        
+		{    
+			bl_level = BL_MIN_LEVEL;      
+		}  
+	}
+	/* backlight ctrl by LCD-self, like as CABC */  
+	/*< DTS2012012101194 lijianzhao 20120121 begin */
+	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;  
+	if ((pdata) && (pdata->set_cabc_brightness))   
+   	{       
+		pdata->set_cabc_brightness(mfd,bl_level);
+	}
+	/* DTS2012012101194 lijianzhao 20120121 end >*/
+
+}
+
+/*< DTS2012022408079 zhongjinrong 20120306 begin */
+void pwm_set_backlight(struct msm_fb_data_type *mfd)
+{
+	lcd_panel_type lcd_panel_wvga = LCD_NONE;
+	/*< DTS2011122704239 liuyuntao 20111229 begin */
+	/*When all the device are resume that can turn the light*/
+	if(atomic_read(&suspend_flag)) 
+	{
+		mfd_local = mfd;
+		backlight_set = TRUE;
+		return;
+	}
+	/* DTS2011122704239 liuyuntao 20111229 end >*/
+/*< DTS2012021601331 duanfei 20120216 begin */
+/*< DTS2012021602342 zhongjinrong 20120224 begin */
+#ifdef CONFIG_ARCH_MSM7X27A
+/* DTS2012021602342 zhongjinrong 20120224 end >*/
+	
+	
+	lcd_panel_wvga = get_lcd_panel_type();
+	/* <DTS2012022501992 liguosheng 20120229 begin */
+	if ((MIPI_RSP61408_CHIMEI_WVGA == lcd_panel_wvga ) 
+		|| (MIPI_RSP61408_BYD_WVGA == lcd_panel_wvga )
+		|| (MIPI_RSP61408_TRULY_WVGA == lcd_panel_wvga )
+		|| (MIPI_HX8369A_TIANMA_WVGA == lcd_panel_wvga ))
+	{
+		/* keep duty is 75% of the quondam duty */
+		mfd->bl_level = mfd->bl_level * 75 / 100;
+	}
+	/* DTS2012022501992 liguosheng 20120229 end> */
+#endif
+/* DTS2012021601331 duanfei 20120216 end >*/
+	if (get_hw_lcd_ctrl_bl_type() == CTRL_BL_BY_MSM)
+	{
+		msm_backlight_set(mfd->bl_level);
+ 	}   
+	else    
+ 	{
+		cabc_backlight_set(mfd);  
+ 	}
+	return;
+}
+/*< DTS2011122704239 liuyuntao 20111229 begin */
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void pwm_backlight_suspend( struct early_suspend *h)
+{
+	atomic_set(&suspend_flag,1);
+}
+
+static void pwm_backlight_resume( struct early_suspend *h)
+{
+	atomic_set(&suspend_flag,0);
+	
+	if (backlight_set == TRUE)
+	{
+		if (get_hw_lcd_ctrl_bl_type() == CTRL_BL_BY_LCD)
+		{
+			/* MIPI use two semaphores */
+			if(get_hw_lcd_interface_type() == LCD_IS_MIPI_CMD)
+			{
+				down(&mfd_local->dma->mutex);
+				down(&mfd_local->sem);
+				pwm_set_backlight(mfd_local);
+				up(&mfd_local->sem);
+				up(&mfd_local->dma->mutex);
+			}
+			/* MDDI don't use semaphore */
+			else if((get_hw_lcd_interface_type() == LCD_IS_MDDI_TYPE1)
+				||(get_hw_lcd_interface_type() == LCD_IS_MDDI_TYPE2))
+			{
+				pwm_set_backlight(mfd_local);
+			}
+			else
+			{
+				down(&mfd_local->sem);
+				pwm_set_backlight(mfd_local);
+				up(&mfd_local->sem);
+			}
+		}
+		else
+		{
+			down(&mfd_local->sem);
+			pwm_set_backlight(mfd_local);
+			up(&mfd_local->sem);
+		}
+	}
+}
+/*add early suspend*/
+static struct early_suspend pwm_backlight_early_suspend = {
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN - 1,
+	.suspend = pwm_backlight_suspend,
+	.resume = pwm_backlight_resume,
+};
 #endif
 
-}
-/* DTS2010120703279 lijianzhao 20101207 end >*/
-/*< DTS2011070504600  sunhonhui 20110706 begin*/
-void cabc_backlight_set(struct msm_fb_data_type * mfd)
-{	
-    uint32 bl_level = mfd->bl_level;
-    /*< DTS2011081800466 pengyu 20110818 begin */
-    struct msm_fb_panel_data *pdata = NULL;
-    /* DTS2011081800466 pengyu 20110818 end >*/
 
-   /* keep duty 10% < level < 90% */
-    if (bl_level)
-    {
-        bl_level = ((bl_level * PWM_LEVEL_ADJUST) / PWM_LEVEL + ADD_VALUE); 
-        if (bl_level < BL_MIN_LEVEL)
-        {
-            bl_level = BL_MIN_LEVEL;
-        }
-    }
-   
-   /* backlight ctrl by LCD-self, like as CABC */
-    up(&mfd->sem);
-    /*< DTS2011081800466 pengyu 20110818 begin */
-    pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
-    if ((pdata) && (pdata->set_cabc_brightness))
-    {
-        pdata->set_cabc_brightness(bl_level);
-    }
-    /* DTS2011081800466 pengyu 20110818 end >*/
-    down(&mfd->sem);
-}
-
-void lcd_backlight_set(struct msm_fb_data_type * mfd)
+static int __init pwm_backlight_init(void)
 {
-	if(machine_is_msm8255_u8860lp()
-    /* <DTS2011102904584 qitongliang 20111109 begin */
-     || machine_is_msm8255_u8680()
-	 || machine_is_msm8255_u8730()
-    /* DTS2011102904584 qitongliang 20111109 end> */
-	/*<DTS2011091502092 liyuping 20110915 begin */
-	 ||machine_is_msm8255_u8860_51())
-	 /* DTS2011091502092 liyuping 20110915 end> */
-    {
-        cabc_backlight_set(mfd);
-    }
-    else
-    {
-        pwm_set_backlight(mfd);
-    }
+	
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	register_early_suspend(&pwm_backlight_early_suspend);
+#endif
+
+	return 0;
 }
-
-/*DTS2011070504600  sunhonghui 20110706 end >*/
-
+module_init(pwm_backlight_init);
+/* DTS2011122704239 liuyuntao 20111229 end >*/
+/* DTS2012022408079 zhongjinrong 20120306 end >*/

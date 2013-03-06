@@ -56,7 +56,7 @@ struct ov7690_ctrl
 static struct ov7690_ctrl *ov7690_ctrl;
 
 static DECLARE_WAIT_QUEUE_HEAD(ov7690_wait_queue);
-DECLARE_MUTEX(ov7690_sem);
+DEFINE_SEMAPHORE(ov7690_sem);
 
 struct register_address_value_pair const
 reg_settings_array[] =
@@ -351,7 +351,9 @@ static int ov7690_sensor_init_done(const struct msm_camera_sensor_info *data)
 
      if (data->vreg_disable_func)
     {
-        data->vreg_disable_func(data->sensor_vreg, data->vreg_num);
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        data->vreg_disable_func(0);
+        /* DTS2012020400396 zhangyu 20120206 end > */
     }
 
     return rc;
@@ -378,7 +380,9 @@ static int ov7690_sensor_init_probe(const struct msm_camera_sensor_info *data)
 
     if (data->vreg_enable_func)
     {
-        data->vreg_enable_func(data->sensor_vreg, data->vreg_num);
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        data->vreg_enable_func(1);
+        /* DTS2012020400396 zhangyu 20120206 end > */
     }
 
     mdelay(OV7690_RESET_DELAY_MSECS);

@@ -286,8 +286,8 @@ static int st303_aot_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-st303_aot_ioctl(struct inode *inode, struct file *file,
+static long
+st303_aot_ioctl(struct file *file,
 	      unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
@@ -387,8 +387,8 @@ static int st303d_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-st303d_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long
+st303d_ioctl(struct file *file, unsigned int cmd,
 	   unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
@@ -550,14 +550,14 @@ static struct file_operations st303d_fops = {
 	.owner = THIS_MODULE,
 	.open = st303d_open,
 	.release = st303d_release,
-	.ioctl = st303d_ioctl,
+	.unlocked_ioctl = st303d_ioctl,
 };
 
 static struct file_operations st303_aot_fops = {
 	.owner = THIS_MODULE,
 	.open = st303_aot_open,
 	.release = st303_aot_release,
-	.ioctl = st303_aot_ioctl,
+	.unlocked_ioctl = st303_aot_ioctl,
 };
 
 static struct miscdevice st303_aot_device = {

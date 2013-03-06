@@ -47,14 +47,6 @@ $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_OUT) $(KERNEL_CONFIG) $(KERNEL_HEADERS_I
 	$(MAKE) -C kernel O=../$(KERNEL_OUT) INSTALL_MOD_PATH=../../$(KERNEL_MODULES_INSTALL) ARCH=arm CROSS_COMPILE=arm-eabi- modules_install
 	$(mv-modules)
 	$(clean-module-folder)
-# /* < DTS2011090704268 jiaxianghong 20110914 begin */	
-# /*
-#  * NOTE:if the value of CONFIG_HUAWEI_HUNGTASK is 'm', we should
-#  * use this command to copy rsm.ko to /system/lib/. Default we don't
-#  * use this command.
-#  */	
-#	cp $(KERNEL_OUT)/drivers/staging/rsm/rsm.ko $(TARGET_OUT)/lib/
-# /* DTS2011090704268 jiaxianghong 20110914 end > */
 
 $(KERNEL_HEADERS_INSTALL): $(KERNEL_OUT) $(KERNEL_CONFIG)
 	$(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- headers_install
@@ -65,6 +57,8 @@ kerneltags: $(KERNEL_OUT) $(KERNEL_CONFIG)
 kernelconfig: $(KERNEL_OUT) $(KERNEL_CONFIG)
 	env KCONFIG_NOTIMESTAMP=true \
 	     $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- menuconfig
-	cp $(KERNEL_OUT)/.config kernel/arch/arm/configs/$(KERNEL_DEFCONFIG)
+	env KCONFIG_NOTIMESTAMP=true \
+	     $(MAKE) -C kernel O=../$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- savedefconfig
+	cp $(KERNEL_OUT)/defconfig kernel/arch/arm/configs/$(KERNEL_DEFCONFIG)
 
 endif

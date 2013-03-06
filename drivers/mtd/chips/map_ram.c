@@ -13,13 +13,7 @@
 #include <linux/init.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
-#include <linux/mtd/compatmac.h>
 
-/* <DTS2010080901139 hufeng 20100821 begin */
-#ifdef CONFIG_HUAWEI_KERNEL
-#include <linux/mmc/core.h>
-#endif
-/* DTS2010080901139 hufeng 20100821 end> */
 
 static int mapram_read (struct mtd_info *, loff_t, size_t, size_t *, u_char *);
 static int mapram_write (struct mtd_info *, loff_t, size_t, size_t *, const u_char *);
@@ -28,11 +22,6 @@ static void mapram_nop (struct mtd_info *);
 static struct mtd_info *map_ram_probe(struct map_info *map);
 static unsigned long mapram_unmapped_area(struct mtd_info *, unsigned long,
 					  unsigned long, unsigned long);
-/* <DTS2010080901139 hufeng 20100821 begin */
-#ifdef CONFIG_HUAWEI_KERNEL
-static int mapram_block_isbad(struct mtd_info *mtd, loff_t ofs);
-#endif
-/* DTS2010080901139 hufeng 20100821 end> */
 
 
 static struct mtd_chip_driver mapram_chipdrv = {
@@ -79,24 +68,11 @@ static struct mtd_info *map_ram_probe(struct map_info *map)
 	mtd->get_unmapped_area = mapram_unmapped_area;
 	mtd->read = mapram_read;
 	mtd->write = mapram_write;
-/* <DTS2010080901139 hufeng 20100821 begin */
-#ifdef CONFIG_HUAWEI_KERNEL
-	mtd->panic_write= mapram_write;
-#endif
-/* DTS2010080901139 hufeng 20100821 end> */
 	mtd->sync = mapram_nop;
 	mtd->flags = MTD_CAP_RAM;
-/* <DTS2010080901139 hufeng 20100821 begin */
-#ifdef CONFIG_HUAWEI_KERNEL
-	mtd->writesize = 512;
-	mtd->block_isbad = mapram_block_isbad;
-	mtd->erasesize = 512;
-#else
 	mtd->writesize = 1;
 
 	mtd->erasesize = PAGE_SIZE;
-#endif
-/* DTS2010080901139 hufeng 20100821 end> */
  	while(mtd->size & (mtd->erasesize - 1))
 		mtd->erasesize >>= 1;
 
@@ -104,15 +80,6 @@ static struct mtd_info *map_ram_probe(struct map_info *map)
 	return mtd;
 }
 
-/* <DTS2010080901139 hufeng 20100821 begin */
-/*ram MTD has not bad block*/
-#ifdef CONFIG_HUAWEI_KERNEL
-static int mapram_block_isbad(struct mtd_info *mtd, loff_t ofs)
-{
-	return 0;
-}
-#endif
-/* DTS2010080901139 hufeng 20100821 end> */
 
 /*
  * Allow NOMMU mmap() to directly map the device (if not NULL)
@@ -168,16 +135,7 @@ static int mapram_erase (struct mtd_info *mtd, struct erase_info *instr)
 
 static void mapram_nop(struct mtd_info *mtd)
 {
-/* <DTS2010080901139 hufeng 20100821 begin */
-#ifdef CONFIG_HUAWEI_KERNEL
-	struct map_info *map = mtd->priv;
-
-	/*we should run mmc panic sync at here*/
-	printk("#### MAP RAM SYNC: map->virt = 0x%p, map->size = 0x%ld\n",map->virt, map->size);
-	
-	mmc_panic_write(map->virt, map->size);
-#endif
-/* DTS2010080901139 hufeng 20100821 end> */
+	/* Nothing to see here */
 }
 
 static int __init map_ram_init(void)

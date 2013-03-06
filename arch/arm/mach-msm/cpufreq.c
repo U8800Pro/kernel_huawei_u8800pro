@@ -26,6 +26,7 @@
 #include <linux/cpumask.h>
 #include <linux/sched.h>
 #include <linux/suspend.h>
+#include <mach/socinfo.h>
 
 #include "acpuclock.h"
 
@@ -39,6 +40,7 @@ struct cpufreq_work_struct {
 };
 
 static DEFINE_PER_CPU(struct cpufreq_work_struct, cpufreq_work);
+static struct workqueue_struct *msm_cpufreq_wq;
 #endif
 
 struct cpufreq_suspend_t {
@@ -49,9 +51,6 @@ struct cpufreq_suspend_t {
 static DEFINE_PER_CPU(struct cpufreq_suspend_t, cpufreq_suspend);
 
 static int override_cpu;
-
-#define dprintk(msg...) \
-		cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-msm", msg)
 
 static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
 {
@@ -124,7 +123,7 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 	}
 
 #ifdef CONFIG_CPU_FREQ_DEBUG
-	dprintk("CPU[%d] target %d relation %d (%d-%d) selected %d\n",
+	pr_debug("CPU[%d] target %d relation %d (%d-%d) selected %d\n",
 		policy->cpu, target_freq, relation,
 		policy->min, policy->max, table[index].frequency);
 #endif
@@ -142,8 +141,8 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 		goto done;
 	} else {
 		cancel_work_sync(&cpu_work->work);
-		init_completion(&cpu_work->complete);
-		schedule_work_on(policy->cpu, &cpu_work->work);
+		INIT_COMPLETION(cpu_work->complete);
+		queue_work_on(policy->cpu, msm_cpufreq_wq, &cpu_work->work);
 		wait_for_completion(&cpu_work->complete);
 	}
 
@@ -174,6 +173,9 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 	struct cpufreq_work_struct *cpu_work = NULL;
 #endif
 
+	if (cpu_is_apq8064())
+		return -ENODEV;
+
 	table = cpufreq_frequency_get_table(policy->cpu);
 	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
@@ -188,7 +190,9 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 
 	cur_freq = acpuclk_get_rate(policy->cpu);
 	if (cpufreq_frequency_table_target(policy, table, cur_freq,
-				CPUFREQ_RELATION_H, &index)) {
+	    CPUFREQ_RELATION_H, &index) &&
+	    cpufreq_frequency_table_target(policy, table, cur_freq,
+	    CPUFREQ_RELATION_L, &index)) {
 		pr_info("cpufreq: cpu%d at invalid freq: %d\n",
 				policy->cpu, cur_freq);
 		return -EINVAL;
@@ -212,6 +216,7 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 #ifdef CONFIG_SMP
 	cpu_work = &per_cpu(cpufreq_work, policy->cpu);
 	INIT_WORK(&cpu_work->work, set_cpu_work);
+	init_completion(&cpu_work->complete);
 #endif
 
 	return 0;
@@ -263,7 +268,7 @@ static ssize_t store_mfreq(struct sysdev_class *class,
 	u64 val;
 
 	if (strict_strtoull(buf, 0, &val) < 0) {
-		printk(KERN_ERR "Failed param conversion\n");
+		pr_err("Invalid parameter to mfreq\n");
 		return 0;
 	}
 	if (val)
@@ -275,6 +280,11 @@ static ssize_t store_mfreq(struct sysdev_class *class,
 
 static SYSDEV_CLASS_ATTR(mfreq, 0200, NULL, store_mfreq);
 
+static struct freq_attr *msm_freq_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
+
 static struct cpufreq_driver msm_cpufreq_driver = {
 	/* lps calculations are handled here. */
 	.flags		= CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
@@ -282,6 +292,7 @@ static struct cpufreq_driver msm_cpufreq_driver = {
 	.verify		= msm_cpufreq_verify,
 	.target		= msm_cpufreq_target,
 	.name		= "msm",
+	.attr		= msm_freq_attr,
 };
 
 static struct notifier_block msm_cpufreq_pm_notifier = {
@@ -295,12 +306,16 @@ static int __init msm_cpufreq_register(void)
 	int err = sysfs_create_file(&cpu_sysdev_class.kset.kobj,
 			&attr_mfreq.attr);
 	if (err)
-		printk(KERN_ERR "Failed to create sysfs mfreq\n");
+		pr_err("Failed to create sysfs mfreq\n");
 
 	for_each_possible_cpu(cpu) {
 		mutex_init(&(per_cpu(cpufreq_suspend, cpu).suspend_mutex));
 		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
 	}
+
+#ifdef CONFIG_SMP
+	msm_cpufreq_wq = create_workqueue("msm-cpufreq");
+#endif
 
 	register_pm_notifier(&msm_cpufreq_pm_notifier);
 	return cpufreq_register_driver(&msm_cpufreq_driver);

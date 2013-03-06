@@ -115,22 +115,6 @@ static char en_data_4voice_u8860[] =
 };
 /* DTS2011080400504 dongchen 20110805 end >*/
 
-/*< DTS2011102903430 dongchen 20111029 begin */
-/* close AGC, 18dB */
-static char en_data_4voice_u8800_pro[] = 
-{
-    /* reg  val  */
-    0x01, 0x83,
-    0x02, 0x05,
-    0x03, 0x09,
-    0x04, 0x00,
-    0x05, 0x12,
-    0x06, 0xfc,
-    0x07, 0x00,
-    0x01, 0xc3
-};
-/* DTS2011102903430 dongchen 20111029 end >*/
-
 /* for music */
 /*< DTS2011092207134 dongchen 20110923 begin */
 /* set default value same as U8860 */
@@ -417,19 +401,17 @@ static int tpa2028d1_probe(struct i2c_client *client,const struct i2c_device_id 
 
         TPA_DEBUG_TPA("tpa2028d1_probe machine_is_msm7x30_u8800_51\n");
     }
-    /*< DTS2011102903430 dongchen 20111029 begin */
 	/*< DTS2011030202729  liliang 20110302  begin */	
 	 else if (machine_is_msm8255_u8800_pro())
     {
-        pen_data_4voice = &(en_data_4voice_u8800_pro[0]);
-        pen_data_4voice_size = ARRAY_SIZE(en_data_4voice_u8800_pro);
+        pen_data_4voice = &(en_data_4voice_u8800_51[0]);
+        pen_data_4voice_size = ARRAY_SIZE(en_data_4voice_u8800_51);
         pen_data_4music = &(en_data_4music_u8800_51[0]);
         pen_data_4music_size = ARRAY_SIZE(en_data_4music_u8800_51);
 
         TPA_DEBUG_TPA("tpa2028d1_probe machine_is_msm8255_u8800_pro\n");
     }
 	/* DTS2011030202729  liliang 20110302 end >*/
-    /* DTS2011102903430 dongchen 20111029 end >*/
 	/*< DTS2011081505841 dongchen 20110819 begin */
     /*< DTS2011080400504 dongchen 20110805 begin */
     /*< DTS2011082205270 dongchen 20110824 begin */
@@ -439,6 +421,9 @@ static int tpa2028d1_probe(struct i2c_client *client,const struct i2c_device_id 
     /* < DTS2011102401822 liwei 20111024 begin */
     else if (machine_is_msm8255_u8860() 
             || machine_is_msm8255_u8860lp()
+            /* < DTS2012022905490 ganfan 20120301 begin */
+            || machine_is_msm8255_u8860_r()
+            /* DTS2012022905490 ganfan 20120301 end > */
             || machine_is_msm8255_u8860_92()
             || machine_is_msm8255_u8680()
             || machine_is_msm8255_u8667()

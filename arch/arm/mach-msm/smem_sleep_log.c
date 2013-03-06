@@ -1,4 +1,4 @@
-/*<DTS2011030801141 renxigang 20110111 20110308 begin*/
+/*< DTS2011062206646 libeibei 20110623 begin */
 /*
  * SMEM Sleep log driver.
  * Allows a user space process to get the SMEM log of sleep.
@@ -18,7 +18,7 @@
 #include <linux/cdev.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
-#include <linux/smp_lock.h>
+#include <linux/semaphore.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
@@ -27,6 +27,7 @@
 #include "smem_sleep_log.h"
 
 #define NAME			"smem_sleep_log"
+#define init_MUTEX(sem)		sema_init(sem, 1)
 
 MODULE_AUTHOR("hw <hw@huawei.com>");
 MODULE_DESCRIPTION("SMEM sleep log Driver");
@@ -62,9 +63,7 @@ char * psmem_buffer = NULL;
 #define MAX_SMEM_SLEEP_LOG_EVENT_BUF_SIZE	MAX_SMEM_SLEEP_LOG_BUF_SIZE
 #define MAX_SMEM_SLEEP_VOTER_BUF_SIZE	1152  /*2 * MAX_NUM_SLEEP_CLIENTS * (SLEEPLOG_CLIENT_LIST_MAX_STR + 1)*/
 
-/*<DTS2011032906278 hujun 20110329 begin*/
 #define SMEM_SLEEP_LOG_DEBUG(fmt, args...) printk(KERN_DEBUG fmt, ##args)
-/*DTS2011032906278 hujun 20110329 end >*/
 
 static ssize_t smem_sleep_log_read(struct file *file, char __user *buf,
 				size_t len, loff_t *ppos)
@@ -106,26 +105,19 @@ static int smem_sleep_log_open(struct inode *inode, struct file *file)
     	SMEM_SLEEP_LOG_DEBUG(KERN_ERR "smem_open: can not get open_sem!\n");
         return -ERESTARTSYS; 
     }
-       
 	file->private_data = smem_log_dev; 
-    /*<DTS2011032906278 hujun 20110329 begin*/
     smem_log_dev->buf_size = 0; 
     /*delete 6 lines*/
-    /*DTS2011032906278 hujun 20110329 end >*/
 	return 0;
 
 }
-
 static int smem_sleep_log_release(struct inode *inode, struct file *file)
 {
-    /*<DTS2011032906278 hujun 20110329 begin*/
     psmem_buffer = NULL;
-    /*DTS2011032906278 hujun 20110329 end >*/
 	up(&smem_log_dev->open_sem);
 	return 0;
 }
 
-/*<DTS2011032906278 hujun 20110329 begin*/
 /*not malloc memory by kmalloc any more, and uste the memory get by smem_alloc directly */
 static long smem_sleep_log_ioctl(struct file *file, unsigned int cmd,
 	unsigned long arg)
@@ -164,7 +156,6 @@ static long smem_sleep_log_ioctl(struct file *file, unsigned int cmd,
     }
 	return ret;
 }
-/*DTS2011032906278 hujun 20110329 end >*/
 
 static const struct file_operations smem_sleep_log_fops = {
 	.owner	= THIS_MODULE,
@@ -177,8 +168,10 @@ static const struct file_operations smem_sleep_log_fops = {
 static int __init smem_sleep_log_init(void)
 {
 	dev_t	dev_id;
+	//u32	low, hi;
 	int	retval;
     int error;
+    //int ret = 0;
         
 	smem_log_dev = kzalloc(sizeof(struct smem_log_data), GFP_KERNEL);	
     if (!smem_log_dev)
@@ -255,4 +248,4 @@ static void __exit smem_sleep_log_cleanup(void)
 
 module_init(smem_sleep_log_init);
 module_exit(smem_sleep_log_cleanup);
-/*DTS2011030801141 renxigang 20110308 end>*/
+/* DTS2011062206646 libeibei 20110623 end >*/

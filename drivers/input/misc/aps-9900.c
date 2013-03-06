@@ -37,6 +37,9 @@
 #include <mach/vreg.h>
 #include <linux/wakelock.h>
 #include <linux/slab.h>
+/* < DTS2012012901908 zhangmin 20120129 begin */
+#include <linux/light.h>
+/* DTS2012012901908 zhangmin 20120129 end > */
 /* < DTS2011052803160 shenjinming 20110611 begin */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
@@ -65,23 +68,13 @@ struct aps_data {
     int (*power)(int on);
 };
 
-/* < DTS2011081101306  liujinggang 20110811 begin */
-/* add lsensor level*/
-#define LSENSOR_MAX_LEVEL 7
-/* < DTS2011091700448  liujinggang 20110917 begin */
-/* adjust the values of lsensor level*/
-/* < DTS2011093001897  liujinggang 20110930 begin */
-/* adjust the values for U8860 pp2*/
-/* < DTS2011101000667 zhangyu 20111015 begin */
-/* adjust the values for U8860 */
+/* < DTS2012020706412 zhangmin 20120306 begin */
+/*code unitary*/
+/*lsensor is for all the product,different phone has different table in .h */
 static uint16_t lsensor_adc_table[LSENSOR_MAX_LEVEL] = {
 	8, 25, 110, 400, 750, 1200, 3000
 };
-/* DTS2011101000667 zhangyu 20111015 end > */
-/* DTS2011093001897  liujinggang 20110930 end > */
-/* DTS2011091700448  liujinggang 20110917 end > */
-/* DTS2011081101306  liujinggang 20110811 end > */
-/* < DTS2011052003350 wangjiongfeng 20110520 begin */
+
 /* add the macro of log */
 static int aps9900_debug_mask;
 module_param_named(aps9900_debug, aps9900_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -98,104 +91,39 @@ struct aps_init_regdata{
 };
 static struct aps_data  *this_aps_data;
 
-/* < DTS2011050303216 wangjiongfeng 20110504 begin */
+static int p_h = 0x3c0;
+static int p_l = 0x3bf;
 struct input_dev *sensor_9900_dev=NULL;
 /* < DTS2011050303216 wangjiongfeng 20110504 end */
 static int aps_9900_delay = 1000;     /*1s*/
-/* < DTS2011050303216 wangjiongfeng 20110504 begin */
-/* delete aps_9900_count */
-/* < DTS2011050303216 wangjiongfeng 20110504 end */
-
+/* < DTS2012032304842 yangbo 20120330 begin */
+/* delete this part */
+/* DTS2012032304842 yangbo 20120330 end > */
 static int aps_first_read = 1;
-/* < DTS2011050303216 wangjiongfeng 20110504 begin */
-static int aps_open_flag=0;
-/* < DTS2011050303216 wangjiongfeng 20110504 end */
 /* use this to make sure which device is open and make a wake lcok*/
-/* < DTS2011052502345 wangjiongfeng 20110525 begin */
-/* add the flag of min_proximity_value */
-/* < DTS2011090706338  liujinggang 20110924 begin */
-/*modify the value*/
-static int min_proximity_value = 853;
-/* DTS2011090706338  liujinggang 20110924 end > */
-/* DTS2011052502345 wangjiongfeng 20110525 end >*/
+static int aps_open_flag=0;
+/* decline the default min_proximity_value */
+static int origin_prox = 822;
+static int min_proximity_value;
 static int light_device_minor = 0;
 static int proximity_device_minor = 0;
 static struct wake_lock proximity_wake_lock;
 static atomic_t l_flag;
 static atomic_t p_flag;
-/* < DTS2011071500961  liujinggang 20110715 begin */
-/*get value of proximity and light*/
+/* to be same with ICS, move the values up */
 static int proximity_data_value = 0;
 static int light_data_value = 0;
-/* DTS2011071500961  liujinggang 20110715 end > */
-/* < DTS2011081902842  liujinggang 20110820 begin */
+
 /*init the value of reg 0*/
 static u8  reg0_value = 0x38; 
-/* DTS2011081902842  liujinggang 20110820 end > */
 
-#define CMD_BYTE      0x80
-#define CMD_WORD      0xA0
-#define CMD_SPECIAL   0xE0
+static char light_device_id[] = "AVAGO-TAOS-9900";
 
-#define APDS9900_ENABLE_REG  0x00
-#define APDS9900_ATIME_REG   0x01
-#define APDS9900_PTIME_REG   0x02
-#define APDS9900_WTIME_REG   0x03
-#define APDS9900_AILTL_REG   0x04
-#define APDS9900_AILTH_REG   0x05
-#define APDS9900_AIHTL_REG   0x06
-#define APDS9900_AIHTH_REG   0x07
-#define APDS9900_PILTL_REG   0x08
-#define APDS9900_PILTH_REG   0x09
-#define APDS9900_PIHTL_REG   0x0A
-#define APDS9900_PIHTH_REG   0x0B
-#define APDS9900_PERS_REG    0x0C
-#define APDS9900_CONFIG_REG  0x0D
-#define APDS9900_PPCOUNT_REG 0x0E
-#define APDS9900_CONTROL_REG 0x0F
-#define APDS9900_REV_REG      0x11
-#define APDS9900_ID_REG       0x12
-#define APDS9900_STATUS_REG  0x13
-#define APDS9900_CDATAL_REG  0x14
-#define APDS9900_CDATAH_REG  0x15
-#define APDS9900_IRDATAL_REG 0x16
-#define APDS9900_IRDATAH_REG 0x17
-#define APDS9900_PDATAL_REG  0x18
-#define APDS9900_PDATAH_REG  0x19
-
-#define DETECTION_THRESHOLD	500
-
-#define APDS9900_POWER_ON 1     /* set the APDS9900_ENABLE_REG's PON=1,Writing a 1 activates the APDS9900 */
-#define APDS9900_POWER_OFF 0    /* set the APDS9900_ENABLE_REG's PON=1,Writing a 0 disables the APDS9900 */
-/* < DTS2011070101164 yuezenglong 20110701 begin */
-/*reconfig reg after resume*/
-#define APDS9900_ENABLE 0x3F    /* set the APDS9900_ENABLE_REG's*/
-/* DTS2011070101164 yuezenglong 20110701 end > */
-/* < DTS2011050303216 wangjiongfeng 20110504 begin */
-#define APDS9900_POWER_MASK (1<<0)
-#define APDS9900_STATUS_PROXIMITY_BIT (1<<5)
-#define APDS9900_STATUS_ALS_BIT (1<<4)
-/* < DTS2011050303216 wangjiongfeng 20110504 end */
-#define APDS9900_PEN_BIT_SHIFT 2
-#define APDS9900_AEN_BIT_SHIFT 1
-
-#define APDS_9901_ID  0x20 /* APDS-9901 */
-#define APDS_9900_ID  0x29 /* APDS-9900 */
-#define APDS_9900_REV_ID 0x01
-
-/* < DTS2011081902842  liujinggang 20110820 begin */
-/*define and init the value of reg 0*/
-/* < DTS2011052502345 wangjiongfeng 20110525 begin */
-#define APDS_9900_MAX_PPDATA 1023
-/* < DTS2011090706338  liujinggang 20110924 begin */
+/* an arithmometer to mark how much times the aps device opened*/
+static int open_count = 0;
 /*modify the value*/
-#define APDS_9900_PWINDOWS_VALUE 170
-/* DTS2011090706338  liujinggang 20110924 end > */
-#define APDS_9900_PWAVE_VALUE 250
-/* DTS2011052502345 wangjiongfeng 20110525 end >*/
-#define APDS9900_REG0_POWER_OFF	0xfe
-#define APDS9900_REG0_AEN_OFF	0xfd
-#define APDS9900_REG0_PEN_OFF	0xfb
+static int apds_9900_pwindows_value = 200;
+static int apds_9900_pwave_value = 100; 
 
 static struct aps_init_regdata aps9900_init_regdata[]=
 {
@@ -210,7 +138,9 @@ static struct aps_init_regdata aps9900_init_regdata[]=
     /* modify the ppcount from 8 to 4 */
     {APDS9900_PPCOUNT_REG, 0x04},
     /* DTS2011052003350 wangjiongfeng 20110520 end >*/
-    {APDS9900_CONTROL_REG, 0x20},
+	/* < DTS2012020100136 zhangmin 20120201 begin */
+    {APDS9900_CONTROL_REG, 0x60},
+	/* DTS2012020100136 zhangmin 20120201 end > */
     {APDS9900_ENABLE_REG, 0x38},
     /* < DTS2011052502345 wangjiongfeng 20110525 begin */
     {APDS9900_PERS_REG, 0x12}
@@ -282,16 +212,28 @@ static int get_9900_register(struct aps_data  *aps, u8 reg, int flag)
         ret = i2c_smbus_read_byte_data(aps->client, CMD_BYTE | reg);
     }
     mutex_unlock(&aps->mlock);
+    /*< DTS2012052402146 jiangweizheng 20120524 begin */
+    if (ret < 0)
+    {
+        printk(KERN_ERR "%s, line %d: read register fail!(reg=0x%x, flag=%d, ret=0x%x)", __func__, __LINE__, reg, flag, ret);
+    }
+    /* DTS2012052402146 jiangweizheng 20120524 end >*/
     return ret;
 }
 
 static int aps_9900_open(struct inode *inode, struct file *file)
 { 
     /* < DTS2011050303216 wangjiongfeng 20110504 begin */
+	/* < DTS2012012901908 zhangmin 20120129 begin */
+    int ret = 0;
+	/* DTS2012012901908 zhangmin 20120129 end > */
     /* when the device is open use this if light open report -1 when proximity open then lock it*/
     if( light_device_minor == iminor(inode) ){
         PROXIMITY_DEBUG("%s:light sensor open\n", __func__);
-        aps_first_read = 1;
+		/* < DTS2012020100136 zhangmin 20120201 begin */
+		/*it's not necessary to set this flag everytime*/
+        /*aps_first_read = 1;*/
+		/* DTS2012020100136 zhangmin 20120201 end > */
     }
 
     if( proximity_device_minor == iminor(inode) ){
@@ -301,7 +243,29 @@ static int aps_9900_open(struct inode *inode, struct file *file)
         input_report_abs(this_aps_data->input_dev, ABS_DISTANCE, 1);
         input_sync(this_aps_data->input_dev);
     }
-
+	/* < DTS2012012901908 zhangmin 20120129 begin */
+    APS9900_DBG(KERN_ERR "%s:flag is %d\n", __func__,aps_open_flag);
+    /* < DTS2012022901364 yangbo 20120229 begin */
+    /* when open_count come to max, the aps device reset the value of min_proximity_value*/
+    if( OPEN_COUNT_MAX == open_count )
+    {
+        min_proximity_value = origin_prox;
+        open_count = 0;
+    }
+    open_count ++;
+    /* DTS2012022901364 yangbo 20120229 end > */
+    if(p_h != get_9900_register(this_aps_data, APDS9900_PIHTL_REG, 1) \
+     ||p_l != get_9900_register(this_aps_data, APDS9900_PILTL_REG, 1) )
+    {
+        ret  = set_9900_register(this_aps_data, APDS9900_PILTL_REG, p_l, 1);
+        ret |= set_9900_register(this_aps_data, APDS9900_PIHTL_REG, p_h, 1);
+        if (ret)
+        {
+            printk(KERN_ERR "%s:set_9900_register is error(%d)!", __func__, ret);
+        }
+        printk("%s:reset PH and PL\n!",__func__);
+    }
+	/* DTS2012012901908 zhangmin 20120129 end > */
     if (!aps_open_flag)
     {
         u8 value_reg0;
@@ -338,9 +302,22 @@ static int aps_9900_open(struct inode *inode, struct file *file)
 static int aps_9900_release(struct inode *inode, struct file *file)
 {
     /* < DTS2011050303216 wangjiongfeng 20110504 begin */
+	/* < DTS2012012901908 zhangmin 20120129 begin */
+    int ret;
     aps_open_flag--;
     aps_9900_delay = 1000;//1s
-    
+    if(p_h != get_9900_register(this_aps_data, APDS9900_PIHTL_REG, 1) \
+     ||p_l != get_9900_register(this_aps_data, APDS9900_PILTL_REG, 1) )
+    {
+        ret  = set_9900_register(this_aps_data, APDS9900_PILTL_REG, p_l, 1);
+        ret |= set_9900_register(this_aps_data, APDS9900_PIHTL_REG, p_h, 1);
+        if (ret)
+        {
+            printk(KERN_ERR "%s:set_9900_register is error(%d)!", __func__, ret);
+        }
+        printk("%s:reset PH and PL\n!",__func__);
+    }
+	/* DTS2012012901908 zhangmin 20120129 end > */
     /*when proximity is released then unlock it*/
     if( proximity_device_minor == iminor(inode) ){
         PROXIMITY_DEBUG("%s: proximity_device_minor == iminor(inode)\n", __func__);
@@ -375,8 +352,8 @@ static int aps_9900_release(struct inode *inode, struct file *file)
     return 0;
 }
 
-static int
-aps_9900_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long
+aps_9900_ioctl(struct file *file, unsigned int cmd,
      unsigned long arg)
 {
     void __user *argp = (void __user *)arg;
@@ -520,7 +497,12 @@ aps_9900_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
             break;
         }
 		/* DTS2011071500961  liujinggang 20110715 end > */
-
+		case ECS_IOCTL_APP_GET_APSID:
+        {
+            if (copy_to_user(argp, light_device_id, strlen(light_device_id)+1))
+                return -EFAULT;
+            break;
+        }
         default:
   	/* < DTS2011050303216 wangjiongfeng 20110504 begin */
         {
@@ -536,7 +518,7 @@ static struct file_operations aps_9900_fops = {
     .owner = THIS_MODULE,
     .open = aps_9900_open,
     .release = aps_9900_release,
-    .ioctl = aps_9900_ioctl,
+    .unlocked_ioctl = aps_9900_ioctl,
 };
 
 static struct miscdevice light_device = {
@@ -608,8 +590,11 @@ static void aps_9900_work_func(struct work_struct *work)
 {
     /* < DTS2011050303216 wangjiongfeng 20110504 begin */
     int pdata = 0;/* proximity data*/
+    /* < DTS2012032304842 yangbo 20120330 begin */
+    /* change irdate to dynamic */
     int cdata = 0;/* ch0 data  */
     int irdata = 0;/* ch1 data  */
+    /* DTS2012032304842 yangbo 20120330 end > */
     int cdata_high = 0, cdata_low = 0;
     int lux; 
     int status;
@@ -626,20 +611,36 @@ static void aps_9900_work_func(struct work_struct *work)
     {
         int pthreshold_h=0, pthreshold_l;
         /* read the proximity data  */
+        APS9900_DBG("Into prox init! \n");
         pdata = get_9900_register(aps, APDS9900_PDATAL_REG, 1);
+        /* < DTS2012012901795 yangbo 20120223 begin */
+        /* protect the proximity fuction when the sunlight is very strong */
+        /*< DTS2012052402146 jiangweizheng 20120524 begin */
+        if( pdata < 0 )
+        {
+            /* the number "200" is a value to make sure there is a valid value */
+            pdata = 200 ;
+            printk(KERN_ERR "%s, line %d: pdate<0, reset to %d\n", __func__, __LINE__, pdata);
+        }
+        /* < DTS2012032304842 yangbo 20120330 begin */
+        /* delete this part */
+        /* DTS2012032304842 yangbo 20120330 end > */
         /* < DTS2011052502345 wangjiongfeng 20110525 begin */
         /* add the arithmetic of setting the proximity thresholds automatically */
-        if ((pdata + APDS_9900_PWAVE_VALUE) < min_proximity_value)
+
+        if ((pdata + apds_9900_pwave_value) < min_proximity_value)
         {
-            min_proximity_value = pdata + APDS_9900_PWAVE_VALUE;
+            min_proximity_value = pdata + apds_9900_pwave_value;
             ret = set_9900_register(aps, APDS9900_PILTL_REG, min_proximity_value, 1);
-            ret |= set_9900_register(aps, APDS9900_PIHTL_REG, (min_proximity_value + APDS_9900_PWINDOWS_VALUE), 1);
+            ret |= set_9900_register(aps, APDS9900_PIHTL_REG, (min_proximity_value + apds_9900_pwindows_value), 1);
             if (ret)
             {
-                printk(KERN_ERR "%s:set APDS9900_PILTL_REG register is error(%d)!", __func__, ret);
+                printk(KERN_ERR "%s, line %d: set APDS9900_PILTL_REG register is error(min=%d, window=%d, ret=%d)\n", \
+                       __func__, __LINE__, min_proximity_value, apds_9900_pwindows_value, ret);
             }
             APS9900_DBG("%s:min_proximity_value=%d\n", __func__, min_proximity_value);
         }
+		/* DTS2011102503457 zhangmin 20111205 end > */
         /* DTS2011052502345 wangjiongfeng 20110525 end >*/
         pthreshold_h = get_9900_register(aps, APDS9900_PIHTL_REG, 1);
         pthreshold_l = get_9900_register(aps, APDS9900_PILTL_REG, 1);
@@ -651,127 +652,189 @@ static void aps_9900_work_func(struct work_struct *work)
         ret = set_9900_register(aps, 0x65, 0, 0);
         if (ret)
         {
-            printk(KERN_ERR "%s:set_9900_register is error(%d),clear failed!", __func__, ret);
+            printk(KERN_ERR "%s, line %d: set_9900_register is error(%d),clear failed!", __func__, __LINE__, ret);
         }
-		/* < DTS2011071500961  liujinggang 20110715 begin */
 		/*get value of proximity*/
          proximity_data_value = pdata;
-		/* DTS2011071500961  liujinggang 20110715 end > */
+
         /* if more than the value of  proximity high threshold we set*/
-        if (pdata >= pthreshold_h) {
-            /* < DTS2011051603591 wangjiongfeng 20110504 begin */
-			/* < DTS2011052003350 wangjiongfeng 20110520 begin */
-            /* modify the low threshold register of proximity from 400 to 700 */
-			/* < DTS2011052502345 wangjiongfeng 20110525 begin */
+
+        if (pdata >= pthreshold_h) 
+		{
             ret = set_9900_register(aps, APDS9900_PILTL_REG, min_proximity_value, 1);
-			/* DTS2011052502345 wangjiongfeng 20110525 end >*/
-			/* DTS2011052003350 wangjiongfeng 20110520 end >*/
-            /* < DTS2011051603591 wangjiongfeng 20110504 end */
             if (ret)
             {
-                printk(KERN_ERR "%s:set APDS9900_PILTL_REG register is error(%d)!", __func__, ret);
+                printk(KERN_ERR "%s, line %d: set APDS9900_PILTL_REG register is error(min=%d, ret=%d)!", __func__, __LINE__, min_proximity_value, ret);
             }
             input_report_abs(aps->input_dev, ABS_DISTANCE, 0);
             input_sync(aps->input_dev);
         }
         /* if less than the value of  proximity low threshold we set*/
-        /* < DTS2011052502345 wangjiongfeng 20110525 begin */
         /* the condition of pdata==pthreshold_l is valid */
         else if (pdata <=  pthreshold_l)
         {
             ret = set_9900_register(aps, APDS9900_PILTL_REG, 0, 1);
             if (ret)
             {
-                printk(KERN_ERR "%s:set APDS9900_PILTL_REGs register is error(%d)!", __func__, ret);
+                printk(KERN_ERR "%s, line %d: set APDS9900_PILTL_REGs register is error(%d)!", __func__, __LINE__, ret);
             }
             input_report_abs(aps->input_dev, ABS_DISTANCE, 1);
             input_sync(aps->input_dev);
         }
-        /* DTS2011052502345 wangjiongfeng 20110525 end >*/
+        /*on 27a platform ,bug info is a lot*/
+        else
+        {
+            printk(KERN_ERR "%s, line %d: Wrong status!\n",  __func__, __LINE__);
+            ret = set_9900_register(aps, APDS9900_PILTL_REG, min_proximity_value, 1);
+            if (ret)
+            {
+                printk(KERN_ERR "%s, line %d: set APDS9900_PILTL_REG register is error(%d)!", __func__, __LINE__, ret);
+            }
+        }
+        /* DTS2012052402146 jiangweizheng 20120524 end >*/
+        pthreshold_h = get_9900_register(aps, APDS9900_PIHTL_REG, 1);
+        pthreshold_l = get_9900_register(aps, APDS9900_PILTL_REG, 1);
+        p_h = pthreshold_h;
+        p_l = pthreshold_l;
+        APS9900_DBG("%s:min = %d,apds_9900 = %d\n",__func__,min_proximity_value,apds_9900_pwindows_value);
+        APS9900_DBG("%s:after reset the pdata=%d pthreshold_h=%d pthreshold_l=%d\n", __func__, pdata, pthreshold_h, pthreshold_l);
     }
+    /*< DTS2012052402146 jiangweizheng 20120524 begin */
+    /* p_flag is close, and no proximity interrupt: normal, just add for debug */ 
+    else if ( !atomic_read(&p_flag) && !(status & APDS9900_STATUS_PROXIMITY_BIT) )
+    {
+        APS9900_DBG("%s, line %d: [APS_OK]p_flag is close and no prox interrupt(status=0x%x).\n", __func__, __LINE__, status);
+    }
+    /* p_flag is open, but no proximity interrupt: show registers value */
+    else if (atomic_read(&p_flag) && !(status & APDS9900_STATUS_PROXIMITY_BIT) )
+    {
+        int pthreshold_h = 0;
+        int pthreshold_l = 0;
+        
+        /* get pdata, p_h, p_l value from registers */
+        pdata        = get_9900_register(aps, APDS9900_PDATAL_REG, 1);
+        pthreshold_h = get_9900_register(aps, APDS9900_PIHTL_REG, 1);
+        pthreshold_l = get_9900_register(aps, APDS9900_PILTL_REG, 1);
+        
+        /* normal */
+        if ( (0 == pthreshold_l && pdata < pthreshold_h)       /* near, but less than pthreshold_h  */
+            || (pthreshold_l > 0 && pdata > pthreshold_l) )    /* far, but bigger than pthreshold_l */
+        {
+            APS9900_DBG("%s, line %d: [APS_OK]p_flag is open, but no prox int(STATUS=0x%x,ENABLE=0x%x,PDATA=%d,PILT=%d,PIHT=%d)\n", \
+                        __func__, __LINE__, status, get_9900_register(aps,APDS9900_ENABLE_REG,0), pdata, pthreshold_l, pthreshold_h);
+        }
+        /* abnormal */
+        else
+        {
+            int reg_enable = get_9900_register(aps,APDS9900_ENABLE_REG,0);
+            printk(KERN_ERR "%s, line %d: [APS_ERR]p_flag is open, but no prox int(STATUS=0x%x,ENABLE=0x%x,PDATA=%d,PILT=%d,PIHT=%d)\n", \
+                   __func__, __LINE__, status, reg_enable, pdata, pthreshold_l, pthreshold_h);
+        }
+    }
+    /* p_flag is close, but raise proximity interrupt: abnormal, clear the prox interrupt bit */ 
+    else if ( !atomic_read(&p_flag) && (status & APDS9900_STATUS_PROXIMITY_BIT) )
+    {
+        /* clear proximity interrupt bit */
+        ret = set_9900_register(aps, 0x65, 0, 0);
+        if (ret)
+        {
+            printk(KERN_ERR "%s, line %d: clear proximity interrupt bit failed(%d)!\n", __func__, __LINE__, ret);
+        }
+        else
+        {
+            printk(KERN_ERR "%s, line %d: p_flag is close, but raise prox interrupt, clear prox interrupt bit.\n", __func__, __LINE__);
+        }
+    }
+    /* DTS2012052402146 jiangweizheng 20120524 end >*/
     /* ALS flag is open and the interrupt belongs to ALS */
     if (atomic_read(&l_flag) && (status & APDS9900_STATUS_ALS_BIT)) 
     {
         /* read the CH0 data and CH1 data  */
+		/* < DTS2011121203017 zhangmin 20111224 begin */
+        APS9900_DBG("into light_init!!\n");
+		/* DTS2011121203017 zhangmin 20111224 end > */
         cdata = get_9900_register(aps, APDS9900_CDATAL_REG, 1);
         irdata = get_9900_register(aps, APDS9900_IRDATAL_REG, 1);
         /* set ALS high threshold = ch0(cdata) + 20%,low threshold = ch0(cdata) - 20% */
         cdata_high = (cdata *  600)/500;
         cdata_low = (cdata *  400)/500;
-		/* < DTS2011081101306  liujinggang 20110811 begin */
-		/* the max value of cdata_high == 0xffff */
-		if(0xffff <= cdata_high )
-		{
-			cdata_high=0xffff;
-		}
-		/* DTS2011081101306  liujinggang 20110811 end > */
+        /*< DTS2012052402146 jiangweizheng 20120524 begin */
+        /* < DTS2011081101306  liujinggang 20110811 begin */
+        /* the max value of cdata_high == 0xffff */
+        if(0xffff <= cdata_high )
+        {
+            cdata_high=0xffff;
+            printk(KERN_ERR "%s, line %d: 0xffff <= cdata_high, reset to 0x%x!\n",  __func__, __LINE__, cdata_high);
+        }
+        /* DTS2011081101306  liujinggang 20110811 end > */
         /* clear als interrupt bit */
         ret = set_9900_register(aps, 0x66,0, 0);
         ret |= set_9900_register(aps, APDS9900_AILTL_REG, cdata_low, 1);
         ret |= set_9900_register(aps, APDS9900_AIHTL_REG, cdata_high, 1);
         if (ret)
         {
-            printk(KERN_ERR "%s:set APDS9900_AILTL_REG register is error(%d)!", __func__, ret);
+            printk(KERN_ERR "%s, line %d: set APDS9900_AILTL_REG register is error(cdata_low=%d,cdata_high=%d,ret=%d)!", __func__, __LINE__, cdata_low, cdata_high, ret);
         }
         /* convert the raw pdata and irdata to the value in units of lux */
         lux = luxcalculation(cdata, irdata);
-		/* < DTS2011081101306  liujinggang 20110811 begin */
-		/*get level of light*/
+        /* < DTS2011081101306  liujinggang 20110811 begin */
         APS9900_DBG("%s:cdata=%d irdata=%d lux=%d\n",__func__, cdata, irdata, lux);
         if (lux >= 0) 
         {
-			/* < DTS2011071500961  liujinggang 20110715 begin */
-			/*get value of light*/
-	         light_data_value = lux;
-			/* DTS2011071500961  liujinggang 20110715 end > */
-	        /* < DTS2011052003350 wangjiongfeng 20110520 begin */
-	        /* lux=0 is valid */
-	        als_level = LSENSOR_MAX_LEVEL - 1;
-			for (i = 0; i < ARRAY_SIZE(lsensor_adc_table); i++){
-				if (lux < lsensor_adc_table[i]){
-					als_level = i;
-					break;
-				}
-			}
-	        APS9900_DBG("%s:cdata=%d irdata=%d lux=%d,als_level==%d\n",__func__, cdata, irdata, lux,als_level);
-	
-			if(aps_first_read)
-			{
-				aps_first_read = 0;
-				input_report_abs(aps->input_dev, ABS_LIGHT, -1);
-				input_sync(aps->input_dev);
-			}
-			else
-			{
-				input_report_abs(aps->input_dev, ABS_LIGHT, als_level);
-				input_sync(aps->input_dev);
-			}
+            /* < DTS2011071500961  liujinggang 20110715 begin */
+            /*get value of light*/
+             light_data_value = lux;
+            /* DTS2011071500961  liujinggang 20110715 end > */
+            /* < DTS2011052003350 wangjiongfeng 20110520 begin */
+            /* lux=0 is valid */
+            als_level = LSENSOR_MAX_LEVEL - 1;
+            for (i = 0; i < ARRAY_SIZE(lsensor_adc_table); i++)
+            {
+                if (lux < lsensor_adc_table[i])
+                {
+                    als_level = i;
+                    break;
+                }
+            }
+            /* DTS2011112800919 zhangmin 20111128 end > */
+            APS9900_DBG("%s:cdata=%d irdata=%d lux=%d,als_level==%d\n",__func__, cdata, irdata, lux,als_level);
+
+            if(aps_first_read)
+            {
+                aps_first_read = 0;
+                input_report_abs(aps->input_dev, ABS_LIGHT, -1);
+                input_sync(aps->input_dev);
+            }
+            else
+            {
+                input_report_abs(aps->input_dev, ABS_LIGHT, als_level);
+                input_sync(aps->input_dev);
+            }
         }
         /* if lux<0,we need to change the gain which we can set register 0x0f */
         else {
-                printk("Need to change gain %2d \n", lux);
+                printk(KERN_ERR "%s, line %d: Need to change gain(lux=%2d)\n", __func__, __LINE__, lux);
         }
+        /* DTS2012052402146 jiangweizheng 20120524 end >*/
         /* DTS2011052003350 wangjiongfeng 20110520 end >*/
 	/* DTS2011081101306  liujinggang 20110811 end > */
     }   
-    if ((status & APDS9900_STATUS_PROXIMITY_BIT)  && (!atomic_read(&p_flag)))
-    {
-        /* clear proximity interrupt bit */
-        ret = set_9900_register(aps, 0x65, 0, 0);
-        if (ret)
-        {
-            printk(KERN_ERR "%s:clear proximity interrupt bit failed(%d)!", __func__, ret);
-        }
-    }
-    if ((status & APDS9900_STATUS_ALS_BIT) && (!atomic_read(&l_flag)))
+    /*< DTS2012052402146 jiangweizheng 20120524 begin */
+    /* l_flag is close, but raise als interrupt: abnormal, clear the als interrupt bit */
+    else if ((status & APDS9900_STATUS_ALS_BIT) && (!atomic_read(&l_flag)))
     {
         /* clear als interrupt bit */
         ret = set_9900_register(aps, 0x66,0, 0);
         if (ret)
         {
-            printk(KERN_ERR "%s:clear als interrupt bit failed(%d)!", __func__, ret);
+            printk(KERN_ERR "%s, line %d: clear als interrupt bit failed(%d)!", __func__, __LINE__, ret);
+        }
+        else
+        {
+            printk(KERN_ERR "%s, line %d: l_flag is close, but raise als interrupt, clear als interrupt bit.\n", __func__, __LINE__);
         }
     }
+    /* DTS2012052402146 jiangweizheng 20120524 end >*/
 
     /* < DTS2011052502345 wangjiongfeng 20110525 begin */
     /* delete the condition */
@@ -832,6 +895,8 @@ static int aps_9900_probe(
 {
     int ret;
     struct aps_data *aps;
+	uint16_t *p = &lsensor_adc_table[0];
+	int i = 0;
 	/* < DTS2011050303216 wangjiongfeng 20110504 begin */
     struct aps9900_hw_platform_data *platform_data = NULL;
 
@@ -841,34 +906,97 @@ static int aps_9900_probe(
         ret = -ENODEV;
         goto err_exit;
     }
+	/*add all GP's embranchment */
+    if(machine_is_msm7x27a_U8655() || machine_is_msm7x27a_U8655_EMMC())
+    {
+        apds_9900_pwindows_value = U8655_WINDOW;
+        apds_9900_pwave_value = U8655_WAVE;
+        p = &lsensor_adc_table_u8655[0];
+    }
+    else if(machine_is_msm7x27a_U8815())
+    {
+        /* < DTS2012030503882 yangbo 20120321 begin */
+        /*merge 8815's parameters to TA and main branch*/
+        apds_9900_pwindows_value = U8815_WINDOW;
+        apds_9900_pwave_value = U8815_WAVE;
+        /* < DTS2012030503882 yangbo 20120321 end */
+        p = &lsensor_adc_table_u8815[0];
+    }
+    else if(machine_is_msm7x27a_C8655_NAND())
+    {
+        apds_9900_pwindows_value = C8655_WINDOW;
+        apds_9900_pwave_value = C8655_WAVE;
+        p = &lsensor_adc_table_c8655[0];
+    }
+    else if(machine_is_msm7x27a_M660())
+    {
+        apds_9900_pwindows_value = M660_WINDOW;
+        apds_9900_pwave_value = M660_WAVE;
+        p = &lsensor_adc_table_m660[0];
+    }
+    /* DTS2012030903755 yangbo 20120309 begin */
+    /* C8812 is another name of C8820 */
+    else if( machine_is_msm7x27a_C8820() )
+    {
+        p = &lsensor_adc_table_c8812[0];	
+    }
+    /* DTS2012030903755 yangbo 20120309 end > */
+    else if( machine_is_msm8255_u8730())
+    {
+        /* < DTS2012032304842 yangbo 20120330 begin */
+        /* delete this line */
+        /* DTS2012032304842 yangbo 20120330 end > */
+        p = &lsensor_adc_table_u8730[0];
+    }
+    else if ( machine_is_msm8255_u8680())
+    {
+        p = &lsensor_adc_table_u8680[0];
+    }
+    else if( machine_is_msm8255_u8667())
+    {
+        p = &lsensor_adc_table_u8667[0];
+    }
+    for(i = 0;i < ARRAY_SIZE(lsensor_adc_table) ; i++ )
+    {
+        lsensor_adc_table[i] = p[i];
+    }
+    origin_prox = MAX_ADC_PROX_VALUE - apds_9900_pwindows_value;
+    min_proximity_value = origin_prox;
 
     platform_data = client->dev.platform_data;
-
+    /* < DTS2012012901908 zhangmin 20120129 begin */
+    /*27A doesn't need match power*/
     if (platform_data->aps9900_power)
     {
+    #ifdef CONFIG_ARCH_MSM7X30
         ret = platform_data->aps9900_power(IC_PM_ON);
         if (ret < 0)
         {
             pr_err("%s:aps9900 power on error!\n", __func__);
             goto err_exit ;
         }
+    #endif
     }
+    /* DTS2012012901908 zhangmin 20120129 end > */
 	/* < DTS2011050303216 wangjiongfeng 20110504 end */
     mdelay(5);
+    /*< DTS2012052402146 jiangweizheng 20120524 begin */
     if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-        PROXIMITY_DEBUG(KERN_ERR "aps_9900_probe: need I2C_FUNC_I2C\n");
+        printk(KERN_ERR "%s, line %d: need I2C_FUNC_I2C\n", __func__, __LINE__);
         ret = -ENODEV;
         goto err_check_functionality_failed;
     }
-	/* < DTS2011050303216 wangjiongfeng 20110504 begin */
-	/* delete some lines */
-	/* < DTS2011050303216 wangjiongfeng 20110504 end */
+    /* < DTS2011050303216 wangjiongfeng 20110504 begin */
+    /* delete some lines */
+    /* < DTS2011050303216 wangjiongfeng 20110504 end */
 
     aps = kzalloc(sizeof(*aps), GFP_KERNEL);
     if (aps == NULL) {
+        printk(KERN_ERR "%s, line %d: kzalloc fail!\n", __func__, __LINE__);
         ret = -ENOMEM;
         goto err_alloc_data_failed;
     }
+    /* DTS2012052402146 jiangweizheng 20120524 end >*/
 
     mutex_init(&aps->mlock);
     INIT_WORK(&aps->work, aps_9900_work_func);
@@ -894,7 +1022,9 @@ static int aps_9900_probe(
             ret = platform_data->aps9900_gpio_config_interrupt();
             if (ret) 
             {
-                PROXIMITY_DEBUG(KERN_ERR "gpio_tlmm_config error\n");
+                /*< DTS2012052402146 jiangweizheng 20120524 begin */
+                printk(KERN_ERR "%s, line %d: gpio_tlmm_config error\n", __func__, __LINE__);
+                /* DTS2012052402146 jiangweizheng 20120524 end >*/
                 goto err_gpio_config_failed;
             }
         }
@@ -951,7 +1081,9 @@ static int aps_9900_probe(
          aps->input_dev = input_allocate_device();
          if (aps->input_dev == NULL) {
          ret = -ENOMEM;
-         PROXIMITY_DEBUG(KERN_ERR "aps_9900_probe: Failed to allocate input device\n");
+         /*< DTS2012052402146 jiangweizheng 20120524 begin */
+         printk(KERN_ERR "%s, line %d: Failed to allocate input device\n", __func__, __LINE__);
+         /* DTS2012052402146 jiangweizheng 20120524 end >*/
          goto err_input_dev_alloc_failed;
          }
         aps->input_dev->name = "sensors_aps";
@@ -1031,10 +1163,14 @@ err_detect_failed:
     kfree(aps);
 err_alloc_data_failed:
 err_check_functionality_failed:
+	/* < DTS2012012901908 zhangmin 20120129 begin */
+	#ifdef CONFIG_ARCH_MSM7X30
     if(platform_data->aps9900_power)
     {
         platform_data->aps9900_power(IC_PM_OFF);
     }
+	#endif
+	/* DTS2012012901908 zhangmin 20120129 end > */
 err_exit:
     return ret;
 	/* < DTS2011050303216 wangjiongfeng 20110504 end */
@@ -1091,7 +1227,7 @@ static int aps_9900_suspend(struct i2c_client *client, pm_message_t mesg)
 	/* < DTS2011050303216 wangjiongfeng 20110504 end */
     return 0;
 }
-
+/* DTS2012020706412 zhangmin 20120306 end > */
 static int aps_9900_resume(struct i2c_client *client)
 {
     /* < DTS2011050303216 wangjiongfeng 20110504 begin */

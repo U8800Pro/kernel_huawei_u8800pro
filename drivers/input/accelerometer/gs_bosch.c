@@ -268,8 +268,8 @@ static int gs_bma250_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-gs_bma250_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long
+gs_bma250_ioctl(struct file *file, unsigned int cmd,
 	   unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
@@ -351,7 +351,7 @@ static struct file_operations gs_bma250_fops = {
 	.owner = THIS_MODULE,
 	.open = gs_bma250_open,
 	.release = gs_bma250_release,
-	.ioctl = gs_bma250_ioctl,
+	.unlocked_ioctl = gs_bma250_ioctl,
 };
 
 static struct miscdevice gsensor_device = {
@@ -536,12 +536,16 @@ static int gs_probe(
 	/*turn on the power*/
 	pdata = client->dev.platform_data;
 	if (pdata){
+/* < DTS2012013004920 zhangmin 20120130 begin */
+#ifdef CONFIG_ARCH_MSM7X30
 		if(pdata->gs_power != NULL){
 			ret = pdata->gs_power(IC_PM_ON);
 			if(ret < 0 ){
 				goto err_check_functionality_failed;
 			}
 		}
+#endif
+/* DTS2012013004920 zhangmin 20120130 end > */
 		if(pdata->adapt_fn != NULL){
 			ret = pdata->adapt_fn();
 			if(ret > 0){
@@ -648,9 +652,12 @@ static int gs_probe(
 	gs->input_dev->id.vendor = GS_BMA250;
 	
 	set_bit(EV_ABS,gs->input_dev->evbit);
-	set_bit(ABS_X, gs->input_dev->absbit);
-	set_bit(ABS_Y, gs->input_dev->absbit);
-	set_bit(ABS_Z, gs->input_dev->absbit);
+	/* < DTS20111208XXXXX  liujinggang 20111208 begin */
+	/* modify for ES-version*/
+	input_set_abs_params(gs->input_dev, ABS_X, -11520, 11520, 0, 0);
+	input_set_abs_params(gs->input_dev, ABS_Y, -11520, 11520, 0, 0);
+	input_set_abs_params(gs->input_dev, ABS_Z, -11520, 11520, 0, 0);
+	/* DTS20111208XXXXX  liujinggang 20111208 end > */
 	set_bit(EV_SYN,gs->input_dev->evbit);
 
 	gs->input_dev->id.bustype = BUS_I2C;
@@ -727,9 +734,13 @@ err_alloc_data_failed:
 /* < DTS2011043000257  liujinggang 20110503 begin */
 /*turn down the power*/
 err_power_failed:
+/* < DTS2012013004920 zhangmin 20120130 begin */
+#ifdef CONFIG_ARCH_MSM7X30
 	if(pdata->gs_power != NULL){
 		pdata->gs_power(IC_PM_OFF);
 	}
+#endif
+/* DTS2012013004920 zhangmin 20120130 end > */
 err_check_functionality_failed:
 /* DTS2011043000257  liujinggang 20110503 end > */
 	return ret;
@@ -826,10 +837,7 @@ static void __exit gs_bma250_exit(void)
 		destroy_workqueue(gs_wq);
 }
 
-/* < DTS2011111404645  zhangmin 20111119 begin */
-/*modify the order of init*/
-module_init(gs_bma250_init);
-/* DTS2011111404645  zhangmin 20111119 end > */
+device_initcall_sync(gs_bma250_init);
 module_exit(gs_bma250_exit);
 
 MODULE_DESCRIPTION("gs_bma250 Driver");

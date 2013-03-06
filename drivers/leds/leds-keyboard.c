@@ -1,4 +1,4 @@
-/*< DTS2011092601370 zhongjinrong 20110926 begin */
+/*< DTS2012052303745 zhongjinrong 20120523 begin */
 /*
  * leds-msm-pmic.c - MSM PMIC LEDs driver.
  *
@@ -50,24 +50,25 @@
 #define LED_BRIGHTNESS_OFF    0
 
 
-
+/*< DTS2012022305689 qitongliang 20120223 begin */
 static void msm_keypad_bl_led_set(struct led_classdev *led_cdev,
 	enum led_brightness value)
 {
 /*delete some lines*/
 	int ret = 0 ;
-	if(LED_BRIGHTNESS_OFF >= value || LED_PWM_LEVEL < value )
+	if(LED_BRIGHTNESS_OFF >= value || LED_BRIGHTNESS_LEVEL < value )
 	{
 		   ret = pmic_set_keyled_intensity(LED_KEYPAD,LED_BRIGHTNESS_OFF  );
 	}
 	else 
 	{
-		   ret = pmic_set_keyled_intensity(LED_KEYPAD, LED_BRIGHTNESS_LEVEL);
+		   ret = pmic_set_keyled_intensity(LED_KEYPAD, value);
 	}
 	if (ret)
 		dev_err(led_cdev->dev, "can't set keypad backlight\n");
 /*delete some lines*/
 }
+/* DTS2012022305689 qitongliang 20120223 end >*/
 
 static struct led_classdev msm_kp_bl_led = {
 /* delete some lines */
@@ -153,4 +154,4 @@ module_exit(msm_pmic_led_exit);
 MODULE_DESCRIPTION("MSM PMIC LEDs driver");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:pmic-leds");
-/* DTS2011092601370 zhongjinrong 20119026 end >*/
+/* DTS2012052303745 zhongjinrong 20120523 end >*/

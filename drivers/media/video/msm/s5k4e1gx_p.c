@@ -589,18 +589,13 @@ static int s5k4e1gx_p_probe_init_done(const struct msm_camera_sensor_info *data)
 {
     CDBG("s5k4e1gx_p_probe_init_done start\n");
     gpio_direction_output(data->sensor_reset, 0);
-    /*<  DTS2011101302587   yuguangcai 20111013 begin */
-    /*pull down vcn_pwd*/
-    gpio_direction_output(data->vcm_pwd, 0);
-    msleep(20);
     gpio_free(data->sensor_reset);
-    gpio_free(data->vcm_pwd);
-    
-    /* DTS2011101302587   yuguangcai 20111013 end > */
+    gpio_free(data->sensor_pwd);
+
     /*probe finish ,power down camera*/
     if (data->vreg_disable_func)
     {
-        data->vreg_disable_func(data->sensor_vreg, data->vreg_num);
+          data->vreg_disable_func(0);
     }
 
     return 0;
@@ -612,13 +607,21 @@ static int s5k4e1gx_p_probe_init_sensor(const struct msm_camera_sensor_info *dat
     uint16_t chipid;
 
     CDBG("s5k4e1gx_p_probe_init_sensor\n");
-    /*<  DTS2011101302587   yuguangcai 20111013 begin */
-    /*delete some lines*/
-    /* DTS2011101302587   yuguangcai 20111013 end > */
+
+    rc = gpio_request(data->sensor_pwd, "s5k4e1gx_p");
+    if (!rc)
+    {
+        gpio_direction_output(data->sensor_pwd, 1);
+    }
+    else
+    {
+        CDBG("gpio_request(data->sensor_pwd, s5k4e1g) Failed \n");
+        goto init_probe_done;
+    }
 
     if (data->vreg_enable_func)
     {
-        data->vreg_enable_func(data->sensor_vreg, data->vreg_num);
+         data->vreg_enable_func(1);
     }
 
     rc = gpio_request(data->sensor_reset, "s5k4e1gx_p");
@@ -1673,8 +1676,7 @@ static int32_t s5k4e1gx_p_power_down(void)
 
     if (s5k4e1gx_p_ctrl->sensordata->vreg_disable_func)
     {
-        rc = s5k4e1gx_p_ctrl->sensordata->vreg_disable_func(s5k4e1gx_p_ctrl->sensordata->sensor_vreg,
-                                                            s5k4e1gx_p_ctrl->sensordata->vreg_num);
+           s5k4e1gx_p_ctrl->sensordata->vreg_disable_func(0);                                                     
     }
 
     return rc;
@@ -1686,14 +1688,10 @@ static int s5k4e1gx_p_sensor_release(void)
 
     mutex_lock(&s5k4e1gx_p_mutex);
 
-    /*<  DTS2011101302587   yuguangcai 20111013 begin */
-    gpio_direction_output(s5k4e1gx_p_ctrl->sensordata->sensor_reset,0);
-    /*pull down vcm_pwd*/
-    gpio_direction_output(s5k4e1gx_p_ctrl->sensordata->vcm_pwd, 0);
-    msleep(20);
+    gpio_direction_output(s5k4e1gx_p_ctrl->sensordata->sensor_reset,
+                          0);
     gpio_free(s5k4e1gx_p_ctrl->sensordata->sensor_reset);
-    gpio_free(s5k4e1gx_p_ctrl->sensordata->vcm_pwd);
-    /* DTS2011101302587   yuguangcai 20111013 end > */
+    gpio_free(s5k4e1gx_p_ctrl->sensordata->sensor_pwd);
     rc = s5k4e1gx_p_power_down();
 
     kfree(s5k4e1gx_p_ctrl);

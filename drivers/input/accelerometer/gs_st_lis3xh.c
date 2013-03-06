@@ -114,30 +114,37 @@ void lis3xh_print_debug(int start_reg,int end_reg)
 /*  DTS2011072105664  xiangxu  20110722 end > */
 static inline int reg_read(struct gs_data *gs , int reg)
 {
-	int val;
+    /*< DTS2012053102470 jiangweizheng 20120531 begin */
+    int val;
 
-	mutex_lock(&gs->mlock);
+    mutex_lock(&gs->mlock);
 
-	val = i2c_smbus_read_byte_data(gs->client, reg);
-	if (val < 0)
-		printk(KERN_ERR "i2c_smbus_read_byte_data failed\n");
+    val = i2c_smbus_read_byte_data(gs->client, reg);
+    if (val < 0)
+    {
+        printk(KERN_ERR "i2c_smbus_read_byte_data failed! reg=0x%x, value=0x%x\n", reg, val);
+    }
 
-	mutex_unlock(&gs->mlock);
+    mutex_unlock(&gs->mlock);
 
-	return val;
+    return val;
+    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 static inline int reg_write(struct gs_data *gs, int reg, uint8_t val)
 {
-	int ret;
+    /*< DTS2012053102470 jiangweizheng 20120531 begin */
+    int ret;
 
-	mutex_lock(&gs->mlock);
-	ret = i2c_smbus_write_byte_data(gs->client, reg, val);
-	if(ret < 0) {
-		printk(KERN_ERR "i2c_smbus_write_byte_data failed\n");
-	}
-	mutex_unlock(&gs->mlock);
+    mutex_lock(&gs->mlock);
+    ret = i2c_smbus_write_byte_data(gs->client, reg, val);
+    if(ret < 0)
+    {
+        printk(KERN_ERR "i2c_smbus_write_byte_data failed! reg=0x%x, value=0x%x, ret=%d\n", reg, val, ret);
+    }
+    mutex_unlock(&gs->mlock);
 
-	return ret;
+    return ret;
+    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 
 #define MG_PER_SAMPLE   	720            /*HAL: 720=1g*/                       
@@ -201,8 +208,8 @@ static int gs_st_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-gs_st_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long
+gs_st_ioctl(struct file *file, unsigned int cmd,
 	   unsigned long arg)
 {
 	
@@ -288,7 +295,7 @@ static struct file_operations gs_st_fops = {
 	.owner = THIS_MODULE,
 	.open = gs_st_open,
 	.release = gs_st_release,
-	.ioctl = gs_st_ioctl,
+	.unlocked_ioctl = gs_st_ioctl,
 };
 
 static struct miscdevice gsensor_device = {
@@ -299,133 +306,145 @@ static struct miscdevice gsensor_device = {
 
 static void gs_work_func(struct work_struct *work)
 {
-	int status;	
-	/* < DTS2011072105664  xiangxu 20110722 begin*/
-	int x = 0, y = 0, z = 0;
-	/*  DTS2011072105664  xiangxu 20110722 end > */
-	u16 u16x, u16y, u16z;
-	u8 u8xl, u8xh, u8yl, u8yh, u8zl, u8zh;
-	int sesc = accel_delay / 1000;
-	int nsesc = (accel_delay % 1000) * 1000000;
-	struct gs_data *gs = container_of(work, struct gs_data, work);
-       
-	status = reg_read(gs, GS_ST_REG_STATUS ); /* read status */
-	
-	if(status & (1<<3))
-	{
-		u8xl = reg_read(gs, GS_ST_REG_OUT_XL);
-		u8xh = reg_read(gs, GS_ST_REG_OUT_XH);
-		u16x = (u8xh << 8) | u8xl;
-		
-		u8yl = reg_read(gs, GS_ST_REG_OUT_YL);
-		u8yh = reg_read(gs, GS_ST_REG_OUT_YH);
-		u16y = (u8yh << 8) | u8yl;
-		
-		u8zl = reg_read(gs, GS_ST_REG_OUT_ZL);
-		u8zh = reg_read(gs, GS_ST_REG_OUT_ZH);
-		u16z = (u8zh << 8) | u8zl;
-		 
-		if(u16x & 0x8000)
-		{
-			x = u16x - 65536;
-		}
-		else
-		{
-			x = u16x;
-		}
-					
-		if(u16y & 0x8000)
-		{
-			y = u16y - 65536;
-		}
-		else
-		{
-			y = u16y;
-		}
-				
-		if(u16z & 0x8000)
-		{
-			z = u16z - 65536;
-		}
-		else
-		{
-			z = u16z;
-		}
+    /*< DTS2012053102470 jiangweizheng 20120531 begin */
+    int status; 
+    /* < DTS2011072105664  xiangxu 20110722 begin*/
+    int x = 0, y = 0, z = 0;
+    /*  DTS2011072105664  xiangxu 20110722 end > */
+    u16 u16x, u16y, u16z;
+    u8 u8xl, u8xh, u8yl, u8yh, u8zl, u8zh;
+    int sesc = accel_delay / 1000;
+    int nsesc = (accel_delay % 1000) * 1000000;
+    struct gs_data *gs = container_of(work, struct gs_data, work);
 
-		/*(Decimal value/ 65536) * 4 g,For (0g ~+2.3g)*/	
-		x = (MG_PER_SAMPLE*40*(s16)x)/FILTER_SAMPLE_NUMBER/10;
-		y = (MG_PER_SAMPLE*40*(s16)y)/FILTER_SAMPLE_NUMBER/10;
-		z = (MG_PER_SAMPLE*40*(s16)z)/FILTER_SAMPLE_NUMBER/10;
+    status = reg_read(gs, GS_ST_REG_STATUS ); /* read status */
+    
+    if(status & (1<<3))
+    {
+        u8xl = reg_read(gs, GS_ST_REG_OUT_XL);
+        u8xh = reg_read(gs, GS_ST_REG_OUT_XH);
+        u16x = (u8xh << 8) | u8xl;
+        
+        u8yl = reg_read(gs, GS_ST_REG_OUT_YL);
+        u8yh = reg_read(gs, GS_ST_REG_OUT_YH);
+        u16y = (u8yh << 8) | u8yl;
+        
+        u8zl = reg_read(gs, GS_ST_REG_OUT_ZL);
+        u8zh = reg_read(gs, GS_ST_REG_OUT_ZH);
+        u16z = (u8zh << 8) | u8zl;
+         
+        if(u16x & 0x8000)
+        {
+            x = u16x - 65536;
+        }
+        else
+        {
+            x = u16x;
+        }
+                    
+        if(u16y & 0x8000)
+        {
+            y = u16y - 65536;
+        }
+        else
+        {
+            y = u16y;
+        }
+                
+        if(u16z & 0x8000)
+        {
+            z = u16z - 65536;
+        }
+        else
+        {
+            z = u16z;
+        }
 
-		/* < DTS2011072105664  xiangxu 20110722 begin*/
-		lis3xh_DBG("Gs_lis3xh:A  x : %d y : %d z : %d \n", x,y,z);
-		/*  DTS2011072105664  xiangxu 20110722 end > */
-		/* < DTS2011011905410   liujinggang 20110119 begin */
-		/* < DTS2011030405439 weiheng 20110307 begin */
-		/*report different values by machines*/
-		if((compass_gs_position==COMPASS_TOP_GS_BOTTOM)||(compass_gs_position==COMPASS_BOTTOM_GS_BOTTOM)||(compass_gs_position==COMPASS_NONE_GS_BOTTOM))
-		{
-			//inverse
-			x *=(-1);
-			y *=(-1);
-		}
-		else
-		{
-			/*
-			if((compass_gs_position==0)||(compass_gs_position==2))
-			*/
-			//obverse
-			y *=(-1);
-			z *=(-1);
-		}
-		/* DTS2011030405439 weiheng 20110307 end > */
-		/* DTS2011011905410   liujinggang 20110119 end > */
-		input_report_abs(gs->input_dev, ABS_X, x);
-		input_report_abs(gs->input_dev, ABS_Y, y);
-		input_report_abs(gs->input_dev, ABS_Z, z);
-		input_sync(gs->input_dev);
+        /*(Decimal value/ 65536) * 4 g,For (0g ~+2.3g)*/    
+        x = (MG_PER_SAMPLE*40*(s16)x)/FILTER_SAMPLE_NUMBER/10;
+        y = (MG_PER_SAMPLE*40*(s16)y)/FILTER_SAMPLE_NUMBER/10;
+        z = (MG_PER_SAMPLE*40*(s16)z)/FILTER_SAMPLE_NUMBER/10;
 
-		/*
-		 * There is a transform formula between ABS_X, ABS_Y, ABS_Z
-		 * and Android_X, Android_Y, Android_Z.
-		 *                      -          -
-		 *                      			|  0 -1  0 |
-		 * [ABS_X ABS_Y ABS_Z]*   |  1  0  0  | = [Android_X, Android_Y, Android_Z]
-		 *                      			|  0  0 -1 |
-		 *                      -          -
-		 * compass uses Android_X, Andorid_Y, Android_Z
-		 */
+        /* < DTS2011072105664  xiangxu 20110722 begin*/
+        lis3xh_DBG("%s, line %d: gs_lis3xh, x:%d y:%d z:%d sec:%d nsec:%d\n", __func__, __LINE__, x, y, z, sesc, nsesc);
+        /*  DTS2011072105664  xiangxu 20110722 end > */
+        /* < DTS2011011905410   liujinggang 20110119 begin */
+        /* < DTS2011030405439 weiheng 20110307 begin */
+        /*report different values by machines*/
+        if((compass_gs_position==COMPASS_TOP_GS_BOTTOM)||(compass_gs_position==COMPASS_BOTTOM_GS_BOTTOM)||(compass_gs_position==COMPASS_NONE_GS_BOTTOM))
+        {
+            //inverse
+            x *=(-1);
+            y *=(-1);
+        }
+        else
+        {
+            /*
+            if((compass_gs_position==0)||(compass_gs_position==2))
+            */
+            //obverse
+            y *=(-1);
+            z *=(-1);
+        }
+        /* DTS2011030405439 weiheng 20110307 end > */
+        /* DTS2011011905410   liujinggang 20110119 end > */
+        input_report_abs(gs->input_dev, ABS_X, x);
+        input_report_abs(gs->input_dev, ABS_Y, y);
+        input_report_abs(gs->input_dev, ABS_Z, z);
+        input_sync(gs->input_dev);
 
-		memset(gs_sensor_data, 0, sizeof(gs_sensor_data));
-		/*gs_sensor_data[0]= x;
-		gs_sensor_data[1]= -y;
-		gs_sensor_data[2]= -z;*/
+        /*
+         * There is a transform formula between ABS_X, ABS_Y, ABS_Z
+         * and Android_X, Android_Y, Android_Z.
+         *                      -          -
+         *                      |  0 -1  0 |
+         * [ABS_X ABS_Y ABS_Z]* |  1  0  0 | = [Android_X, Android_Y, Android_Z]
+         *                      |  0  0 -1 |
+         *                      -          -
+         * compass uses Android_X, Andorid_Y, Android_Z
+         */
 
-		gs_sensor_data[0]= -x;
-		gs_sensor_data[1]= y;
-		gs_sensor_data[2]= -z;
-	}
+        memset(gs_sensor_data, 0, sizeof(gs_sensor_data));
+        /*gs_sensor_data[0]= x;
+        gs_sensor_data[1]= -y;
+        gs_sensor_data[2]= -z;*/
 
-	/* < DTS2011072105664  xiangxu 20110722 begin */
-    lis3xh_DBG("Gs_lis3xh:A  x : %d y : %d z : %d \n", x,y,z);
+        gs_sensor_data[0]= -x;
+        gs_sensor_data[1]= y;
+        gs_sensor_data[2]= -z;
+    }
+    else
+    {
+        printk(KERN_ERR "%s, line %d: status=0x%x\n", __func__, __LINE__, status);
+    }
+    /* < DTS2011072105664  xiangxu 20110722 begin */
     if(lis3xh_debug_mask)
     {
-	    /* print reg info in such times */
-		if(!(++list3xh_times%lis3xh_PRINT_PER_TIMES))  
-		{
-			/* count return to 0 */
-			list3xh_times = 0;
-			lis3xh_print_debug(GS_ST_REG_STATUS_AUX,GS_ST_REG_WHO_AM_I);
-			lis3xh_print_debug(GS_ST_REG_TEMP_CFG_REG,GS_ST_REG_OUT_ZH);
-			lis3xh_print_debug(GS_ST_REG_FF_WU_CFG_1,GS_ST_REG_CLICK_SRC);
-			lis3xh_print_debug(GS_ST_REG_CLICK_THSY_X,GS_ST_REG_CLICK_WINDOW);
-		}
+        /* print reg info in such times */
+        if(!(++list3xh_times%lis3xh_PRINT_PER_TIMES))  
+        {
+            /* count return to 0 */
+            list3xh_times = 0;
+            lis3xh_print_debug(GS_ST_REG_STATUS_AUX,GS_ST_REG_WHO_AM_I);
+            lis3xh_print_debug(GS_ST_REG_TEMP_CFG_REG,GS_ST_REG_OUT_ZH);
+            lis3xh_print_debug(GS_ST_REG_FF_WU_CFG_1,GS_ST_REG_CLICK_SRC);
+            lis3xh_print_debug(GS_ST_REG_CLICK_THSY_X,GS_ST_REG_CLICK_WINDOW);
+        }
     }
     /* DTS2011072105664  xiangxu 20110722 end > */
-	if (gs->use_irq)
-		enable_irq(gs->client->irq);
-	else
-		hrtimer_start(&gs->timer, ktime_set(sesc, nsesc), HRTIMER_MODE_REL);
+    if (gs->use_irq)
+    {
+        enable_irq(gs->client->irq);
+    }
+    else
+    {
+        /* hrtimer_start fail */
+        if (0 != hrtimer_start(&gs->timer, ktime_set(sesc, nsesc), HRTIMER_MODE_REL) )
+        {
+            printk(KERN_ERR "%s, line %d: hrtimer_start fail! sec=%d, nsec=%d\n", __func__, __LINE__, sesc, nsesc);
+        }
+    }
+    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 
 
@@ -480,6 +499,9 @@ static int gs_probe(
 {	
 	int ret;
 	struct gs_data *gs;
+	/* < DTS2012013004920 zhangmin 20120130 begin */
+	int reg_st;
+	/* DTS2012013004920 zhangmin 20120130 end > */
 	/* < DTS2011011905410   liujinggang 20110119 begin */
 	struct gs_platform_data *pdata = NULL;
 
@@ -498,12 +520,16 @@ static int gs_probe(
 	/*turn on the power*/
 	pdata = client->dev.platform_data;
 	if (pdata){
+/* < DTS2012013004920 zhangmin 20120130 begin */
+#ifdef CONFIG_ARCH_MSM7X30
 		if(pdata->gs_power != NULL){
 			ret = pdata->gs_power(IC_PM_ON);
 			if(ret < 0 ){
 				goto err_check_functionality_failed;
 			}
 		}
+#endif
+/* DTS2012013004920 zhangmin 20120130 end > */
 		if(pdata->adapt_fn != NULL){
 			ret = pdata->adapt_fn();
 			if(ret > 0){
@@ -556,8 +582,38 @@ static int gs_probe(
 	gs->sub_type = reg_read(gs, 0x0f);
 	printk("sub_type = %d\n", gs->sub_type);
 	printk("gs is %s\n", (gs->sub_type==0x33)? "ST LIS3DH":"ST LIS331DLH");
-
-
+	/* < DTS2012013004920 zhangmin 20120130 begin */
+	/*this plan is provided by ST company,detail is attaching on the dts website*/
+    reg_st = reg_read(gs, 0x1E);
+    reg_st = reg_st | 0x80 ;
+    ret = reg_write(gs, 0x1E, reg_st);
+    if (ret < 0) 
+    {
+		printk(KERN_ERR "write 0x1E fail at first time!\n");
+		ret = reg_write(gs, 0x1E, reg_st);
+        if (ret < 0) 
+        {
+            printk(KERN_ERR "write 0x1E fail at second time!\n");
+        }
+        else
+        {
+            printk(KERN_ERR "write 0x1E success at second time!\n");
+        }
+	}
+    else
+    {
+        printk(KERN_ERR "write 0x1E success at first time!\n");
+    }
+    reg_st = reg_read(gs, 0x1E);
+    if(0x80 == (reg_st & 0x80))
+    {
+        printk("set and read success!\n");
+    }
+    else
+    {
+        printk("set failed!\n");
+    }
+	/* DTS2012013004920 zhangmin 20120130 end > */
 	ret = reg_write(gs, GS_ST_REG_CTRL2, 0x00); /* device command = ctrl_reg2 */
 	if (ret < 0) {
 		printk(KERN_ERR "i2c_smbus_write_byte_data failed\n");
@@ -593,9 +649,12 @@ static int gs_probe(
 
 	set_bit(EV_ABS,gs->input_dev->evbit);
 	
-	set_bit(ABS_X, gs->input_dev->absbit);
-	set_bit(ABS_Y, gs->input_dev->absbit);
-	set_bit(ABS_Z, gs->input_dev->absbit);
+	/* < DTS20111208XXXXX  liujinggang 20111208 begin */
+	/* modify for ES-version*/
+	input_set_abs_params(gs->input_dev, ABS_X, -11520, 11520, 0, 0);
+	input_set_abs_params(gs->input_dev, ABS_Y, -11520, 11520, 0, 0);
+	input_set_abs_params(gs->input_dev, ABS_Z, -11520, 11520, 0, 0);
+	/* DTS20111208XXXXX  liujinggang 20111208 end > */
 	
 	set_bit(EV_SYN,gs->input_dev->evbit);
 
@@ -640,19 +699,38 @@ static int gs_probe(
 	register_early_suspend(&gs->early_suspend);
 #endif
 
-      gs_wq = create_singlethread_workqueue("gs_wq");
-      if (!gs_wq)
-	      return -ENOMEM;
-	
-      this_gs_data =gs;
-	/* < DTS2011011905410   liujinggang 20110119 begin */
-	if(pdata && pdata->init_flag)
-		*(pdata->init_flag) = 1;
-	/* DTS2011011905410   liujinggang 20110119 end > */
-      printk(KERN_INFO "gs_probe: Start LIS35DE  in %s mode\n", gs->use_irq ? "interrupt" : "polling");
+/*< DTS2012053102470 jiangweizheng 20120531 begin */
+    gs_wq = create_singlethread_workqueue("gs_wq");
+    if (!gs_wq)
+    {
+        ret = -ENOMEM;
+        printk(KERN_ERR "%s, line %d: create_singlethread_workqueue fail!\n", __func__, __LINE__);
+        goto err_create_workqueue_failed;
+    }
+    this_gs_data =gs;
 
-      return 0;
-	
+    /* < DTS2011011905410   liujinggang 20110119 begin */
+    if (pdata && pdata->init_flag)
+        *(pdata->init_flag) = 1;
+    /* DTS2011011905410   liujinggang 20110119 end > */
+     printk(KERN_INFO "gs_probe: Start LIS35DE in %s mode\n", gs->use_irq ? "interrupt" : "polling");
+
+    return 0;
+
+err_create_workqueue_failed:
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    unregister_early_suspend(&gs->early_suspend);
+#endif
+
+    if (gs->use_irq)
+    {
+        free_irq(client->irq, gs);
+    }
+    else
+    {
+        hrtimer_cancel(&gs->timer);
+    }
+/* DTS2012053102470 jiangweizheng 20120531 end >*/
 err_misc_device_register_failed:
 		misc_deregister(&gsensor_device);
 		
@@ -672,9 +750,13 @@ err_alloc_data_failed:
 /* < DTS2011043000257  liujinggang 20110503 begin */
 /*turn down the power*/	
 err_power_failed:
+/* < DTS2012013004920 zhangmin 20120130 begin */
+#ifdef CONFIG_ARCH_MSM7X30
 	if(pdata->gs_power != NULL){
 		pdata->gs_power(IC_PM_OFF);
 	}
+#endif
+/* DTS2012013004920 zhangmin 20120130 end > */
 err_check_functionality_failed:
 /* DTS2011043000257  liujinggang 20110503 end > */
 	return ret;
@@ -683,7 +765,11 @@ err_check_functionality_failed:
 static int gs_remove(struct i2c_client *client)
 {
 	struct gs_data *gs = i2c_get_clientdata(client);
-	unregister_early_suspend(&gs->early_suspend);
+/*< DTS2012053102470 jiangweizheng 20120531 begin */
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    unregister_early_suspend(&gs->early_suspend);
+#endif
+/* DTS2012053102470 jiangweizheng 20120531 end >*/
 	if (gs->use_irq)
 		free_irq(client->irq, gs);
 	else

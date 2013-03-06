@@ -11,11 +11,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -41,6 +36,10 @@
 /* DTS2010102600914 zhangtao 20101026 end > */
 #define MAX_KEYPAD_BL_LEVEL	16
 
+/*< DTS2012051704510 houming 20120517 begin */
+#define PM8058_GPIO_PM_TO_SYS(pm_gpio)     (pm_gpio + NR_GPIO_IRQS)
+/* DTS2012051704510 houming 20120517 end >*/
+
 /*< DTS2011070504600  sunhonghui 20110706 begin */
 /*U8860lp use GPIO 25 Of PIMIC to driver the led backlight, Then configure it as PWM to driver LED*/
 #ifdef CONFIG_HUAWEI_LEDS_PMIC
@@ -54,6 +53,10 @@
 /*< DTS2011061001175 jiaoshuangwei 20110725 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 #define LED_BRIGHTNESS_LEVEL  2
+/* < DTS2011091905733 liwei 20111221 begin */
+#define LED_BRIGHTNESS_LEVEL_U8680 12
+#define LED_BRIGHTNESS_LEVEL_U8667 20
+/* DTS2011091905733 liwei 20111221 end > */
 #define LED_BRIGHTNESS_OFF    0
 #endif
 /* DTS2011061001175jiaoshuangwei 20110725 end >*/
@@ -64,7 +67,7 @@ static struct pwm_device *bl_pwm;
 int led_pwm_gpio_config(void)
 {
     int rc;
-    struct pm8058_gpio backlight_drv = 
+    struct pm_gpio backlight_drv = 
     {
         .direction      = PM_GPIO_DIR_OUT,
         .output_buffer  = PM_GPIO_OUT_BUF_CMOS,
@@ -76,11 +79,17 @@ int led_pwm_gpio_config(void)
         .inv_int_pol 	= 1,
     };
     if(machine_is_msm8255_u8860lp()
+    /* < DTS2012022905490 ganfan 20120301 begin */
+    || machine_is_msm8255_u8860_r()
+    /* DTS2012022905490 ganfan 20120301 end > */
 	/*<DTS2011091502092 liyuping 20110915 begin */
 	 ||machine_is_msm8255_u8860_51())
 	/* DTS2011091502092 liyuping 20110915 end> */
     {
-        rc = pm8058_gpio_config( 24, &backlight_drv);
+	    /*< DTS2012051704510 houming 20120517 begin */
+		/* renew config the gpio value */
+        rc = pm8xxx_gpio_config( PM8058_GPIO_PM_TO_SYS(24), &backlight_drv);    
+		/* DTS2012051704510 houming 20120517 end >*/
     }
     else
     {
@@ -103,82 +112,95 @@ static void msm_keypad_bl_led_set(struct led_classdev *led_cdev,
 /* < DTS2010102600914 zhangtao 20101026 begin */
 #ifdef CONFIG_HUAWEI_LEDS_PMIC
     int ret = 0;
-    /*< DTS2010112702297 wangquanli 201001125 begin */
-	/*< DTS2011030202729  liliang 20110302  begin */		
-	/*< DTS2011042703705 zhangbo 20110422 begin */
-	/* <DTS2011050700551 zhangbo 20110505 begin */
-    /* <DTS2011062600102 sunhonghui 20110626 begin */
-    /*< DTS2011070504600  sunhonghui 20110706 begin */
-/*< DTS2011061001175 jiaoshuangwei 20110725 begin */
-    if(machine_is_msm7x30_u8800() || machine_is_msm7x30_u8800_51() || machine_is_msm8255_u8800_pro() ) 
-/* DTS2011061001175jiaoshuangwei 20110725 end >*/
-    /*DTS2011070504600  sunhonghui 20110706 end >*/
-    /* DTS2011062600102 sunhonghui 20110626 end> */
-	/* DTS2011050700551 zhangbo 20110505 end> */
-	/* DTS2011042703705 zhangbo 20110422 end >*/
-	/* DTS2011030202729  liliang 20110302 end >*/    
-	/* DTS2010112702297 wangquanli 201001125 end >*/
-    {
-	/* <DTS2011101203790 sunkai 20111024 begin */
-	/*  when the value between 0 and 255,set the key brightness is LED_BRIGHRNESS_LEVEL or set the brightness is 0 */
-	if( LED_BRIGHTNESS_OFF >= value || LED_PWM_LEVEL < value )
-	{
-		ret = pmic_set_keyled_intensity(LED_KEYPAD, LED_BRIGHTNESS_OFF);
-	}
-	else
-	{
-		ret = pmic_set_keyled_intensity(LED_KEYPAD, 100);	
-	}
-      /*< DTS2011072204018  sunhonghui 20110722 begin */
-      //ret = pmic_set_led_intensity(LED_KEYPAD, !( ! value));
-      /*DTS2011072204018  sunhonghui 20110722 end >*/
-	/* DTS2011101203790 sunkai 20111024 end> */
-    }
-    /*< DTS2011070504600  sunhonghui 20110706 begin */
-    else if( machine_is_msm8255_u8860lp()	
-	/*<DTS2011091502092 liyuping 20110915 begin */
-	       ||machine_is_msm8255_u8860_51())
-	/* DTS2011091502092 liyuping 20110915 end> */
-    {
-        pwm_config(bl_pwm, LED_PWM_DUTY_LEVEL*value/NSEC_PER_USEC, LED_PWM_PERIOD/NSEC_PER_USEC);
-        pwm_enable(bl_pwm);
-    }
-	/* <DTS2011091200073 zhangbo 20110912 begin */
-    else if(machine_is_msm7x30_u8820()
-	    || (machine_is_msm8255_u8730()))
-	/* DTS2011091200073 zhangbo 20110912 end> */
-    /*DTS2011070504600  sunhonghui 20110706 end >*/
+/*< DTS2012020306500 lijianzhao 20120204 begin */
+/* 7x27a platform use mpp7 as keypad backlight */
+	/*< DTS2012021602342 zhongjinrong 20120224 begin */
+	#ifdef CONFIG_ARCH_MSM7X27A
+	/* DTS2012021602342 zhongjinrong 20120224 end >*/
+    	ret = pmic_secure_mpp_config_i_sink(PM_MPP_7, PM_MPP__I_SINK__LEVEL_5mA, \
+            	(!!value) ? PM_MPP__I_SINK__SWITCH_ENA : PM_MPP__I_SINK__SWITCH_DIS);
+	#else
+	    if(machine_is_msm7x30_u8800() || machine_is_msm7x30_u8800_51() || machine_is_msm8255_u8800_pro() ) 
+	    {
+	    /* < DTS2012063002166 xiedayong 20120704 begin */
+	    /* when the value between 0 and 60,set the key brightness is LED_BRIGHRNESS_LEVEL or set the brightness is 0 */
+	    if( LED_BRIGHTNESS_OFF >= value || LED_PWM_LEVEL < value )
+	    {
+	        ret = pmic_set_keyled_intensity(LED_KEYPAD, LED_BRIGHTNESS_OFF);
+	    }
+	    else
+	    {
+		    ret = pmic_set_keyled_intensity(LED_KEYPAD, 100);
+	    }
+	      /*< DTS2011072204018  sunhonghui 20110722 begin */
+	      //ret = pmic_set_led_intensity(LED_KEYPAD, !( ! value));
+	      /*DTS2011072204018  sunhonghui 20110722 end >*/
+	    /* DTS2012063002166 xiedayong 20120704 end > */
+	    }
+	    /*< DTS2011070504600  sunhonghui 20110706 begin */
+	    else if( machine_is_msm8255_u8860lp()	
+        /* < DTS2012022905490 ganfan 20120301 begin */
+        || machine_is_msm8255_u8860_r()
+        /* DTS2012022905490 ganfan 20120301 end > */
+		/*<DTS2011091502092 liyuping 20110915 begin */
+		       ||machine_is_msm8255_u8860_51())
+		/* DTS2011091502092 liyuping 20110915 end> */
+	    {
+	        pwm_config(bl_pwm, LED_PWM_DUTY_LEVEL*value/NSEC_PER_USEC, LED_PWM_PERIOD/NSEC_PER_USEC);
+	        pwm_enable(bl_pwm);
+	    }
+	    else if(machine_is_msm7x30_u8820()
+		    || (machine_is_msm8255_u8730()))
+	    /*DTS2011070504600  sunhonghui 20110706 end >*/
+	    {   
+	      /*< DTS2011072204018  sunhonghui 20110722 begin */
+	      ret = pmic_set_mpp6_led_intensity(!( ! value));
+	      /* DTS2011072204018  sunhonghui 20110722 end >*/
+	    }
+		/*< when the value between 0 and 255,set the key brightness is LED_BRIGHRNESS_LEVEL or set the brightness is 0 */
+/* <DTS2012013002968 liwei 20120130 begin */
+		else if( machine_is_msm8255_u8860() 
+		      || machine_is_msm8255_c8860() 
+			  || machine_is_msm8255_u8860_92())
+/* DTS2012013002968 liwei 20120130 end > */
+		{
+	       if(LED_BRIGHTNESS_OFF >= value || LED_PWM_LEVEL < value )
+	       {
+		   	   ret = pmic_set_keyled_intensity(LED_KEYPAD,LED_BRIGHTNESS_OFF  );
+	       }
+		   else 
+		   {
+		   	   ret = pmic_set_keyled_intensity(LED_KEYPAD, LED_BRIGHTNESS_LEVEL);
+		   }
+		}
+/* <DTS2012013002968 liwei 20120130 begin */
+    else if(machine_is_msm8255_u8680())
     {   
-      /*< DTS2011072204018  sunhonghui 20110722 begin */
-      ret = pmic_set_mpp6_led_intensity(!( ! value));
-      /* DTS2011072204018  sunhonghui 20110722 end >*/
+	    /* Set keypad led brightness level 12 for U8680 */
+        if(LED_BRIGHTNESS_OFF >= value || LED_PWM_LEVEL < value)
+        {
+            ret = pmic_set_keyled_intensity(LED_KEYPAD,LED_BRIGHTNESS_OFF);
+        }
+        else 
+        {
+            ret = pmic_set_keyled_intensity(LED_KEYPAD, LED_BRIGHTNESS_LEVEL_U8680);
+        }	
     }
-/*< DTS2011061001175 jiaoshuangwei 20110725 begin */
-/*< when the value between 0 and 255,set the key brightness is LED_BRIGHRNESS_LEVEL or set the brightness is 0 */
-#ifdef CONFIG_HUAWEI_KERNEL
-    /* <DTS2011071600361 liyuping 20110716 begin */
-	/* < DTS2011082302564 liwei 20110823 begin */
-	/* < DTS2011102401822 liwei 20111024 begin */
-	else if( machine_is_msm8255_u8860() 
-	      || machine_is_msm8255_c8860() 
-		  || machine_is_msm8255_u8860_92()
-		  || machine_is_msm8255_u8680()
-		  || machine_is_msm8255_u8667())
-    /* DTS2011102401822 liwei 20111024 end > */
-	/* DTS2011082302564 liwei 20110823 end > */
-	/* DTS2011071600361 liyuping 20110716 end> */
-	{
-       if(LED_BRIGHTNESS_OFF >= value || LED_PWM_LEVEL < value )
-       {
-	   	   ret = pmic_set_keyled_intensity(LED_KEYPAD,LED_BRIGHTNESS_OFF  );
-       }
-	   else 
-	   {
-	   	   ret = pmic_set_keyled_intensity(LED_KEYPAD, LED_BRIGHTNESS_LEVEL);
-	   }
-	}
-#endif
-/* DTS2011061001175jiaoshuangwei 20110725 end >*/
+    else if(machine_is_msm8255_u8667())
+    {   
+        /* Set keypad led brightness level 16 for U8667 */
+        if(LED_BRIGHTNESS_OFF >= value || LED_PWM_LEVEL < value)
+        {
+            ret = pmic_set_keyled_intensity(LED_KEYPAD, LED_BRIGHTNESS_OFF);
+        }
+        else 
+        {
+            ret = pmic_set_keyled_intensity(LED_KEYPAD, LED_BRIGHTNESS_LEVEL_U8667);
+        }	
+    }
+/* DTS2012013002968 liwei 20120130 end > */
+	#endif
+/* DTS2012020306500 lijianzhao 20120204 end >*/
     if (ret)
 		dev_err(led_cdev->dev, "can't set keypad backlight\n");
 #else
@@ -215,6 +237,9 @@ static int msm_pmic_led_probe(struct platform_device *pdev)
 /*< DTS2011070504600  sunhonghui 20110706 begin */
 #ifdef CONFIG_HUAWEI_LEDS_PMIC
     if( machine_is_msm8255_u8860lp()	
+    /* < DTS2012022905490 ganfan 20120301 begin */
+    || machine_is_msm8255_u8860_r()
+    /* DTS2012022905490 ganfan 20120301 end > */
 	/*<DTS2011091502092 liyuping 20110915 begin */
 	  ||machine_is_msm8255_u8860_51())
 	/* DTS2011091502092 liyuping 20110915 end> */
@@ -244,6 +269,9 @@ static int msm_pmic_led_suspend(struct platform_device *dev,
 /* if phone is set in system sleep indicator mode and is sleepping,bl_pwm must be free for GPIO_24 is being controled by modem*/
 #ifdef CONFIG_HUAWEI_LEDS_PMIC
     if( machine_is_msm8255_u8860lp()
+    /* < DTS2012022905490 ganfan 20120301 begin */
+    || machine_is_msm8255_u8860_r()
+    /* DTS2012022905490 ganfan 20120301 end > */
 /*<DTS2011091502092 liyuping 20110915 begin */
 	 ||machine_is_msm8255_u8860_51())
 /* DTS2011091502092 liyuping 20110915 end> */
@@ -262,6 +290,9 @@ static int msm_pmic_led_resume(struct platform_device *dev)
 /* if phone is set in system sleep indicator mode and awoke,GPIO_24 is relseased so it should be requested*/
 #ifdef CONFIG_HUAWEI_LEDS_PMIC
     if( machine_is_msm8255_u8860lp()
+    /* < DTS2012022905490 ganfan 20120301 begin */
+    || machine_is_msm8255_u8860_r()
+    /* DTS2012022905490 ganfan 20120301 end > */
 /*<DTS2011091502092 liyuping 20110915 begin */
 	 ||machine_is_msm8255_u8860_51())
 /* DTS2011091502092 liyuping 20110915 end> */

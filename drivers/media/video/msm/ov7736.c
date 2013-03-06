@@ -59,22 +59,6 @@ enum ov7736_resolution_t
     INVALID_SIZE
 };
 
-/*< DTS2011072504793   songxiaoming 20110803 begin */
-/*add the wb setting*/
-typedef enum
-{
-    CAMERA_WB_MIN_MINUS_1,
-    CAMERA_WB_AUTO = 1,
-    CAMERA_WB_CUSTOM,
-    CAMERA_WB_INCANDESCENT,
-    CAMERA_WB_FLUORESCENT,
-    CAMERA_WB_DAYLIGHT,
-    CAMERA_WB_CLOUDY_DAYLIGHT,
-    CAMERA_WB_TWILIGHT,
-    CAMERA_WB_SHADE,
-    CAMERA_WB_MAX_PLUS_1
-} config3a_wb_t;
-/* DTS2011072504793   songxiaoming 20110803 end > */
 enum ov7736_reg_update_t
 {
     /* Sensor egisters that need to be updated during initialization */
@@ -405,7 +389,7 @@ static struct  i2c_client *ov7736_client = NULL;
 static struct ov7736_ctrl_t *ov7736_ctrl = NULL;
 
 static DECLARE_WAIT_QUEUE_HEAD(ov7736_wait_queue);
-DECLARE_MUTEX(ov7736_sem);
+DEFINE_SEMAPHORE(ov7736_sem);
 
 static int ov7736_i2c_rxdata(unsigned short saddr,
                              unsigned char *rxdata, int length)
@@ -780,7 +764,9 @@ static int ov7736_sensor_init_done(const struct msm_camera_sensor_info *data)
 
     if (data->vreg_disable_func)
     {
-        data->vreg_disable_func(data->sensor_vreg, data->vreg_num);
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        data->vreg_disable_func(0);
+        /* DTS2012020400396 zhangyu 20120206 end > */
     }
 
     return 0;
@@ -816,11 +802,9 @@ static int ov7736_probe_init_sensor(const struct msm_camera_sensor_info *data)
     mdelay(5);
     if (data->vreg_enable_func)
     {
-        rc = data->vreg_enable_func(data->sensor_vreg, data->vreg_num);
-        if (rc < 0)
-        {
-            goto init_probe_fail;
-        }
+        /*< DTS2012020400396 zhangyu 20120206 begin */
+        data->vreg_enable_func(1);
+        /* DTS2012020400396 zhangyu 20120206 end > */
     }
 
     mdelay(5);

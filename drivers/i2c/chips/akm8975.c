@@ -36,7 +36,9 @@
 #include <mach/vreg.h>
 
 #include "linux/hardware_self_adapt.h"
-
+/* < DTS2012022000736 zhangmin 20120220 begin */
+#include <linux/gpio_event.h>
+/* DTS2012022000736 zhangmin 20120220 end > */
 /* <DTS2011021804534 shenjinming 20110218 begin */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
@@ -52,8 +54,9 @@
 #define MAX_FAILURE_COUNT	3
 #define AKM8975_RETRY_COUNT	10
 #define AKM8975_DEFAULT_DELAY	100
-
-#define GPIO_COMPASS_INT  132
+/* < DTS2012013004920 zhangmin 20120130 begin */
+/*move it to hardware_self_adapt.h*/
+/* DTS2012013004920 zhangmin 20120130 end > */
 
 #if AKM8975_DEBUG_MSG
 #define AKMDBG(fmt, args...) printk(KERN_INFO "AKM8975 " fmt "\n", ##args)
@@ -432,6 +435,23 @@ static void AKECS_CloseDone(void)
 static int akm_aot_open(struct inode *inode, struct file *file)
 {
 	int ret = -1;
+	/* < DTS2012022000736 zhangmin 20120220 begin */
+	/*
+	*int atomic_cmpxchg(atomic_t *v, int old, int new)
+	*{
+	*	int ret;
+	*	unsigned long flags;
+	*	spin_lock_irqsave(ATOMIC_HASH(v), flags);
+	*
+	*	ret = v->counter;
+	*	if (likely(ret == old))
+	*		v->counter = new;
+	*
+	*	spin_unlock_irqrestore(ATOMIC_HASH(v), flags);
+	*	return ret;
+	*}
+	*/
+	/* DTS2012022000736 zhangmin 20120220 end > */
 
 	AKMFUNC("akm_aot_open");
 	if (atomic_cmpxchg(&open_count, 0, 1) == 0) {
@@ -454,8 +474,8 @@ static int akm_aot_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-akm_aot_ioctl(struct inode *inode, struct file *file,
+static long
+akm_aot_ioctl(struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
@@ -565,8 +585,8 @@ static int akmd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int
-akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long
+akmd_ioctl(struct file *file, unsigned int cmd,
 		   unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
@@ -579,6 +599,9 @@ akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	short delay;		/* for GET_DELAY */
 	int status;			/* for OPEN/CLOSE_STATUS */
 	int ret = -1;		/* Return value. */
+	/* < DTS2012022000736 zhangmin 20120220 begin */
+	int slide = 0;
+	/* DTS2012022000736 zhangmin 20120220 end > */
 	/*AKMDBG("%s (0x%08X).", __func__, cmd);*/
 
 	/* < DTS2011022604747  liujinggang 20110228 begin */
@@ -626,7 +649,15 @@ akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		}
 		printk(KERN_INFO "ECS_IOCTL_SET_CAL   calibration_value=%d\n",calibration_value);
 		break;
-		
+	/* < DTS2012022000736 zhangmin 20120220 begin */
+	/*add ioctl cmd*/
+	case ECS_IOCTL_APP_GET_SLIDE:
+		if (argp == NULL) {
+			AKMDBG("invalid argument.");
+			return -EINVAL;
+		}
+		break;
+	/* DTS2012022000736 zhangmin 20120220 end > */
 	default:
 		break;
 	}
@@ -685,6 +716,13 @@ akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		AKMFUNC("IOCTL_GET_DELAY");
 		delay = akmd_delay;
 		break;
+	/* < DTS2012022000736 zhangmin 20120220 begin */
+	/*add ioctl cmd*/
+	case ECS_IOCTL_APP_GET_SLIDE:  
+		slide = get_slide_pressed();
+		AKMFUNC("GET_SLIDE \n");
+		break;
+	/* DTS2012022000736 zhangmin 20120220 end > */
 	case ECS_IOCTL_SET_CAL:
 		break;
 	default:
@@ -718,6 +756,15 @@ akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return -EFAULT;
 		}
 		break;
+	/* < DTS2012022000736 zhangmin 20120220 begin */
+	/*add ioctl cmd*/
+	case ECS_IOCTL_APP_GET_SLIDE:  
+		if (copy_to_user(argp, &slide,sizeof(slide))) {
+			AKMDBG("copy_to_user failed.");
+			return -EFAULT;
+		}
+		break;
+	/* DTS2012022000736 zhangmin 20120220 end > */
 	default:
 		break;
 	}
@@ -792,14 +839,14 @@ static struct file_operations akmd_fops = {
 	.owner = THIS_MODULE,
 	.open = akmd_open,
 	.release = akmd_release,
-	.ioctl = akmd_ioctl,
+	.unlocked_ioctl = akmd_ioctl,
 };
 
 static struct file_operations akm_aot_fops = {
 	.owner = THIS_MODULE,
 	.open = akm_aot_open,
 	.release = akm_aot_release,
-	.ioctl = akm_aot_ioctl,
+	.unlocked_ioctl = akm_aot_ioctl,
 };
 
 static struct miscdevice akmd_device = {
@@ -831,7 +878,25 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		err = -ENODEV;
 		goto exit_check_functionality_failed;
 	}
-	
+/* < DTS2012013004920 zhangmin 20120130 begin */
+/*27A doesn't to mate power*/
+#ifdef CONFIG_ARCH_MSM7X27
+    /*
+     *hardware has change the board on T2,and qualcomm's bluetooth IC is using.
+     *so we used the fack IIC'address to adjust the old one and new one 
+     */
+	if (WIFI_QUALCOMM == get_hw_wifi_device_type())
+    {
+        client->addr = 0x0D ;
+		printk("akm8975 new address!\n");
+    }   
+    else
+    {
+        client->addr = 0x0C ;
+		printk("akm8975 old address!\n");
+    }
+	pdata = client->dev.platform_data;
+#else
 	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/*turn on the power*/	
 	pdata = client->dev.platform_data;
@@ -844,7 +909,8 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		}
 	}
 	/* DTS2011043000257  liujinggang 20110503 end > */
-	
+#endif
+/* DTS2012013004920 zhangmin 20120130 end > */
 	/* Allocate memory for driver data */
 	akm = kzalloc(sizeof(struct akm8975_data), GFP_KERNEL);
 	if (!akm) {
@@ -1014,9 +1080,13 @@ exit_check_dev_id:
 exit_alloc_data_failed:
 	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/* turn down the power */
+/* < DTS2012013004920 zhangmin 20120130 begin */
+#ifdef CONFIG_ARCH_MSM7X30
 	if(pdata->compass_power != NULL){
 		pdata->compass_power(IC_PM_OFF);
 	}
+#endif
+/* DTS2012013004920 zhangmin 20120130 end > */
 exit_check_functionality_failed:
 	/* DTS2011043000257  liujinggang 20110503 end > */
 	return err;

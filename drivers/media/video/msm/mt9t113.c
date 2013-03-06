@@ -1,5 +1,6 @@
-/*< DTS2011102805854 yuguangcai 20111031 begin */
-
+/*< DTS2012020400396 zhangyu 20120206 begin */
+/*< DTS2011100802771   songxiaoming 20111009 begin */
+/*< DTS2012021703250 zhouqiwei 20120301 begin */
 /*
  * Copyright (c) 2008-2009 QUALCOMM USA, INC.
  *
@@ -29,12 +30,15 @@
 #include <mach/camera.h>
 #include "mt9t113.h"
 #include "linux/hardware_self_adapt.h"
+/* < DTS2012010906170 zhouqiwei 20120110 begin */
+#include <asm/mach-types.h>
+/* DTS2012010906170 zhouqiwei 20120110 end > */
 
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
  #include <linux/hw_dev_dec.h>
 #endif
 
-#ifdef CONFIG_HUAWEI_SENSOR_MT9T113
+#ifdef CONFIG_HUAWEI_CAMERA_SENSOR_MT9T113
  #undef CDBG
  #define CDBG(fmt, args...) printk(KERN_INFO "mt9t113.c: " fmt, ## args)
 #endif
@@ -116,36 +120,25 @@ struct mt9t113_ctrl_t
 
     unsigned short imgaddr;
 };
-
-typedef enum
-{
-    CAMERA_WB_MIN_MINUS_1,
-    CAMERA_WB_AUTO = 1,/* This list must match aeecamera.h */
-    CAMERA_WB_CUSTOM,
-    CAMERA_WB_INCANDESCENT,
-    CAMERA_WB_FLUORESCENT,
-    CAMERA_WB_DAYLIGHT,
-    CAMERA_WB_CLOUDY_DAYLIGHT,
-    CAMERA_WB_TWILIGHT,
-    CAMERA_WB_SHADE,
-    CAMERA_WB_MAX_PLUS_1
-} config3a_wb_t;
-
-typedef enum
-{
-    CAMERA_ANTIBANDING_OFF,
-    CAMERA_ANTIBANDING_60HZ,
-    CAMERA_ANTIBANDING_50HZ,
-    CAMERA_ANTIBANDING_AUTO,
-    CAMERA_MAX_ANTIBANDING,
-} camera_antibanding_type;
+/* <DTS2012041003722 sibingsong 20120410 begin */
 
 const static char mt9t113_supported_effect[] = "none,mono,negative,sepia,aqua";
 static bool CSI_CONFIG;
-
+#define REGISTER_WRITE_WAIT_FW 1
+#define REGISTER_WRITE_WAIT_PATCH 2
+#define REGISTER_WRITE_WAIT_PREVIEW 3
+#define REGISTER_WRITE_WAIT_SNAPSHOT 4
+#define EFFECT_OFF_VALUE 0
+#define EFFECT_MONO_VALUE 1
+#define EFFECT_SEPIA_VALUE 2
+#define EFFECT_AQUA_VALUE 2
+#define EFFECT_NEGATIVE_VALUE 3
+#define WB_AUTO_VALUE 0x003F
+#define WB_NOT_AUTO_VALUE 0
+#define MT9T113_IS_ON 1
 static struct  mt9t113_work_t *mt9t113sensorw = NULL;
 
-static struct  i2c_client *mt9t113_client  = NULL;
+static struct  i2c_client *mt9t113_client = NULL;
 static struct mt9t113_ctrl_t *mt9t113_ctrl = NULL;
 static enum mt9t113_reg_update_t last_rupdate = -1;
 static enum mt9t113_setting_t last_rt = -1;
@@ -153,7 +146,7 @@ static DECLARE_WAIT_QUEUE_HEAD(mt9t113_wait_queue);
 DEFINE_MUTEX(mt9t113_sem);
 
 static int mt9t113_i2c_rxdata(unsigned short saddr,
-                              unsigned char *rxdata, int length)
+                             unsigned char *rxdata, int length)
 {
     struct i2c_msg msgs[] =
     {
@@ -195,7 +188,7 @@ static int32_t mt9t113_i2c_read_w(unsigned short raddr, unsigned short *rdata)
     buf[0] = (raddr & 0xFF00) >> 8;
     buf[1] = (raddr & 0x00FF);
 
-    rc = mt9t113_i2c_rxdata(mt9t113_client->addr << 2, buf, 2);
+    rc = mt9t113_i2c_rxdata(mt9t113_client->addr, buf, 2);
     if (rc < 0)
     {
         return rc;
@@ -212,7 +205,7 @@ static int32_t mt9t113_i2c_read_w(unsigned short raddr, unsigned short *rdata)
 }
 
 static int32_t mt9t113_i2c_txdata(unsigned short saddr,
-                                  unsigned char *txdata, int length)
+                                 unsigned char *txdata, int length)
 {
     int32_t i  = 0;
     int32_t rc = -EFAULT;
@@ -255,7 +248,7 @@ static int32_t mt9t113_i2c_write_w(unsigned short waddr, unsigned short wdata)
     buf[2] = (wdata & 0xFF00) >> 8;
     buf[3] = (wdata & 0x00FF);
 
-    rc = mt9t113_i2c_txdata(mt9t113_client->addr << 2, buf, 4);
+    rc = mt9t113_i2c_txdata(mt9t113_client->addr, buf, 4);
 
     if (rc < 0)
     {
@@ -267,7 +260,7 @@ static int32_t mt9t113_i2c_write_w(unsigned short waddr, unsigned short wdata)
 }
 
 static int32_t mt9t113_i2c_write_w_table(struct mt9t113_i2c_reg_conf const *reg_conf_tbl,
-                                         int                                num_of_items_in_table)
+                                        int                               num_of_items_in_table)
 {
     int i;
     int32_t rc = -EFAULT;
@@ -319,20 +312,119 @@ int32_t mt9t113_set_pict_exp_gain(uint16_t gain, uint32_t line)
     /* camera_timed_wait(snapshot_wait*exposure_ratio); */
     return rc;
 }
+/*< DTS2012013103283   songxiaoming 20120201 begin */ 
+/* Mirror from kernel space */ 
+static int32_t mt9t113_set_mirror_mode(void)
+{
+    int32_t rc = 0;
 
+    if (HW_MIRROR_AND_FLIP == get_hw_camera_mirror_type()) 
+    {
+        rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_mirror_mode_reg_config,
+                    				  mt9t113_regs.mt9t113_mirror_mode_reg_config_size);
+    }
+
+    return rc;
+}
+/* DTS2012013103283  songxiaoming 20120201 end > */
+static int mt9t113_register_waiting(int time)
+{
+    int rc = 0, i;
+    unsigned short r_value;
+
+    /* wait for FW initialization complete
+     * bit[14] of register 0x0018 is the STANDBY_CONTROL_AND_STATUS bit
+     * the bit is 0 when initialization done
+     * read the register per 5ms, timeout after 100ms
+     */
+    if (REGISTER_WRITE_WAIT_FW == time)
+    {
+        for(i = 20; i > 0; i --)
+        {
+            CDBG("time = %d, i =%d\n", time ,i);
+            rc = mt9t113_i2c_read_w(0x0018, &r_value);
+            if(0 == (r_value & 0x4000))
+            {
+                return rc;
+            }
+            mdelay(5);
+        }
+    }
+
+    /* wait for Patch loading complete
+     * variable 0x0018 is the MON_RAM_PATCH_ID status
+     * the status is 1 when initialization done
+     * read the statue per 5ms, timeout after 100ms
+     */
+    if (REGISTER_WRITE_WAIT_PATCH == time)
+    {
+        for(i = 20; i > 0; i --)
+        {
+            CDBG("time = %d, i =%d\n", time ,i);
+            rc = mt9t113_i2c_write_w(0x098E, 0x800C);
+            rc = mt9t113_i2c_read_w(0x0990, &r_value);
+            CDBG("====rc = %d, r_value =%d \n", rc, r_value);
+            if(1 == r_value)
+            {
+                return rc;
+            }
+            mdelay(10);
+        }
+    }
+
+    /* wait for sensor to enter the Preview mode
+     * variable 0x8401 is the sensor MODE status
+     * the status is 0x0003 when sensor in Preview mode
+     * read the statue per 20ms, timeout after 200ms
+     */
+    if (REGISTER_WRITE_WAIT_PREVIEW == time)
+    {
+        mdelay(30);
+        for(i = 0; i< 10; i++)
+        {
+            rc = mt9t113_i2c_write_w(0x098E, 0x8401);
+            rc = mt9t113_i2c_read_w(0x0990, &r_value);
+            if(0x0003 == r_value)
+            {
+                break;
+            }
+            mdelay(20);
+        }
+    }
+
+    /* wait for sensor to enter the Snapshot mode
+     * variable 0x8401 is the sensor MODE status
+     * the status is 0x0007 when sensor in Snapshot mode
+     * read the statue per 20ms, timeout after 200ms
+     */
+    if (REGISTER_WRITE_WAIT_SNAPSHOT == time)
+    {
+        mdelay(30);
+        for(i = 0; i< 10; i++)
+        {
+            rc = mt9t113_i2c_write_w(0x098E, 0x8401);
+            rc = mt9t113_i2c_read_w(0x0990, &r_value);
+            if(0x0007 == r_value)
+            {
+                break;
+            }
+            mdelay(20);
+        }
+    }
+
+    return rc;
+}
 int32_t mt9t113_setting(enum mt9t113_reg_update_t rupdate,
-                        enum mt9t113_setting_t    rt)
+                       enum mt9t113_setting_t    rt)
 {
     struct msm_camera_csi_params mt9t113_csi_params;
     int32_t rc = 0;
-    unsigned short chipid, capret, i = 100;
-
-    //  mutex_lock(&mt9t113_sem);
+    unsigned short mode_value;
+  //  mutex_lock(&mt9t113_sem);
     if ((rupdate == last_rupdate) && (rt == last_rt))
     {
         CDBG("mt9t113_setting exit\n");
-
-        //     mutex_unlock(&mt9t113_sem);
+   //     mutex_unlock(&mt9t113_sem);
         return rc;
     }
 
@@ -344,20 +436,23 @@ int32_t mt9t113_setting(enum mt9t113_reg_update_t rupdate,
         /*preview setting*/
         if (rt == RES_PREVIEW)
         {
-            CDBG("mt9t113:  sensor: init preview reg.\n");
-            rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_preview_reg_config,
-                                           mt9t113_regs.mt9t113_preview_reg_config_size);
-            mdelay(200);
-            if (rc)
+            rc = mt9t113_i2c_write_w(0x098E, 0x8401);
+            rc = mt9t113_i2c_read_w(0x0990, &mode_value);
+            if(0x0003 != mode_value)
             {
-                CDBG("       write mt9t113_preview_reg_config error!!!!!!");
+                CDBG("mt9t113:  sensor: init preview reg.\n");
+                rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_preview_reg_config,
+                                          mt9t113_regs.mt9t113_preview_reg_config_size);
+                if (rc)
+                {
+                   CDBG("       write mt9t113_preview_reg_config error!!!!!!");
+                }
+                mt9t113_register_waiting(REGISTER_WRITE_WAIT_PREVIEW);
             }
-
-            if (!CSI_CONFIG)
+            if(!CSI_CONFIG)
             {
                 CDBG("mt9t113: init CSI  config!\n");
-
-                //   msm_camio_vfe_clk_rate_set(192000000);
+             //   msm_camio_vfe_clk_rate_set(192000000);
                 mt9t113_csi_params.data_format = CSI_8BIT;
                 mt9t113_csi_params.lane_cnt = 1;
                 mt9t113_csi_params.lane_assign = 0xe4;
@@ -366,37 +461,20 @@ int32_t mt9t113_setting(enum mt9t113_reg_update_t rupdate,
                 rc = msm_camio_csi_config(&mt9t113_csi_params);
                 CSI_CONFIG = 1;
             }
+            /* < DTS2012052201247 tangying 20120522 begin */
+            /*stream on*/
+            mt9t113_i2c_write_w(0x0018, 0x002a);
+            /* DTS2012052201247 tangying 20120522 end > */
         }
         /*snapshot setting*/
         else
         {
             CDBG("mt9t113:  sensor: init snapshot reg.\n");
             rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_snapshot_reg_config,
-                                           mt9t113_regs.mt9t113_snapshot_reg_config_size);
-            mdelay(100);
-
-            while (i)
-            {
-                mt9t113_i2c_write_w(0x098E, 0x8401);
-                rc = mt9t113_i2c_read_w(0x0990, &capret);
-
-                CDBG("%s: capret is %d\n", __func__, capret);
-                if (0x07 == capret)
-                {
-                    break;
-                }
-
-                i--;
-                mdelay(10);
-            }
-
-            if (0 == i)
-            {
-                CDBG("mt9t113:  init snapshot reg failed.\n");
-            }
+                                          mt9t113_regs.mt9t113_snapshot_reg_config_size);
+            mt9t113_register_waiting(REGISTER_WRITE_WAIT_SNAPSHOT);
         }
-
-        mdelay(100);
+        mdelay(5);
         break;
 
     case REG_INIT:
@@ -404,45 +482,55 @@ int32_t mt9t113_setting(enum mt9t113_reg_update_t rupdate,
         CSI_CONFIG = 0;
 
         /* Write init sensor register */
+
         rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_sensor_start,
-                                       mt9t113_regs.mt9t113_init_reg_sensor_start_size);
-        mdelay(100);
+                                      mt9t113_regs.mt9t113_init_reg_sensor_start_size);
+        mt9t113_register_waiting(REGISTER_WRITE_WAIT_FW);
         if (rc)
         {
             CDBG("       write mt9t113_init_reg_sensor_start error!!!!!!");
         }
-
-        rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_byd,
-                                       mt9t113_regs.mt9t113_init_reg_config_byd_size);
-        mdelay(200);
+        /*< DTS2012020307372 cuixuefeng 20120326 begin */
+        /*if  machine is msm7x27a_M660,set mt9t113_init_reg_config_sunny_M660,else mt9t113_init_reg_config_sunny */
+        if(machine_is_msm7x27a_M660())
+        {
+            rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_sunny_M660,
+                                          mt9t113_regs.mt9t113_init_reg_config_sunny_M660_size);			
+        }
+        else
+        {
+            rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_sunny,
+                                          mt9t113_regs.mt9t113_init_reg_config_sunny_size);
+        }
+        /* DTS2012020307372 cuixuefeng 20120326 end > */  
+        mt9t113_register_waiting(REGISTER_WRITE_WAIT_PATCH);
         if (rc)
         {
-            CDBG("       write mt9t113_init_reg_config_byd error!!!!!!");
+            CDBG("       write mt9t113_init_reg_config_sunny error!!!!!!");
         }
-
-        rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_byd_2,
-                                       mt9t113_regs.mt9t113_init_reg_config_byd_2_size);
-        mdelay(100);
+        rc = mt9t113_set_mirror_mode();
+        /*< DTS2012020307372 cuixuefeng 20120326 begin */
+        /*if  machine is msm7x27a_M660,set mt9t113_init_reg_config_sunny_2_M660,else mt9t113_init_reg_config_sunny_2 */
+        if(machine_is_msm7x27a_M660())
+        {
+            rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_sunny_2_M660,
+                                          mt9t113_regs.mt9t113_init_reg_config_sunny_2_M660_size);			
+        }
+        else
+        {
+            rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_sunny_2,
+                                          mt9t113_regs.mt9t113_init_reg_config_sunny_2_size);
+        }
+        /* DTS2012020307372 cuixuefeng 20120326 end > */       
         if (rc)
         {
-            CDBG("       write mt9t113_init_reg_config_byd_2 error!!!!!!");
+            CDBG("       write mt9t113_init_reg_config_sunny_2 error!!!!!!");
         }
 
-        rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_byd_3,
-                                       mt9t113_regs.mt9t113_init_reg_config_byd_3_size);
-        mdelay(300);
-        if (rc)
-        {
-            CDBG("       write mt9t113_init_reg_config_byd_3 error!!!!!!");
-        }
+        /*< DTS2012013103283   songxiaoming 20120201 begin */
 
-        rc = mt9t113_i2c_read_w(0x0010, &chipid);
-        CDBG("~~~~~~~~~~~~~~~ 0x0010 = 0x%x \n", chipid);
-
-        rc = mt9t113_i2c_read_w(0x001E, &chipid);
-        CDBG("~~~~~~~~~~~~~~~ 0x001E = 0x%x \n", chipid);
         break;
-
+        /* DTS2012013103283  songxiaoming 20120201 end > */
     default:
         rc = -EFAULT;
         break;
@@ -453,7 +541,7 @@ int32_t mt9t113_setting(enum mt9t113_reg_update_t rupdate,
         last_rt = rt;
     }
 
-    //  mutex_unlock(&mt9t113_sem);
+  //  mutex_unlock(&mt9t113_sem);
     return rc;
 }
 
@@ -499,12 +587,17 @@ int32_t mt9t113_snapshot_config(int mode)
 
     CDBG("mt9t113_snapshot_config in\n");
     rc = mt9t113_setting(UPDATE_PERIODIC, RES_CAPTURE);
-    mdelay(50);
+    /*< DTS2011122205086 yuguangcai 20120103 begin */
+    /*delete one line*/
+    /* DTS2011122205086 yuguangcai 20120103 end > */
     if (rc < 0)
     {
         return rc;
     }
 
+    /*< DTS2011122205086 yuguangcai 20120103 begin */
+    /*delete one line*/
+    /* DTS2011122205086 yuguangcai 20120103 end > */
     mt9t113_ctrl->curr_res = mt9t113_ctrl->pict_res;
 
     mt9t113_ctrl->sensormode = mode;
@@ -516,7 +609,7 @@ int32_t mt9t113_power_down(void)
 {
     int32_t rc = 0;
 
-    mdelay(5);
+    mdelay(1);
 
     return rc;
 }
@@ -528,18 +621,38 @@ int32_t mt9t113_move_focus(int direction, int32_t num_steps)
 
 static int mt9t113_sensor_init_done(const struct msm_camera_sensor_info *data)
 {
+    /*< DTS2012020606152 yuguangcai 20120208 begin */
+    unsigned short r_standby;
     /* Set the sensor reset when camera is not initialization. */
-    gpio_direction_output(data->sensor_reset, 0);
-    gpio_free(data->sensor_reset);
-
-    gpio_direction_output(data->sensor_pwd, 1);
-    gpio_free(data->sensor_pwd);
-
-    if (data->vreg_disable_func)
+    /*< DTS2012021505523 yuguangcai 20120215 begin */
+    /*delete one line*/
+    /* DTS2012021505523 yuguangcai 20120215 end > */
     {
-        data->vreg_disable_func(data->sensor_vreg, data->vreg_num);
+        gpio_direction_output(data->sensor_reset, 0);
+        gpio_free(data->sensor_reset);
     }
 
+    /*as the FAE suggest, vdd_dis_soft setted ON, R0x0028[0] = 1*/
+    mt9t113_i2c_read_w(0x0028,&r_standby);
+    r_standby |= 0x0001;
+    mt9t113_i2c_write_w(0x0028,r_standby);
+    /* DTS2012020606152 yuguangcai 20120208 end > */
+    /*< DTS2012012901317 yuguangcai 20120131 begin */
+    /*< DTS2012021000399 yuguangcai 20120211 begin */
+    gpio_direction_output(data->sensor_pwd, 1);
+    gpio_free(data->sensor_pwd);
+    /* DTS2012021000399 yuguangcai 20120211 end > */
+
+    /*< DTS2012021505523 yuguangcai 20120215 begin */
+    /*delete one line*/
+    /* DTS2012021505523 yuguangcai 20120215 end > */
+    {
+        if (data->vreg_disable_func)
+        {
+            data->vreg_disable_func(0);
+        }
+    }
+    /* DTS2012012901317 yuguangcai 20120131 end > */
     last_rupdate = -1;
     last_rt = -1;
     return 0;
@@ -551,46 +664,41 @@ static int mt9t113_probe_init_sensor(const struct msm_camera_sensor_info *data)
     unsigned short chipid;
 
     /* pull down power down */
+    /*< DTS2012012901317 yuguangcai 20120131 begin */
+    /*< DTS2012021000399 yuguangcai 20120211 begin */
     rc = gpio_request(data->sensor_pwd, "mt9t113");
     if (!rc || (rc == -EBUSY))
     {
-        gpio_direction_output(data->sensor_pwd, 1);
+        gpio_direction_output(data->sensor_pwd, 0);
     }
+    /* DTS2012021000399 yuguangcai 20120211 end > */
     else
     {
         goto init_probe_fail;
     }
 
+    mdelay(1);
     /* Set the sensor reset when camera is not initialization. */
-    rc = gpio_request(data->sensor_reset, "mt9t113");
-    if (!rc)
+    /*< DTS2012021505523 yuguangcai 20120215 begin */
+    /*delete one line*/
+    /* DTS2012021505523 yuguangcai 20120215 end > */
     {
-        rc = gpio_direction_output(data->sensor_reset, 0);
-    }
-    else
-    {
-        goto init_probe_fail;
-    }
-
-    mdelay(20);
-    if (data->vreg_enable_func)
-    {
-        rc = data->vreg_enable_func(data->sensor_vreg, data->vreg_num);
-        if (rc < 0)
+        rc = gpio_request(data->sensor_reset, "mt9t113");
+        if (!rc || (rc == -EBUSY))
         {
-            CDBG("%s : vreg_enable_func failed! ", __func__);
-            goto init_probe_fail;
+            rc = gpio_direction_output(data->sensor_reset, 0);
         }
-    }
-
-    {
-        rc = gpio_direction_output(data->sensor_pwd, 0);
-        if (rc < 0)
+        else
         {
             goto init_probe_fail;
         }
+        mdelay(2);
 
-        mdelay(50);
+       if (data->vreg_enable_func)
+       {
+           data->vreg_enable_func(1);
+       }
+        mdelay(60);
 
         /*hardware reset*/
         /* Set the sensor reset when camera is not initialization. */
@@ -599,30 +707,28 @@ static int mt9t113_probe_init_sensor(const struct msm_camera_sensor_info *data)
         {
             goto init_probe_fail;
         }
+        mdelay(5);
+        /* Set the soft reset to reset the chip and read the chip ID when camera is not initialization. */
+        /* DTS2012012901317 yuguangcai 20120131 end > */
+        /* 3. Read sensor Model ID: */
+        rc = mt9t113_i2c_read_w(0x0000, &chipid);
+        if (rc < 0)
+        {
+            CDBG("mt9t113_i2c_read_w Model_ID failed!! rc=%d", rc);
+            goto init_probe_fail;
+        }
 
-        mdelay(100);
+        CDBG("mt9t113 chipid = 0x%x\n", chipid);
+
+        /* 4. Compare sensor ID to MT9T113 ID: */
+        if (chipid != MT9T113_CHIP_ID)
+        {
+            CDBG("mt9t113 Model_ID error!!");
+            rc = -ENODEV;
+            goto init_probe_fail;
+        }
+        CDBG("sensor name is %s.", data->sensor_name);
     }
-
-    /* Set the soft reset to reset the chip and read the chip ID when camera is not initialization. */
-    /* 3. Read sensor Model ID: */
-    rc = mt9t113_i2c_read_w(0x0000, &chipid);
-    if (rc < 0)
-    {
-        CDBG("mt9t113_i2c_read_w Model_ID failed!! rc=%d", rc);
-        goto init_probe_fail;
-    }
-
-    CDBG("mt9t113 chipid = 0x%x\n", chipid);
-
-    /* 4. Compare sensor ID to MT9T113 ID: */
-    if (chipid != MT9T113_CHIP_ID)
-    {
-        CDBG("mt9t113 Model_ID error!!");
-        rc = -ENODEV;
-        goto init_probe_fail;
-    }
-
-    CDBG("sensor name is %s.", data->sensor_name);
 
     goto init_probe_done;
 
@@ -658,7 +764,7 @@ int mt9t113_sensor_open_init(const struct msm_camera_sensor_info *data)
 
     /* enable mclk first */
     msm_camio_clk_rate_set(MT9T113_DEFAULT_CLOCK_RATE);
-    mdelay(20);
+    mdelay(1);
 
     rc = mt9t113_probe_init_sensor(data);
     if (rc < 0)
@@ -668,8 +774,18 @@ int mt9t113_sensor_open_init(const struct msm_camera_sensor_info *data)
     }
     else
     {
-        rc = mt9t113_setting(REG_INIT, RES_PREVIEW);
+        /*< DTS2012012901317 yuguangcai 20120131 begin */
+        CSI_CONFIG = 0;
+        /* DTS2012012901317 yuguangcai 20120131 end > */
         CDBG("mt9t113 init succeed!!!!! rc = %d \n", rc);
+        /*< DTS2012021505523 yuguangcai 20120215 begin */
+        rc = mt9t113_setting(REG_INIT, RES_PREVIEW);
+        if (rc < 0)
+        {
+            CDBG("mt9t113 init failed!!!!!\n");
+            goto init_fail;
+        }
+        /* DTS2012021505523 yuguangcai 20120215 end > */
         goto init_done;
     }
 
@@ -692,7 +808,6 @@ int32_t mt9t113_set_sensor_mode(int mode, int res)
 {
     int32_t rc = 0;
 
-    CDBG("%s : start to set sensor mode ", __func__);
     switch (mode)
     {
     case SENSOR_PREVIEW_MODE:
@@ -719,27 +834,73 @@ static long mt9t113_set_effect(int mode, int effect)
     struct mt9t113_i2c_reg_conf const *reg_conf_tbl = NULL;
     int num_of_items_in_table = 0;
     long rc = 0;
-
+    unsigned short effect_value;
     printk("mt9t113_set_effect \n ");
+    /* variable 0xE887 is the key of effect
+     * if the value of register is already the value
+     * we are to set, return from the func
+     */
+    rc = mt9t113_i2c_write_w(0x098E, 0xE887);
+    rc = mt9t113_i2c_read_w(0x0990, &effect_value);
     switch (effect)
     {
     case CAMERA_EFFECT_OFF:
-        printk("~~~~~~~~~~~CAMERA_EFFECT_OFF \n ");
+        if(EFFECT_OFF_VALUE == effect_value)
+        {
+            return 0;
+        }
         reg_conf_tbl = mt9t113_regs.mt9t113_effect_off_reg_config;
         num_of_items_in_table = mt9t113_regs.mt9t113_effect_off_reg_config_size;
         break;
 
     case CAMERA_EFFECT_MONO:
-        printk("~~~~~~~~~~~CAMERA_EFFECT_MONO \n ");
+        if(EFFECT_MONO_VALUE == effect_value)
+        {
+            return 0;
+        }
         reg_conf_tbl = mt9t113_regs.mt9t113_effect_mono_reg_config;
         num_of_items_in_table = mt9t113_regs.mt9t113_effect_mono_reg_config_size;
         break;
 
     case CAMERA_EFFECT_NEGATIVE:
+        if(EFFECT_NEGATIVE_VALUE == effect_value)
+        {
+            return 0;
+        }
         reg_conf_tbl = mt9t113_regs.mt9t113_effect_negative_reg_config;
         num_of_items_in_table = mt9t113_regs.mt9t113_effect_negative_reg_config_size;
         break;
 
+    case CAMERA_EFFECT_SEPIA:
+        if(EFFECT_SEPIA_VALUE == effect_value)
+        {
+            rc = mt9t113_i2c_write_w(0x098E, 0xE889);
+            rc = mt9t113_i2c_read_w(0x0990, &effect_value);
+            if(0x1E == effect_value)
+            {
+                return 0;
+            }
+        }
+        reg_conf_tbl = mt9t113_regs.mt9t113_effect_sepia_reg_config;
+        num_of_items_in_table = mt9t113_regs.mt9t113_effect_sepia_reg_config_size;
+        break;
+
+    case CAMERA_EFFECT_AQUA:
+        if(EFFECT_AQUA_VALUE == effect_value)
+        {
+            rc = mt9t113_i2c_write_w(0x098E, 0xE889);
+            rc = mt9t113_i2c_read_w(0x0990, &effect_value);
+            if(0xE0 == effect_value)
+            {
+                return 0;
+            }
+        }
+        reg_conf_tbl = mt9t113_regs.mt9t113_effect_aqua_reg_config;
+        num_of_items_in_table = mt9t113_regs.mt9t113_effect_aqua_reg_config_size;
+        break;
+
+    /*< DTS2011111900798 yuguangcai 20111130 begin */
+    /*the effect we need is solarize and posterize*/
     case CAMERA_EFFECT_SOLARIZE:
         reg_conf_tbl = mt9t113_regs.mt9t113_effect_solarize_reg_config;
         num_of_items_in_table = mt9t113_regs.mt9t113_effect_solarize_reg_config_size;
@@ -750,31 +911,15 @@ static long mt9t113_set_effect(int mode, int effect)
         num_of_items_in_table = mt9t113_regs.mt9t113_effect_posterize_reg_config_size;
         break;
 
-    case CAMERA_EFFECT_SEPIA:
-        reg_conf_tbl = mt9t113_regs.mt9t113_effect_sepia_reg_config;
-        num_of_items_in_table = mt9t113_regs.mt9t113_effect_sepia_reg_config_size;
-        break;
-
-    case CAMERA_EFFECT_AQUA:
-        reg_conf_tbl = mt9t113_regs.mt9t113_effect_aqua_reg_config;
-        num_of_items_in_table = mt9t113_regs.mt9t113_effect_aqua_reg_config_size;
-        break;
-
-    case CAMERA_EFFECT_WHITEBOARD:
-        reg_conf_tbl = mt9t113_regs.mt9t113_effect_whiteboard_reg_config;
-        num_of_items_in_table = mt9t113_regs.mt9t113_effect_whiteboard_reg_config_size;
-        break;
-
-    case CAMERA_EFFECT_BLACKBOARD:
-        reg_conf_tbl = mt9t113_regs.mt9t113_effect_blackboard_reg_config;
-        num_of_items_in_table = mt9t113_regs.mt9t113_effect_blackboard_reg_config_size;
-        break;
-
     default:
         return 0;
     }
-
+    /*< DTS2012022504199 yuguangcai 20120306 begin */
+    /*delete some lines*/
+    /* DTS2012022504199 yuguangcai 20120306 end > */
     rc = mt9t113_i2c_write_w_table(reg_conf_tbl, num_of_items_in_table);
+    mdelay(50);
+
     return rc;
 }
 
@@ -783,38 +928,90 @@ static long mt9t113_set_wb(int wb)
     struct mt9t113_i2c_reg_conf const *reg_conf_tbl = NULL;
     int num_of_items_in_table = 0;
     long rc = 0;
+    unsigned short wb_value;
 
+    /* variable 0x6848 is the key of whitebalance
+     * if the value of register is already the value
+     * we are to set, return from the func
+     */
+    rc = mt9t113_i2c_write_w(0x098E, 0x6848);
+    rc = mt9t113_i2c_read_w(0x0990, &wb_value);
     CDBG("mt9t113_set_wb FF wb:%d", wb);
     switch (wb)
     {
     case CAMERA_WB_AUTO:
+        if(WB_AUTO_VALUE == wb_value)
+        {
+            return 0;
+        }
         reg_conf_tbl = mt9t113_regs.mt9t113_wb_auto_reg_config;
         num_of_items_in_table = mt9t113_regs.mt9t113_wb_auto_reg_config_size;
         break;
 
     case CAMERA_WB_INCANDESCENT:
+        if(WB_NOT_AUTO_VALUE == wb_value)
+        {
+            rc = mt9t113_i2c_write_w(0x098E, 0xAC3B);
+            rc = mt9t113_i2c_read_w(0x0990, &wb_value);
+            if(0x0060 == wb_value)
+            {
+                return 0;
+            }
+        }
         reg_conf_tbl = mt9t113_regs.mt9t113_wb_a_reg_config;
         num_of_items_in_table = mt9t113_regs.mt9t113_wb_a_reg_config_size;
-        break;
-
-    case CAMERA_WB_FLUORESCENT:
-        reg_conf_tbl = mt9t113_regs.mt9t113_wb_tl84_reg_config;
-        num_of_items_in_table = mt9t113_regs.mt9t113_wb_tl84_reg_config_size;
-        break;
-
-    case CAMERA_WB_DAYLIGHT:
-        reg_conf_tbl = mt9t113_regs.mt9t113_wb_d65_reg_config;
-        num_of_items_in_table = mt9t113_regs.mt9t113_wb_d65_reg_config_size;
-        break;
-
-    case CAMERA_WB_CLOUDY_DAYLIGHT:
-        reg_conf_tbl = mt9t113_regs.mt9t113_wb_d50_reg_config;
-        num_of_items_in_table = mt9t113_regs.mt9t113_wb_d50_reg_config_size;
         break;
 
     case CAMERA_WB_CUSTOM:
         reg_conf_tbl = mt9t113_regs.mt9t113_wb_f_reg_config;
         num_of_items_in_table = mt9t113_regs.mt9t113_wb_f_reg_config_size;
+        break;
+    case CAMERA_WB_FLUORESCENT:
+        if(WB_NOT_AUTO_VALUE == wb_value)
+        {
+            rc = mt9t113_i2c_write_w(0x098E, 0xAC3B);
+            rc = mt9t113_i2c_read_w(0x0990, &wb_value);
+            if(0x0050 == wb_value)
+            {
+                return 0;
+            }
+        }
+        reg_conf_tbl = mt9t113_regs.mt9t113_wb_tl84_reg_config;
+        num_of_items_in_table = mt9t113_regs.mt9t113_wb_tl84_reg_config_size;
+        break;
+
+    case CAMERA_WB_DAYLIGHT:
+        if(WB_NOT_AUTO_VALUE == wb_value)
+        {
+            rc = mt9t113_i2c_write_w(0x098E, 0xAC3B);
+            rc = mt9t113_i2c_read_w(0x0990, &wb_value);
+            if(0x0044 == wb_value)
+            {
+                return 0;
+            }
+        }
+        /* < DTS2012011703990 zhouqiwei 20120202 begin */
+        /* Daylight should be D50 */
+        reg_conf_tbl = mt9t113_regs.mt9t113_wb_d50_reg_config;
+        num_of_items_in_table = mt9t113_regs.mt9t113_wb_d50_reg_config_size;
+        /* DTS2012011703990 zhouqiwei 20120202 end > */
+        break;
+
+    case CAMERA_WB_CLOUDY_DAYLIGHT:
+        if(WB_NOT_AUTO_VALUE == wb_value)
+        {
+            rc = mt9t113_i2c_write_w(0x098E, 0xAC3B);
+            rc = mt9t113_i2c_read_w(0x0990, &wb_value);
+            if(0x003A == wb_value)
+            {
+                return 0;
+            }
+        }
+        /* < DTS2012011703990 zhouqiwei 20120202 begin */
+        /* Cloudy should be D65 */
+        reg_conf_tbl = mt9t113_regs.mt9t113_wb_d65_reg_config;
+        num_of_items_in_table = mt9t113_regs.mt9t113_wb_d65_reg_config_size;
+        /* DTS2012011703990 zhouqiwei 20120202 end > */
         break;
 
     case CAMERA_WB_TWILIGHT:
@@ -828,33 +1025,26 @@ static long mt9t113_set_wb(int wb)
     default:
         return 0;
     }
-
+    /*< DTS2011111900798 yuguangcai 20111130 begin */
     rc = mt9t113_i2c_write_w_table(reg_conf_tbl, num_of_items_in_table);
+    /* DTS2011111900798 yuguangcai 20111130 end > */
+    mdelay(50);
     return rc;
 }
 
-static long mt9t113_set_antibanding(int antibanding)
-{
-    long rc = 0;
-
-    /*FF*/
-    CDBG("mt9t113_set_antibanding FF antibanding:%d", antibanding);
-
-    return rc;
-}
-
+/*< DTS2011111900798 yuguangcai 20111130 begin */
+/*delete the unused antibanding func*/
+/* DTS2011111900798 yuguangcai 20111130 end > */
 int mt9t113_sensor_config(void __user *argp)
 {
     struct sensor_cfg_data cdata;
     long rc = 0;
-
     if (copy_from_user(&cdata,
                        (void *)argp,
                        sizeof(struct sensor_cfg_data)))
     {
         return -EFAULT;
     }
-
     mutex_lock(&mt9t113_sem);
     CDBG("mt9t113_sensor_config: cfgtype = %d\n",
          cdata.cfgtype);
@@ -898,9 +1088,8 @@ int mt9t113_sensor_config(void __user *argp)
         break;
 
     case CFG_SET_MODE:
-        CDBG(">>>>>>>>>>>>.CFG_SET_MODE type is %d\n", cdata.cfgtype);
         rc = mt9t113_set_sensor_mode(cdata.mode,
-                                     cdata.rs);
+                                    cdata.rs);
         break;
 
     case CFG_PWR_DOWN:
@@ -920,9 +1109,8 @@ int mt9t113_sensor_config(void __user *argp)
             cdata.cfg.focus.steps);
         break;
     case CFG_SET_EFFECT:
-        CDBG(">>>>>>>>>>>>>>>>CFG_SET_EFFECT type is %d\n", cdata.cfgtype);
         rc = mt9t113_set_effect(cdata.mode,
-                                cdata.cfg.effect);
+                               cdata.cfg.effect);
         break;
 
     case CFG_SET_WB:
@@ -930,11 +1118,9 @@ int mt9t113_sensor_config(void __user *argp)
         break;
 
     case CFG_SET_ANTIBANDING:
-        if (0)
-        {
-            rc = mt9t113_set_antibanding(cdata.cfg.effect);
-        }
-
+        /*< DTS2011111900798 yuguangcai 20111130 begin */
+        /*delete the antibanding handling*/
+        /* DTS2011111900798 yuguangcai 20111130 end > */
         break;
 
     case CFG_MAX:
@@ -945,12 +1131,145 @@ int mt9t113_sensor_config(void __user *argp)
         rc = -EFAULT;
         break;
     }
-
     mutex_unlock(&mt9t113_sem);
 
     return rc;
 }
+/* < DTS2012052201247 tangying 20120522 begin */
+/*sensor driver add reset function to reset sensor when camera frame thread timeout*/
+static int mt9t113_reset_camera(void)
+{
+    int rc = 0;
+    unsigned short mode_value = 0;
+    unsigned short chipid = 0;
+    struct msm_camera_csi_params mt9t113_csi_params;
 
+    const struct msm_camera_sensor_info *data = mt9t113_ctrl->sensordata;
+    if(data == NULL)
+        return -EINVAL;
+
+    mutex_lock(&mt9t113_sem);
+
+    rc = mt9t113_i2c_read_w(0x0000, &chipid);
+    if (rc < 0)
+    {
+        printk("%s:%d, read i2c fail\n",__func__,__LINE__);
+    }
+
+    //power down
+    gpio_direction_output(data->sensor_reset, 0);
+    msleep(5);
+
+    gpio_direction_output(data->sensor_pwd, 1);
+    msleep(5);
+
+    if (data->vreg_disable_func)
+    {
+        data->vreg_disable_func(0);
+    }
+
+    //power on
+    msm_camio_clk_rate_set(MT9T113_DEFAULT_CLOCK_RATE);
+    msleep(1);
+
+    gpio_direction_output(data->sensor_pwd, 0);
+    msleep(5);
+
+    //hardware reset
+    gpio_direction_output(data->sensor_reset, 0);
+    msleep(2);
+
+    if (data->vreg_enable_func)
+    {
+        data->vreg_enable_func(1);
+    }
+    msleep(60);
+    
+    gpio_direction_output(data->sensor_reset, 1);
+    msleep(10);
+
+    rc = mt9t113_i2c_read_w(0x0000, &chipid);
+    if (rc < 0)
+    {
+        printk("%s:%d, read i2c fail\n",__func__,__LINE__);
+        goto reset_done;
+    }
+
+    mt9t113_csi_params.data_format = CSI_8BIT;
+    mt9t113_csi_params.lane_cnt = 1;
+    mt9t113_csi_params.lane_assign = 0xe4;
+    mt9t113_csi_params.dpcm_scheme = 0;
+    mt9t113_csi_params.settle_cnt = 0x18;
+    rc = msm_camio_csi_config(&mt9t113_csi_params);
+
+
+    //stream off
+    rc = mt9t113_i2c_write_w(0x301A, 0x50F8);
+    if (rc < 0)
+    {
+        printk(KERN_DEBUG "mt9t113_i2c_write_w fail: %d\n",__LINE__);
+        goto reset_done;   
+    }
+
+    
+    //Write init sensor register 
+    rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_sensor_start,
+                                      mt9t113_regs.mt9t113_init_reg_sensor_start_size);
+    mt9t113_register_waiting(REGISTER_WRITE_WAIT_FW);
+    if (rc)
+    {
+        CDBG("write mt9t113_init_reg_sensor_start error!!!!!!: %d",__LINE__);
+    }
+
+
+    rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_sunny,
+                                       mt9t113_regs.mt9t113_init_reg_config_sunny_size);
+    mt9t113_register_waiting(REGISTER_WRITE_WAIT_PATCH);
+    if (rc)
+    {
+        CDBG("write mt9t113_init_reg_config_sunny error!!!!!!: %d",__LINE__);
+    }
+
+    rc = mt9t113_set_mirror_mode();
+    rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_init_reg_config_sunny_2,
+                                       mt9t113_regs.mt9t113_init_reg_config_sunny_2_size);
+    if (rc)
+    {
+        CDBG("write mt9t113_init_reg_config_sunny_2 error!!!!!!: %d",__LINE__);
+    }
+
+    msleep(50);
+   
+    //start stream on
+    rc = mt9t113_i2c_write_w(0x098E, 0x8401);
+    rc = mt9t113_i2c_read_w(0x0990, &mode_value);
+    if(0x0003 != mode_value)
+    {
+        CDBG("mt9t113:  sensor: init preview reg.\n");
+        rc = mt9t113_i2c_write_w_table(mt9t113_regs.mt9t113_preview_reg_config,
+                                      mt9t113_regs.mt9t113_preview_reg_config_size);
+        if (rc)
+        {
+            CDBG("write mt9t113_preview_reg_config error!!!!!!: %d",__LINE__);
+        }
+        mt9t113_register_waiting(REGISTER_WRITE_WAIT_PREVIEW);
+    }
+
+    //msleep(2000);
+    rc = mt9t113_i2c_write_w(0x0018, 0x002a);
+    if (rc < 0)
+    {
+        printk(KERN_DEBUG "mt9t113_i2c_write_w fail: %d\n",__LINE__);
+        goto reset_done;    
+    }
+reset_done:    
+    mutex_unlock(&mt9t113_sem);
+
+    printk(KERN_DEBUG "%s: reinit regs rc = %d\n", __func__, rc);
+  
+    return rc;
+}
+/* DTS2012052201247 tangying 20120522 end > */
 int mt9t113_sensor_release(void)
 {
     int rc = -EBADF;
@@ -961,7 +1280,6 @@ int mt9t113_sensor_release(void)
 
     mt9t113_sensor_init_done(mt9t113_ctrl->sensordata);
 
-    msleep(150);
     kfree(mt9t113_ctrl);
 
     mutex_unlock(&mt9t113_sem);
@@ -970,7 +1288,7 @@ int mt9t113_sensor_release(void)
 }
 
 static int mt9t113_i2c_probe(struct i2c_client *         client,
-                             const struct i2c_device_id *id)
+                            const struct i2c_device_id *id)
 {
     int rc = 0;
 
@@ -993,6 +1311,9 @@ static int mt9t113_i2c_probe(struct i2c_client *         client,
     mt9t113_init_client(client);
     mt9t113_client = client;
 
+#ifdef CONFIG_ARCH_MSM7X30
+    mt9t113_client->addr = mt9t113_client->addr << 2;
+#endif
     //mt9t113_client->addr = mt9t113_client->addr >> 1;
     mdelay(50);
 
@@ -1023,7 +1344,7 @@ static struct i2c_driver mt9t113_i2c_driver =
 };
 
 static int mt9t113_sensor_probe(const struct msm_camera_sensor_info *info,
-                                struct msm_sensor_ctrl *             s)
+                               struct msm_sensor_ctrl *             s)
 {
     /* We expect this driver to match with the i2c device registered
      * in the board file immediately. */
@@ -1039,6 +1360,11 @@ static int mt9t113_sensor_probe(const struct msm_camera_sensor_info *info,
     msm_camio_clk_rate_set(MT9T113_DEFAULT_CLOCK_RATE);
     mdelay(20);
 
+    /*< DTS2012012901317 yuguangcai 20120131 begin */
+    /*< DTS2012021000399 yuguangcai 20120211 begin */
+    /*delete some lines*/
+    /* DTS2012021000399 yuguangcai 20120211 end > */
+    /* DTS2012012901317 yuguangcai 20120131 end > */
     rc = mt9t113_probe_init_sensor(info);
     if (rc < 0)
     {
@@ -1047,9 +1373,25 @@ static int mt9t113_sensor_probe(const struct msm_camera_sensor_info *info,
         goto probe_done;
     }
     else
+    /*< DTS2012012901317 yuguangcai 20120131 begin */
     {
+        /*< DTS2012022504199 yuguangcai 20120306 begin */
+        /*delete one line*/
+        /* DTS2012022504199 yuguangcai 20120306 end > */
+        /* < DTS2012031403324 zhouqiwei 20120314 begin */
+        /* delete one line */
+        /* DTS2012031403324 zhouqiwei 20120314 end > */
         CDBG("mt9t113 probe succeed!!!!\n");
+        /* < DTS2012031904303 zhouqiwei 20130319 begin */
+        /* camera name for project menu to display */
+        strncpy((char *)info->sensor_name, "23060073FF-MT-B", strlen("23060073FF-MT-B"));
+        /* DTS2012031904303 zhouqiwei 20130319 end > */
     }
+    /*initialize the registers to save the time of open camera*/
+    /*< DTS2012021505523 yuguangcai 20120215 begin */
+    /*don't use standby mode anymore, delete the initiation when probe*/
+    /* DTS2012021505523 yuguangcai 20120215 end > */
+    /* DTS2012012901317 yuguangcai 20120131 end > */
 
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
     /* detect current device successful, set the flag as present */
@@ -1059,7 +1401,17 @@ static int mt9t113_sensor_probe(const struct msm_camera_sensor_info *info,
     s->s_init = mt9t113_sensor_open_init;
     s->s_release = mt9t113_sensor_release;
     s->s_config = mt9t113_sensor_config;
+    /*<  DTS2011101301987   yuguangcai 20111013 begin */
+    /*set the s_mount_angle value of sensor*/
+#ifdef CONFIG_ARCH_MSM7X27A
+    s->s_mount_angle = info->sensor_platform_info->mount_angle;
+#else
     s->s_mount_angle = 0;
+#endif
+    /* < DTS2012052201247 tangying 20120522 begin */
+    s->s_reset_regs = mt9t113_reset_camera;
+    /* DTS2012052201247 tangying 20120522 end > */
+    /* DTS2011101301987   yuguangcai 20111013 end > */
     mt9t113_sensor_init_done(info);
 
     /* For go to sleep mode, follow the datasheet */
@@ -1069,6 +1421,7 @@ static int mt9t113_sensor_probe(const struct msm_camera_sensor_info *info,
 probe_done:
     return rc;
 }
+/* DTS2012041003722 sibingsong 20120410 end> */
 
 static int __mt9t113_probe(struct platform_device *pdev)
 {
@@ -1091,4 +1444,7 @@ static int __init mt9t113_init(void)
 
 module_init(mt9t113_init);
 
-/* DTS2011102805854 yuguangcai 20111031 end > */
+/* DTS2012021703250 zhouqiwei 20120301 end > */
+/* DTS2011100802771   songxiaoming 20111009 end > */
+/* DTS2012020400396 zhangyu 20120206 end > */
+
