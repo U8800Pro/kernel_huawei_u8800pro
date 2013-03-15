@@ -13,10 +13,11 @@
 #ifndef __ARCH_ARM_MACH_MSM_BOARD_7627A__
 #define __ARCH_ARM_MACH_MSM_BOARD_7627A__
 
-/* < DTS2012042302547 chendeng 20120428 begin */
 #include "pm.h"
-/* DTS2012042302547 chendeng 20120428 end > */
 void __init msm7627a_init_mmc(void);
+
+void __init msm_msm7627a_allocate_memory_regions(void);
+void __init msm_fb_add_devices(void);
 
 enum {
 	GPIO_EXPANDER_IRQ_BASE  = NR_MSM_IRQS + NR_GPIO_IRQS,
@@ -64,9 +65,9 @@ enum {
 	QRD_GPIO_TP,
 	QRD_GPIO_CAM_GP_CAMIF_RESET,
 };
-/* < DTS2012021306459 zhangyun 20120213 begin */
+
+#define ADSP_RPC_PROG           0x3000000a
 #if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
-/* DTS2012021306459 zhangyun 20120213 end > */
 
 #define FPGA_MSM_CNTRL_REG2 0x90008010
 #define BAHAMA_SLAVE_ID_FM_REG 0x02
@@ -98,13 +99,9 @@ struct bt_vreg_info {
 	struct regulator *reg;
 };
 
-extern struct platform_device msm_bt_power_device;
-
 void __init msm7627a_bt_power_init(void);
 #endif
-/* < DTS2012021306459 zhangyun 20120213 begin */
 #if (defined(HUAWEI_BT_BTLA_VER30) && defined(CONFIG_HUAWEI_KERNEL))
-
 struct bt_vreg_info {
 	const char *name;
 	unsigned int pmapp_id;
@@ -114,23 +111,23 @@ struct bt_vreg_info {
 	struct regulator *reg;
 };
 
-void __init bt_bcm4330_power_init(void);
+void __init msm7627a_bt_power_init(void);
 
-/* < DTS2012022206848 yangyang 20120220 begin */ 
+
+
 void bt_wake_msm_config(void);
-/* DTS2012022206848 yangyang 20120220 end >*/
 
-extern struct platform_device msm_bt_power_device;
-extern struct platform_device msm_bluesleep_device;
+/*delete 2 lines, no need in this file again*/
 
 #endif
+
+extern struct platform_device msm_device_snd;
+extern struct platform_device msm_device_adspdec;
+extern struct platform_device msm_device_cad;
+
 void __init msm7627a_camera_init(void);
-/* < DTS2012042302547 chendeng 20120428 begin */
-/*
- * From the qualcomm patch, the CR is 00823327.
- * Fix sd card resuming fail issue.
- */
-u32 msm7627a_power_collapse_latency(enum msm_pm_sleep_mode);
-/* DTS2012042302547 chendeng 20120428 end > */
+int lcd_camera_power_onoff(int on);
+
+void __init msm7627a_add_io_devices(void);
+void __init qrd7627a_add_io_devices(void);
 #endif
-/* DTS2012021306459 zhangyun 20120213 end > */

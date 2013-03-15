@@ -229,13 +229,14 @@ static struct msm_sensor_fn_t ov9726_func_tbl = {
 	.sensor_set_fps = msm_sensor_set_fps,
 	.sensor_write_exp_gain = msm_sensor_write_exp_gain1,
 	.sensor_write_snapshot_exp_gain = msm_sensor_write_exp_gain1,
-	.sensor_setting = msm_sensor_setting1,
+	.sensor_csi_setting = msm_sensor_setting1,
 	.sensor_set_sensor_mode = msm_sensor_set_sensor_mode,
 	.sensor_mode_init = msm_sensor_mode_init,
 	.sensor_get_output_info = msm_sensor_get_output_info,
 	.sensor_config = msm_sensor_config,
 	.sensor_power_up = msm_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
+	.sensor_get_csi_params = msm_sensor_get_csi_params,
 };
 
 static struct msm_sensor_reg_t ov9726_regs = {
@@ -271,6 +272,7 @@ static struct msm_sensor_ctrl_t ov9726_s_ctrl = {
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(ov9726_subdev_info),
 	.sensor_v4l2_subdev_ops = &ov9726_subdev_ops,
 	.func_tbl = &ov9726_func_tbl,
+	.clk_rate = MSM_SENSOR_MCLK_24HZ,
 };
 
 module_init(msm_sensor_init_module);

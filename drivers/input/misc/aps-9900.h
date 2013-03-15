@@ -1,4 +1,3 @@
-/* < DTS2011042604384  wangjiongfeng 20110427 begin */
 /* drivers/input/misc/aps-9900.h
  *
  * Copyright (C) 2010 HUAWEI, Inc.
@@ -24,14 +23,11 @@
 #define ECS_IOCTL_APP_GET_LFLAG		_IOR(0xA1, 0x1B, short)
 #define ECS_IOCTL_APP_SET_PFLAG		_IOW(0xA1, 0x1E, short)
 #define ECS_IOCTL_APP_GET_PFLAG		_IOR(0xA1, 0x1D, short)
-/* < DTS2011071500961  liujinggang 20110715 begin */
 #define ECS_IOCTL_APP_GET_PDATA_VALVE	_IOR(0xA1, 0x32, short)
 #define ECS_IOCTL_APP_GET_LDATA_VALVE	_IOR(0xA1, 0x33, short)
-/* DTS2011071500961  liujinggang 20110715 end > */
 
 #define VREG_GP4_NAME	"gp4"
 #define VREG_GP4_VOLTAGE_VALUE	2700
-/* < DTS2012020706412 zhangmin 20120306 begin */
 
 #define CMD_BYTE      0x80
 #define CMD_WORD      0xA0
@@ -65,17 +61,14 @@
 
 #define DETECTION_THRESHOLD	500
 
+#define PPCOUNT_REG_INDEX 4
 #define APDS9900_POWER_ON 1     /* set the APDS9900_ENABLE_REG's PON=1,Writing a 1 activates the APDS9900 */
 #define APDS9900_POWER_OFF 0    /* set the APDS9900_ENABLE_REG's PON=1,Writing a 0 disables the APDS9900 */
-/* < DTS2011070101164 yuezenglong 20110701 begin */
 /*reconfig reg after resume*/
 #define APDS9900_ENABLE 0x3F    /* set the APDS9900_ENABLE_REG's*/
-/* DTS2011070101164 yuezenglong 20110701 end > */
-/* < DTS2011050303216 wangjiongfeng 20110504 begin */
 #define APDS9900_POWER_MASK (1<<0)
 #define APDS9900_STATUS_PROXIMITY_BIT (1<<5)
 #define APDS9900_STATUS_ALS_BIT (1<<4)
-/* < DTS2011050303216 wangjiongfeng 20110504 end */
 #define APDS9900_PEN_BIT_SHIFT 2
 #define APDS9900_AEN_BIT_SHIFT 1
 
@@ -94,19 +87,32 @@
 
 #define U8655_WAVE  35
 #define U8655_WINDOW  115
-/* < DTS2012052106315 yangbo 20120529 begin */
-/* update the parameters of proximity in 881X serials, it will affect 8818S and 8815 */
-#define U8815_WAVE  158
-#define U8815_WINDOW 356
-/* DTS2012052106315 yangbo 20120529 end > */
+#define U8815_WAVE  150
+#define U8815_WINDOW 150
 #define C8655_WAVE  40
 #define C8655_WINDOW 225
 
 #define M660_WAVE  25
 #define M660_WINDOW 90
-/* < DTS2012032304842 yangbo 20120330 begin */
+/* the values below are all experience value */
+#define CU8825_WAVE 144
+#define CU8825_WINDOW 303
+#define C8812E_WAVE 84
+#define C8812E_WINDOW 200
+/* the values below are all experience value */
+#define CU8950_WAVE 113
+#define CU8950_WINDOW 193
+/* the values below are all experience value */
+#define Y300_WAVE 127
+#define Y300_WINDOW 300
+#define G510_WAVE 176
+#define G510_WINDOW 310
+/* the values below are all experience value */
+#define G510C_WAVE 137
+#define G510C_WINDOW 290
+#define H867G_WAVE 74
+#define H867G_WINDOW 221
 /* delete this part */
-/* DTS2012032304842 yangbo 20120330 end > */
 
 static uint16_t lsensor_adc_table_u8655[LSENSOR_MAX_LEVEL] = {
 	30, 48, 72, 134, 245, 360, 500
@@ -120,12 +126,10 @@ static uint16_t lsensor_adc_table_c8655[LSENSOR_MAX_LEVEL] = {
 static uint16_t lsensor_adc_table_m660[LSENSOR_MAX_LEVEL] = {
 	33, 100, 150, 332, 400, 480, 553
 };
-/* DTS2012050401689 zhangmin 20120504 begin */
-/* the values below are all experience value and provide by wenjuan*/
+/* the values below are all experience value */
 static uint16_t lsensor_adc_table_c8812[LSENSOR_MAX_LEVEL] = {
-	8, 80, 470, 900, 1200, 1500, 2200
+	39, 52, 170, 389, 475, 561, 648
 };
-/* DTS2012050401689 zhangmin 20120504 end > */
 static uint16_t lsensor_adc_table_u8680[LSENSOR_MAX_LEVEL] = {
 	10, 26, 210, 560, 860, 1200, 1500
 };
@@ -136,6 +140,29 @@ static uint16_t lsensor_adc_table_u8730[LSENSOR_MAX_LEVEL] = {
 static uint16_t lsensor_adc_table_u8667[LSENSOR_MAX_LEVEL] = {
 	25, 55, 210, 600, 860, 1000, 1300
 };
-/* DTS2012020706412 zhangmin 20120306 end > */
+/* the values below are all experience value */
+static uint16_t lsensor_adc_table_cu8825[LSENSOR_MAX_LEVEL] = {
+	37, 64, 300, 794, 1200, 2079, 3000
+};
+static uint16_t lsensor_adc_table_c8812e[LSENSOR_MAX_LEVEL] = {
+	37, 64, 300, 794, 1200, 2079, 3000
+};
+/* the values below are all experience value */
+static uint16_t lsensor_adc_table_cu8950[LSENSOR_MAX_LEVEL] = {
+	29, 56, 260, 625, 795, 965, 1300
+};
+/* the values below are all experience value */
+static uint16_t lsensor_adc_table_g510[LSENSOR_MAX_LEVEL] = {
+	12,	30,	210, 560, 860, 1200, 1500
+};
+/* the values below are all experience value */
+static uint16_t lsensor_adc_table_g510c[LSENSOR_MAX_LEVEL] = {
+	12,	30,	210, 560, 860, 1200, 1500
+};
+static uint16_t lsensor_adc_table_y300[LSENSOR_MAX_LEVEL] = {
+	14,	32,	218, 576, 880, 1250, 1600
+};
+static uint16_t lsensor_adc_table_H867G[LSENSOR_MAX_LEVEL] = {
+	14, 40, 400, 740, 950, 1355, 3000
+};
 #endif /* _LINUX_APS_9900_H */
-/* < DTS2011042604384  wangjiongfeng 20110427 end */

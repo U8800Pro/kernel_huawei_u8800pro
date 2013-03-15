@@ -10,6 +10,7 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 */
+// rollback to original BlueZ
 
 #ifndef __AMP_H
 #define __AMP_H

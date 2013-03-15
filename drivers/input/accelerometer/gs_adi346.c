@@ -1,4 +1,3 @@
-/* < DTS2011010404642 wuzhihui 20110104 begin */
 /* drivers/input/accelerometer/gs_adi346.c
  *
  * Copyright (C) 2010-2011  Huawei.
@@ -34,12 +33,10 @@
 
 #include <linux/gs_adxl345.h>
 
-/* <DTS2011021804534 shenjinming 20110218 begin */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
 #endif
-/* DTS2011021804534 shenjinming 20110218 end> */
-
+#include <linux/sensors.h>
 //#define ENABLE_GS_DEBUG
 //#undef ENABLE_GS_DEBUG
 
@@ -113,9 +110,36 @@
 #define RANGE_PM_4g	1
 #define RANGE_PM_8g	2
 #define RANGE_PM_16g	3
-
-
-
+/* DATA_CTRL_REG: controls the output data rate of the part */
+#define ODR12_5F     0x07   //Period   80ms
+#define ODR25F       0x08   //Period   40ms
+#define ODR50F       0x09   //Period   20ms
+#define ODR100F      0x0A   //Period   10ms
+#define ODR200F      0x0B   //Period    5ms
+#define ODR400F      0x0C   //Period  2.5ms
+#define ODR_MASK     0xF0
+/*This is the classcial Delay_time from framework and the units is ms*/
+#define DELAY_FASTEST  10
+#define DELAY_GAME     20
+#define DELAY_UI       68
+#define DELAY_NORMAL  200
+#define DELAY_ERROR 10000
+/*
+ * The following table lists the maximum appropriate poll interval for each
+ * available output data rate.
+ * Make sure the status still have proper timer.
+ */
+ 
+static const struct {
+	unsigned int cutoff;
+	u8 mask;
+} adi_odr_table[] = {
+	{ DELAY_FASTEST,ODR200F},
+	{ DELAY_GAME,   ODR100F},
+	{ DELAY_UI,      ODR25F},
+	{ DELAY_NORMAL,ODR12_5F},
+	{ DELAY_ERROR, ODR12_5F},
+};
 
 
 static unsigned model;
@@ -126,14 +150,12 @@ enum {
 	MODE_8G,
 };
 
-/* < DTS2011071300230  liujinggang 20110810 begin */
 #define MG_PER_SAMPLE		720		/*HAL: 720=1g*/
 //#define FILTER_SAMPLE_NUMBER	128
 #define FILTER_SAMPLE_NUMBER	256		/* 256 = 1g */
 #define	GPIO_INT1		19
 #define GPIO_INT2		20
 #define GS_ST_TIMRER		(1000)		/*1000ms*/
-/* DTS2011071300230  liujinggang 20110810 end > */
 
 #define ECS_IOCTL_READ_ACCEL_XYZ			_IOR(0xA1, 0x06, char[3])
 #define ECS_IOCTL_APP_SET_DELAY 			_IOW(0xA1, 0x18, short)
@@ -171,7 +193,6 @@ static atomic_t a_flag;
 static void gs_early_suspend(struct early_suspend *h);
 static void gs_late_resume(struct early_suspend *h);
 #endif
-/* < DTS2011072105664 xiangxu  20110722 begin */
 static inline int reg_read(struct gs_data *gs , int reg);
 static int adi346_debug_mask;
 module_param_named(adi346_debug, adi346_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -196,10 +217,7 @@ void adi346_print_debug(int start_reg,int end_reg)
 	}
 }
 
-/* DTS2011072105664 xiangxu  20110722 end > */
-/* < DTS2011011905410   liujinggang 20110119 begin */
 static compass_gs_position_type  compass_gs_position=COMPASS_TOP_GS_TOP;
-/* DTS2011011905410   liujinggang 20110119 end > */
 static int adxl34x_i2c_read_block(struct i2c_client *client,
 				unsigned char reg, int count,
 				void *buf)
@@ -223,7 +241,6 @@ static int adxl34x_i2c_read_block(struct i2c_client *client,
 /**************************************************************************************/
 static inline int reg_read(struct gs_data *gs , int reg)
 {
-    /*< DTS2012053102470 jiangweizheng 20120531 begin */
     int val;
 
     mutex_lock(&gs->mlock);
@@ -237,11 +254,9 @@ static inline int reg_read(struct gs_data *gs , int reg)
     mutex_unlock(&gs->mlock);
 
     return val;
-    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 static inline int reg_write(struct gs_data *gs, int reg, uint8_t val)
 {
-    /*< DTS2012053102470 jiangweizheng 20120531 begin */
     int ret;
 
     mutex_lock(&gs->mlock);
@@ -253,7 +268,6 @@ static inline int reg_write(struct gs_data *gs, int reg, uint8_t val)
     mutex_unlock(&gs->mlock);
 
     return ret;
-    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 
 /**************************************************************************************/
@@ -266,10 +280,38 @@ static int gs_data_to_compass(signed short accel_data [3])
 	accel_data[2]=st_sensor_data[2];
 	return 0;
 }
-
+static void gs_adi_update_odr(struct gs_data  *gs)
+{
+	int i;
+	int reg = 0;
+	int ret = 0;
+	short time_reg;
+	for (i = 0; i < ARRAY_SIZE(adi_odr_table); i++) 
+	{
+		time_reg = adi_odr_table[i].mask;
+		if (accel_delay <= adi_odr_table[i].cutoff)
+		{
+			accel_delay = adi_odr_table[i].cutoff;
+			break;
+		}
+	}
+	printk("Update G-sensor Odr ,delay_time is %d\n",accel_delay);
+	reg  = reg_read(gs, GS_ADI_REG_BW);
+	if( reg < 0 )
+	{
+		printk("Update_odr read register error \n");
+		return;
+	}
+	reg  = reg & ODR_MASK;
+	time_reg = time_reg | reg ;
+	ret  = reg_write(gs,GS_ADI_REG_BW,time_reg);
+	if(ret < 0)
+	{
+		printk("register write failed is gs_mma_update_odr\n ");
+	}
+}
 /**************************************************************************************/
 
-/* < DTS2011071300230  liujinggang 20110810 begin */
 /*set register*/
 static int gs_st_open(struct inode *inode, struct file *file)
 {	
@@ -304,7 +346,6 @@ static int gs_st_release(struct inode *inode, struct file *file)
 
 	return 0;
 }
-/* DTS2011071300230  liujinggang 20110810 end > */
 
 static long
 gs_st_ioctl(struct file *file, unsigned int cmd,
@@ -344,6 +385,7 @@ gs_st_ioctl(struct file *file, unsigned int cmd,
 				accel_delay = flag;
 			else
 				accel_delay = 10;   /*10ms*/
+			gs_adi_update_odr(this_gs_data);
 			break;
 			
 		case ECS_IOCTL_APP_GET_DELAY:
@@ -400,8 +442,6 @@ static struct miscdevice gsensor_device = {
 
 static void gs_work_func(struct work_struct *work)
 {
-    /*< DTS2012053102470 jiangweizheng 20120531 begin */
-    /* < DTS2011071300230  liujinggang 20110810 begin */
     /*modify the data processing*/
     int ret = 0;
     short buf[3];
@@ -422,15 +462,11 @@ static void gs_work_func(struct work_struct *work)
     y16 = buf[1];
     z16 = buf[2];
 
-    /* < DTS2011072105664  xiangxu 20110722 begin*/
     ADI346_DBG("%s, line %d: gs_adi346, origin data: x:%d y:%d z:%d sec:%d nsec:%d\n", __func__, __LINE__, x16, y16, z16, sesc, nsesc);
-    /*  DTS2011072105664   xiangxu 20110722 end > */
     x = x16*MG_PER_SAMPLE/FILTER_SAMPLE_NUMBER;
     y = y16*MG_PER_SAMPLE/FILTER_SAMPLE_NUMBER;
     z = z16*MG_PER_SAMPLE/FILTER_SAMPLE_NUMBER;
 
-    /* < DTS2011011905410   liujinggang 20110119 begin */
-    /* < DTS2011030405439 weiheng 20110307 begin */
     /*report different values by machines*/
     if((compass_gs_position==COMPASS_TOP_GS_BOTTOM)||(compass_gs_position==COMPASS_BOTTOM_GS_BOTTOM)||(compass_gs_position==COMPASS_NONE_GS_BOTTOM))
     {
@@ -445,8 +481,6 @@ static void gs_work_func(struct work_struct *work)
         //obverse
         z*=(-1);
     }
-    /* DTS2011030405439 weiheng 20110307 end > */
-    /* DTS2011011905410   liujinggang 20110119 end > */
 
     input_report_abs(gs->input_dev, ABS_X, y);
     input_report_abs(gs->input_dev, ABS_Y, x);
@@ -470,8 +504,6 @@ static void gs_work_func(struct work_struct *work)
     st_sensor_data[2]= -z;
         
 
-    /* DTS2011071300230  liujinggang 20110810 end > */
-    /* < DTS2011072105664 xiangxu 20110722 begin */
     ADI346_DBG("%s, line %d: gs_adi346, report data: x:%d y:%d z:%d\n", __func__, __LINE__, x, y, z);
     if(adi346_debug_mask)
     {
@@ -483,7 +515,6 @@ static void gs_work_func(struct work_struct *work)
             adi346_print_debug(GS_ADI_REG_THRESH_TAP,GS_ADI_REG_ORIENT);
         }
     }
-    /* DTS2011072105664 xiangxu 20110722 end > */
     
     if (gs->use_irq)
     {
@@ -497,7 +528,6 @@ static void gs_work_func(struct work_struct *work)
             printk(KERN_ERR "%s, line %d: hrtimer_start fail! sec=%d, nsec=%d\n", __func__, __LINE__, sesc, nsesc);
         }
     }
-    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 
 
@@ -552,11 +582,8 @@ static int gs_probe(
 	int ret = 0;
 	struct gs_data *gs;
 	unsigned char revid;
-	/* < DTS2011011905410   liujinggang 20110119 begin */
 	struct gs_platform_data *pdata = NULL;
- 	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/*delete 20 lines*/
-	/* DTS2011043000257  liujinggang 20110503 end > */
 	    
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		printk(KERN_ERR "gs_adi346_probe: need I2C_FUNC_I2C\n");
@@ -564,11 +591,9 @@ static int gs_probe(
 		goto err_check_functionality_failed;
 	}
 
-	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/*turn on the power*/
 	pdata = client->dev.platform_data;
 	if (pdata){
-/* < DTS2012013004920 zhangmin 20120130 begin */
 #ifdef CONFIG_ARCH_MSM7X30
 		if(pdata->gs_power != NULL){
 			ret = pdata->gs_power(IC_PM_ON);
@@ -577,7 +602,6 @@ static int gs_probe(
 			}
 		}
 #endif
-/* DTS2012013004920 zhangmin 20120130 end > */
 				
 		if(pdata->adapt_fn != NULL){
 			ret = pdata->adapt_fn();
@@ -605,7 +629,6 @@ static int gs_probe(
 			}
 		}
 	}
-	/* DTS2011011905410   liujinggang 20110119 end > */
 	client->addr = 0x53;//8bit address is 0xA6
 
 #ifndef   GS_POLLING 	
@@ -615,7 +638,6 @@ static int gs_probe(
 		goto err_power_failed;
 	}
 #endif
-	/* DTS2011043000257  liujinggang 20110503 end > */
 
 	gs = kzalloc(sizeof(*gs), GFP_KERNEL);
 	if (gs == NULL) {
@@ -641,7 +663,6 @@ static int gs_probe(
 		goto err_detect_failed;
 	}
 
-	/* < DTS2011071300230  liujinggang 20110810 begin */
 	/*modify the initializtion*/
 
 	ret = reg_write(gs, GS_ADI_REG_OFSX, 0); /* offset: 0g */
@@ -670,14 +691,11 @@ static int gs_probe(
 		/* fail? */
 		goto err_detect_failed;
 	}
-	/* DTS2011071300230  liujinggang 20110810 end > */
 
-    /* <DTS2011021804534 shenjinming 20110218 begin */
     #ifdef CONFIG_HUAWEI_HW_DEV_DCT
     /* detect current device successful, set the flag as present */
     set_hw_dev_flag(DEV_I2C_G_SENSOR);
     #endif
-    /* DTS2011021804534 shenjinming 20110218 end> */   
 
 	if (sensor_dev == NULL)
 	{
@@ -748,7 +766,6 @@ static int gs_probe(
 	register_early_suspend(&gs->early_suspend);
 #endif
 
-/*< DTS2012053102470 jiangweizheng 20120531 begin */
     gs_wq = create_singlethread_workqueue("gs_wq");
     if (!gs_wq)
     {
@@ -759,13 +776,15 @@ static int gs_probe(
     
     this_gs_data = gs;
 
-    /* < DTS2011011905410   liujinggang 20110119 begin */
     if(pdata && pdata->init_flag)
         *(pdata->init_flag) = 1;
-    /* DTS2011011905410   liujinggang 20110119 end > */
-
+    ret = set_sensor_input(ACC, gs->input_dev->dev.kobj.name);
+    if (ret) {
+        dev_err(&client->dev, "%s set_sensor_input failed\n", __func__);
+        goto err_create_workqueue_failed;
+    }
     printk(KERN_INFO "gs_probe: Start adi346  in %s mode\n", gs->use_irq ? "interrupt" : "polling");
-
+    set_sensors_list(G_SENSOR);
     return 0;
 
 err_create_workqueue_failed:
@@ -781,7 +800,6 @@ err_create_workqueue_failed:
     {
         hrtimer_cancel(&gs->timer);
     }
-/* DTS2012053102470 jiangweizheng 20120531 end >*/
 err_misc_device_register_failed:
 	misc_deregister(&gsensor_device);
 
@@ -795,19 +813,15 @@ err_alloc_data_failed:
 #ifndef   GS_POLLING 
 	gs_free_int();
 #endif
-/* < DTS2011043000257  liujinggang 20110503 begin */
 /*turn down the power*/	
 err_power_failed:
-/* < DTS2012013004920 zhangmin 20120130 begin */
 #ifdef CONFIG_ARCH_MSM7X30
 	if(pdata->gs_power != NULL){
 		pdata->gs_power(IC_PM_OFF);
 	}
 #endif
-/* DTS2012013004920 zhangmin 20120130 end > */
 err_check_functionality_failed:
 
-/* DTS2011043000257  liujinggang 20110503 end > */
 	printk(KERN_INFO "gs_probe: faile  adi346  in  mode\n");
 
 	return ret;
@@ -816,11 +830,9 @@ err_check_functionality_failed:
 static int gs_remove(struct i2c_client *client)
 {
 	struct gs_data *gs = i2c_get_clientdata(client);
-/*< DTS2012053102470 jiangweizheng 20120531 begin */
 #ifdef CONFIG_HAS_EARLYSUSPEND
     unregister_early_suspend(&gs->early_suspend);
 #endif
-/* DTS2012053102470 jiangweizheng 20120531 end >*/
 	if (gs->use_irq)
 		free_irq(client->irq, gs);
 	else
@@ -831,7 +843,6 @@ static int gs_remove(struct i2c_client *client)
 	return 0;
 }
 
-/* < DTS2011071300230  liujinggang 20110810 begin */
 /*set register*/
 static int gs_suspend(struct i2c_client *client, pm_message_t mesg)
 {
@@ -869,7 +880,6 @@ static int gs_resume(struct i2c_client *client)
 
 	return 0;
 }
-/* DTS2011071300230  liujinggang 20110810 end > */
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void gs_early_suspend(struct early_suspend *h)
@@ -923,4 +933,3 @@ module_exit(gs_adi346_exit);
 
 MODULE_DESCRIPTION("gs_adi346 Driver");
 MODULE_LICENSE("GPL");
-/* DTS2011010404642 wuzhihui 20110104 end > */

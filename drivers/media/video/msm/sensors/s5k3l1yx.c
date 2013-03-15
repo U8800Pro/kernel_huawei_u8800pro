@@ -114,8 +114,8 @@ static struct msm_camera_i2c_reg_conf s5k3l1yx_video_60fps_settings[] = {
 	{0x0113, 0x0A}, /* CCP_data_format_L raw8=0808 ,DCPM10 -->8= 0A08 */
 	{0x0306, 0x00}, /* pll_multiplier */
 	{0x0307, 0xA5}, /* pll_multiplier */
-	{0x0202, 0x02}, /* coarse_integration_time */
-	{0x0203, 0x1C}, /* coarse_integration_time */
+	{0x0202, 0x03}, /* coarse_integration_time */
+	{0x0203, 0xD8}, /* coarse_integration_time */
 	{0x0340, 0x03}, /* frame_length_lines */
 	{0x0341, 0xE0}, /* frame_length_lines */
 	{0x0342, 0x14}, /* line_length_pck */
@@ -123,7 +123,7 @@ static struct msm_camera_i2c_reg_conf s5k3l1yx_video_60fps_settings[] = {
 	{0x0344, 0x01}, /* x_addr_start */
 	{0x0345, 0x20}, /* x_addr_start */
 	{0x0346, 0x02}, /* y_addr_start */
-	{0x0347, 0x23}, /* y_addr_start */
+	{0x0347, 0x24}, /* y_addr_start */
 	{0x0348, 0x0E}, /* x_addr_end */
 	{0x0349, 0xA0}, /* x_addr_end */
 	{0x034A, 0x09}, /* y_addr_end */
@@ -152,7 +152,7 @@ static struct msm_camera_i2c_reg_conf s5k3l1yx_video_90fps_settings[] = {
 	{0x0306, 0x00}, /* pll_multiplier */
 	{0x0307, 0xA5}, /* pll_multiplier */
 	{0x0202, 0x02}, /* coarse_integration_time */
-	{0x0203, 0x1C}, /* coarse_integration_time */
+	{0x0203, 0x90}, /* coarse_integration_time */
 	{0x0340, 0x02}, /* frame_length_lines */
 	{0x0341, 0x98}, /* frame_length_lines */
 	{0x0342, 0x14}, /* line_length_pck */
@@ -160,7 +160,7 @@ static struct msm_camera_i2c_reg_conf s5k3l1yx_video_90fps_settings[] = {
 	{0x0344, 0x01}, /* x_addr_start */
 	{0x0345, 0x20}, /* x_addr_start */
 	{0x0346, 0x02}, /* y_addr_start */
-	{0x0347, 0x23}, /* y_addr_start */
+	{0x0347, 0x24}, /* y_addr_start */
 	{0x0348, 0x0E}, /* x_addr_end */
 	{0x0349, 0xA0}, /* x_addr_end */
 	{0x034A, 0x09}, /* y_addr_end */
@@ -188,16 +188,16 @@ static struct msm_camera_i2c_reg_conf s5k3l1yx_video_120fps_settings[] = {
 	{0x0113, 0x0A}, /* CCP_data_format_L raw8=0808 ,DCPM10 -->8= 0A08 */
 	{0x0306, 0x00}, /* pll_multiplier */
 	{0x0307, 0xA5}, /* pll_multiplier */
-	{0x0202, 0x02}, /* coarse_integration_time */
-	{0x0203, 0x1C}, /* coarse_integration_time */
+	{0x0202, 0x01}, /* coarse_integration_time */
+	{0x0203, 0xFA}, /* coarse_integration_time */
 	{0x0340, 0x02}, /* frame_length_lines */
-	{0x0341, 0x0D}, /* frame_length_lines */
+	{0x0341, 0x02}, /* frame_length_lines */
 	{0x0342, 0x14}, /* line_length_pck */
 	{0x0343, 0xD8}, /* line_length_pck */
 	{0x0344, 0x01}, /* x_addr_start */
 	{0x0345, 0x20}, /* x_addr_start */
 	{0x0346, 0x02}, /* y_addr_start */
-	{0x0347, 0x23}, /* y_addr_start */
+	{0x0347, 0x24}, /* y_addr_start */
 	{0x0348, 0x0E}, /* x_addr_end */
 	{0x0349, 0xA0}, /* x_addr_end */
 	{0x034A, 0x09}, /* y_addr_end */
@@ -481,7 +481,7 @@ static struct msm_sensor_output_info_t s5k3l1yx_dimensions[] = {
 		.line_length_pclk = 5336,
 		.frame_length_lines = 3052,
 		.vt_pixel_clk = 330000000,
-		.op_pixel_clk = 320000000,
+		.op_pixel_clk = 264000000,
 		.binning_factor = 1,
 	},
 	/* 30 fps preview */
@@ -491,7 +491,7 @@ static struct msm_sensor_output_info_t s5k3l1yx_dimensions[] = {
 		.line_length_pclk = 4480,
 		.frame_length_lines = 2456,
 		.vt_pixel_clk = 330000000,
-		.op_pixel_clk = 320000000,
+		.op_pixel_clk = 264000000,
 		.binning_factor = 1,
 	},
 	/* 60 fps video */
@@ -501,7 +501,7 @@ static struct msm_sensor_output_info_t s5k3l1yx_dimensions[] = {
 		.line_length_pclk = 5336,
 		.frame_length_lines = 992,
 		.vt_pixel_clk = 330000000,
-		.op_pixel_clk = 320000000,
+		.op_pixel_clk = 264000000,
 		.binning_factor = 1,
 	},
 	/* 90 fps video */
@@ -511,7 +511,7 @@ static struct msm_sensor_output_info_t s5k3l1yx_dimensions[] = {
 		.line_length_pclk = 5336,
 		.frame_length_lines = 664,
 		.vt_pixel_clk = 330000000,
-		.op_pixel_clk = 320000000,
+		.op_pixel_clk = 264000000,
 		.binning_factor = 1,
 	},
 	/* 120 fps video */
@@ -519,9 +519,9 @@ static struct msm_sensor_output_info_t s5k3l1yx_dimensions[] = {
 		.x_output = 864,
 		.y_output = 480,
 		.line_length_pclk = 5336,
-		.frame_length_lines = 525,
+		.frame_length_lines = 514,
 		.vt_pixel_clk = 330000000,
-		.op_pixel_clk = 320000000,
+		.op_pixel_clk = 264000000,
 		.binning_factor = 1,
 	},
 	/* 24 fps snapshot */
@@ -538,11 +538,11 @@ static struct msm_sensor_output_info_t s5k3l1yx_dimensions[] = {
 
 static struct msm_camera_csid_vc_cfg s5k3l1yx_cid_cfg[] = {
 	{0, CSI_RAW10, CSI_DECODE_10BIT},
+	{1, CSI_EMBED_DATA, CSI_DECODE_8BIT},
 };
 
 static struct msm_camera_csi2_params s5k3l1yx_csi_params = {
 	.csid_params = {
-		.lane_assign = 0xe4,
 		.lane_cnt = 4,
 		.lut_params = {
 			.num_cid = ARRAY_SIZE(s5k3l1yx_cid_cfg),
@@ -652,6 +652,8 @@ static struct msm_sensor_fn_t s5k3l1yx_func_tbl = {
 	.sensor_config = msm_sensor_config,
 	.sensor_power_up = msm_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
+	.sensor_adjust_frame_lines = msm_sensor_adjust_frame_lines,
+	.sensor_get_csi_params = msm_sensor_get_csi_params,
 };
 
 static struct msm_sensor_reg_t s5k3l1yx_regs = {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2010, 2012 Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,11 +25,9 @@
 #include "msm_fb_panel.h"
 #include "mddihost.h"
 #include "mddihosti.h"
-/*< DTS2010120703279 lijianzhao 20101207 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 #include "hw_lcd_common.h"
 #endif
-/* DTS2010120703279 lijianzhao 20101207 end >*/
 #define FEATURE_MDDI_UNDERRUN_RECOVERY
 #ifndef FEATURE_MDDI_DISABLE_REVERSE
 static void mddi_read_rev_packet(byte *data_ptr);
@@ -79,12 +77,10 @@ boolean mddi_debug_clear_rev_data = TRUE;
 uint32 *mddi_reg_read_value_ptr;
 
 mddi_client_capability_type mddi_client_capability_pkt;
-/*<DTS2011060400761 fengwei 20110604 begin*/
 /*close Mddi Reverse link for reslove blankscreen*/
 #ifndef FEATURE_MDDI_DISABLE_REVERSE
 static boolean mddi_client_capability_request = FALSE;
 #endif
-/*DTS2011060400761 fengwei 20110604 end>*/
 
 #ifndef FEATURE_MDDI_DISABLE_REVERSE
 
@@ -1452,14 +1448,10 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 {
 	uint32 pad_reg_val;
 	mddi_host_cntl_type *pmhctl = &(mhctl[host_idx]);
-/*< DTS2010120703279 lijianzhao 20101207 begin */
 	hw_lcd_interface_type mddi_port_type = get_hw_lcd_interface_type();
-/* DTS2010120703279 lijianzhao 20101207 end >*/
-/*< DTS2011022700231 lijianzhao 20110227 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 	lcd_panel_type lcd_panel_wvga=get_lcd_panel_type();
 #endif
-/* DTS2011022700231 lijianzhao 20110227 end >*/
 	if (pmhctl->driver_state == MDDI_DRIVER_ENABLED)
 		return;
 
@@ -1477,7 +1469,6 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 
 	/* Subframes per media frames register (= 0x03) */
 	mddi_host_reg_out(SPM, 0x0003);
-/*< DTS2010120703279 lijianzhao 20101207 begin */
 /* Config MDDI host register according to MDDI type */
 #ifdef CONFIG_HUAWEI_KERNEL
 	if(LCD_IS_MDDI_TYPE2 == mddi_port_type)
@@ -1514,9 +1505,7 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 	/* Turn Around 2 register (= 0x0C) */
 	mddi_host_reg_out(TA2_LEN, MDDI_HOST_TA2_LEN);
 #endif
-/* DTS2010120703279 lijianzhao 20101207 end >*/
 
-/*< DTS2011022700231 lijianzhao 20110227 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 /* a_si LCD use as MDDI type1,so must increase high to 800,low to 200 */
 	if(LCD_NT35510_ALPHA_SI_WVGA == lcd_panel_wvga)
@@ -1536,7 +1525,6 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 	/* Drive lo register (= 0x32) */
 	mddi_host_reg_out(DRIVE_LO, 0x0032);
 #endif
-/* DTS2011022700231 lijianzhao 20110227 end >*/ 
 	/* Display wakeup count register (= 0x3c) */
 	mddi_host_reg_out(DISP_WAKE, 0x003c);
 
@@ -1562,7 +1550,6 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 		mddi_host_reg_out(PAD_CTL, 0x08000);
 		udelay(5);
 	}
-/*< DTS2010120703279 lijianzhao 20101207 begin */
 /* Config MDDI host register according to MDDI type */
 #ifdef CONFIG_HUAWEI_KERNEL
 	if(LCD_IS_MDDI_TYPE2 == mddi_port_type)
@@ -1574,19 +1561,9 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 		/* Recommendation from PAD hw team */
 		mddi_host_reg_out(PAD_CTL, 0x402a850f);
 	#endif
-		/*< DTS2012052303745 zhongjinrong 20120523 begin */
-		/*< DTS2011102804140 qitongliang 20111111 begin */
-	    /* resolve the buddy Lcd displaying unnormally*/
-		if (machine_is_msm8255_u8730())
-		{
-			pad_reg_val = 0x12238020;
-		}
-		else
-		{
-			pad_reg_val = 0x10220020;
-		}
-		/* DTS2011102804140 qitongliang 20111111 end >*/
-		/* DTS2012052303745 zhongjinrong 20120523 end >*/
+
+		pad_reg_val = 0x10220020;
+
 	#if defined(CONFIG_FB_MSM_MDP31) || defined(CONFIG_FB_MSM_MDP40)
 		mddi_host_reg_out(PAD_IO_CTL, 0x00320000);
 		mddi_host_reg_out(PAD_CAL, pad_reg_val);
@@ -1643,7 +1620,6 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 	mddi_host_reg_out(PAD_CAL, pad_reg_val);
 #endif
 #endif
-/* DTS2010120703279 lijianzhao 20101207 end >*/
 
 	mddi_host_core_version = mddi_host_reg_inm(CORE_VER, 0xffff);
 
@@ -1655,7 +1631,6 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 
 	if ((mddi_host_core_version > 8) && (mddi_host_core_version < 0x19))
 		mddi_host_reg_out(TEST, 0x2);
-/*< DTS2011022700231 lijianzhao 20110227 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 /* a_si LCD use as MDDI type1,add 200ns in wake-up diagram */
 	if(LCD_NT35510_ALPHA_SI_WVGA == lcd_panel_wvga)
@@ -1671,7 +1646,6 @@ static void mddi_host_initialize_registers(mddi_host_type host_idx)
 	/* Need an even number for counts */
 	mddi_host_reg_out(DRIVER_START_CNT, 0x60006);
 #endif
-/* DTS2011022700231 lijianzhao 20110227 end >*/ 
 #ifndef T_MSM7500
 	/* Setup defaults for MDP related register */
 	mddi_host_reg_out(MDP_VID_FMT_DES, 0x5666);
@@ -2017,42 +1991,6 @@ uint32 mddi_get_client_id(void)
 		if (ret < 0)
 			MDDI_MSG_ERR("mddi_client_power return %d", ret);
 	}
-
-#if 0
-	switch (mddi_client_capability_pkt.Mfr_Name) {
-	case 0x4474:
-		if ((mddi_client_capability_pkt.Product_Code != 0x8960) &&
-		    (target == DISPLAY_1)) {
-			ret = PRISM_WVGA;
-		}
-		break;
-
-	case 0xD263:
-		if (target == DISPLAY_1)
-			ret = TOSHIBA_VGA_PRIM;
-		else if (target == DISPLAY_2)
-			ret = TOSHIBA_QCIF_SECD;
-		break;
-
-	case 0:
-		if (mddi_client_capability_pkt.Product_Code == 0x8835) {
-			if (target == DISPLAY_1)
-				ret = SHARP_QVGA_PRIM;
-			else if (target == DISPLAY_2)
-				ret = SHARP_128x128_SECD;
-		}
-		break;
-
-	default:
-		break;
-	}
-
-	if ((!client_detection_try) && (ret != TOSHIBA_VGA_PRIM)
-	    && (ret != TOSHIBA_QCIF_SECD)) {
-		/* Not a Toshiba display, so change drive_lo back to default value */
-		mddi_host_reg_out(DRIVE_LO, 0x0032);
-	}
-#endif
 
 #endif
 

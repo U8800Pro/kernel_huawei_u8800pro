@@ -59,6 +59,10 @@
 #define MSG_ID_OUTPUT_PRIMARY           40
 #define MSG_ID_OUTPUT_SECONDARY         41
 #define MSG_ID_STATS_COMPOSITE          42
+#define MSG_ID_STOP_LS_ACK              43
+#define MSG_ID_OUTPUT_TERTIARY1         44
+#define MSG_ID_OUTPUT_TERTIARY2         45
+
 
 /* ISP command IDs */
 #define VFE_CMD_DUMMY_0                                 0
@@ -199,6 +203,7 @@
 #define VFE_CMD_SCALE_OUTPUT2_CONFIG                    135
 #define VFE_CMD_CAPTURE_RAW                             136
 #define VFE_CMD_STOP_LIVESHOT                           137
+#define VFE_CMD_RECONFIG_VFE                            138
 
 struct msm_isp_cmd {
 	int32_t  id;
@@ -241,8 +246,17 @@ struct msm_isp_cmd {
 #define VPE_SCALER_CONFIG_LEN           260
 #define VPE_DIS_OFFSET_CFG_LEN          12
 
-#define IMEM_Y_OFFSET  0x2E000000
-#define IMEM_CBCR_OFFSET  0x2E00FA00
+
+#define CAPTURE_WIDTH          1280
+#define IMEM_Y_SIZE            (CAPTURE_WIDTH*16)
+#define IMEM_CBCR_SIZE         (CAPTURE_WIDTH*8)
+
+#define IMEM_Y_PING_OFFSET     0x2E000000
+#define IMEM_CBCR_PING_OFFSET  (IMEM_Y_PING_OFFSET + IMEM_Y_SIZE)
+
+#define IMEM_Y_PONG_OFFSET     (IMEM_CBCR_PING_OFFSET + IMEM_CBCR_SIZE)
+#define IMEM_CBCR_PONG_OFFSET  (IMEM_Y_PONG_OFFSET + IMEM_Y_SIZE)
+
 
 struct msm_vpe_op_mode_cfg {
 	uint8_t op_mode_cfg[VPE_OPERATION_MODE_CFG_LEN];
@@ -305,17 +319,19 @@ struct msm_mctl_pp_frame_cmd {
 	/* TBD: 3D related */
 };
 
-#define VFE_OUTPUTS_MAIN_AND_PREVIEW	BIT(0)
-#define VFE_OUTPUTS_MAIN_AND_VIDEO	BIT(1)
-#define VFE_OUTPUTS_MAIN_AND_THUMB	BIT(2)
-#define VFE_OUTPUTS_THUMB_AND_MAIN	BIT(3)
-#define VFE_OUTPUTS_PREVIEW_AND_VIDEO	BIT(4)
-#define VFE_OUTPUTS_VIDEO_AND_PREVIEW	BIT(5)
-#define VFE_OUTPUTS_PREVIEW		BIT(6)
-#define VFE_OUTPUTS_VIDEO		BIT(7)
-#define VFE_OUTPUTS_RAW			BIT(8)
-#define VFE_OUTPUTS_JPEG_AND_THUMB	BIT(9)
-#define VFE_OUTPUTS_THUMB_AND_JPEG	BIT(10)
+#define VFE_OUTPUTS_MAIN_AND_PREVIEW    BIT(0)
+#define VFE_OUTPUTS_MAIN_AND_VIDEO      BIT(1)
+#define VFE_OUTPUTS_MAIN_AND_THUMB      BIT(2)
+#define VFE_OUTPUTS_THUMB_AND_MAIN      BIT(3)
+#define VFE_OUTPUTS_PREVIEW_AND_VIDEO   BIT(4)
+#define VFE_OUTPUTS_VIDEO_AND_PREVIEW   BIT(5)
+#define VFE_OUTPUTS_PREVIEW             BIT(6)
+#define VFE_OUTPUTS_VIDEO               BIT(7)
+#define VFE_OUTPUTS_RAW                 BIT(8)
+#define VFE_OUTPUTS_JPEG_AND_THUMB      BIT(9)
+#define VFE_OUTPUTS_THUMB_AND_JPEG      BIT(10)
+#define VFE_OUTPUTS_RDI0                BIT(11)
+#define VFE_OUTPUTS_RDI1                BIT(12)
 
 #endif /*__MSM_ISP_H__*/
 

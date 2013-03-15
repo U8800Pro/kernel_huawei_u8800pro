@@ -1,5 +1,3 @@
-/* <DTS2012032603420 sibingsong 20120326 begin */
-/*< DTS2012020400396 zhangyu 20120206 begin */
 /* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -12,6 +10,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/debugfs.h>
 #include <linux/types.h>
@@ -24,15 +23,11 @@
 #include <mach/camera.h>
 #include <media/msm_camera.h>
 #include "s5k4e1.h"
-/* <DTS2011112400871 sunwenyong 20111124 begin */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
 #endif
-/* DTS2011112400871 sunwenyong 20111124 end> */
-/* < DTS2011091701690  zhangyu 20110917 begin */
 #undef CDBG
 #define CDBG(fmt, args...) printk(KERN_INFO "s5k4e1.c: " fmt, ## args)
-/* DTS2011091701690 zhangyu 20110917 end > */
 /* 16bit address - 8 bit context register structure */
 #define Q8	0x00000100
 #define Q10	0x00000400
@@ -60,9 +55,9 @@ struct s5k4e1_work_t {
 };
 
 static struct s5k4e1_work_t *s5k4e1_sensorw;
-static struct i2c_client *s5k4e1_client;
 static struct s5k4e1_work_t *s5k4e1_af_sensorw;
 static struct i2c_client *s5k4e1_af_client;
+static struct i2c_client *s5k4e1_client;
 
 struct s5k4e1_ctrl_t {
 	const struct  msm_camera_sensor_info *sensordata;
@@ -171,9 +166,7 @@ static int32_t s5k4e1_i2c_write_b_sensor(unsigned short waddr, uint8_t bdata)
 	buf[0] = (waddr & 0xFF00) >> 8;
 	buf[1] = (waddr & 0x00FF);
 	buf[2] = bdata;
-	/*< DTS2011111504200 zhangyu 20111115 begin */
 //	CDBG("i2c_write_b addr = 0x%x, val = 0x%x\n", waddr, bdata);
-	/* DTS2011111504200 zhangyu 20111115 end > */
 	rc = s5k4e1_i2c_txdata(s5k4e1_client->addr, buf, 3);
 	if (rc < 0) {
 		CDBG("i2c_write_b failed, addr = 0x%x, val = 0x%x!\n",
@@ -213,7 +206,6 @@ static int32_t s5k4e1_af_i2c_write_b_sensor(uint8_t waddr, uint8_t bdata)
 	saddr = (s5k4e1_af_client->addr) << 1;
 #endif
 	rc = s5k4e1_i2c_txdata(saddr, buf, 2);
-	/* DTS2011091701690 zhangyu 20110917 end > */
 	if (rc < 0) {
 		pr_err("i2c_write_b failed, addr = 0x%x, val = 0x%x!\n",
 				waddr, bdata);
@@ -328,9 +320,7 @@ static int32_t s5k4e1_write_exp_gain(uint16_t gain, uint32_t line)
 	int32_t rc = 0;
 	static uint32_t fl_lines;
 
-	/* <DTS2011122208447 zhouqiwei 20111222 begin > */
 	CDBG("---------------s5k4e1_write_exp_gain : gain = %d line = %d \n", gain, line);
-	/* <DTS2011122208447 zhouqiwei 20111222 end > */
 	if (gain > max_legal_gain) {
 		pr_debug("Max legal gain Line:%d\n", __LINE__);
 		gain = max_legal_gain;
@@ -339,7 +329,6 @@ static int32_t s5k4e1_write_exp_gain(uint16_t gain, uint32_t line)
 	s5k4e1_i2c_write_b_sensor(0x0204, s5k4e1_byte(gain, MSB));
 	s5k4e1_i2c_write_b_sensor(0x0205, s5k4e1_byte(gain, LSB));
 
-	/*< DTS2011111504200 zhangyu 20111115 begin */
 	/* Modi write exposure lines */
 	if (line > (prev_frame_length_lines - 4)) {
 		fl_lines = line;
@@ -370,12 +359,10 @@ static int32_t s5k4e1_write_exp_gain(uint16_t gain, uint32_t line)
 		s5k4e1_i2c_write_b_sensor(0x0203, s5k4e1_byte(line, LSB));
 		s5k4e1_group_hold_off();
 	}
-	/* DTS2011111504200 zhangyu 20111115 end > */
 	return rc;
 }
 
 
-/*< DTS2011111504200 zhangyu 20111115 begin */
 static int32_t s5k4e1_set_pict_exp_gain(uint16_t gain, uint32_t line)
 {
 	uint16_t max_legal_gain = 0x0200;
@@ -417,7 +404,7 @@ static int32_t s5k4e1_set_pict_exp_gain(uint16_t gain, uint32_t line)
 	s5k4e1_i2c_write_b_sensor(0x0340, ll_pck_msb);
 	s5k4e1_i2c_write_b_sensor(0x0341, ll_pck_lsb);
 
-
+	/* Coarse Integration Time */
 	s5k4e1_i2c_write_b_sensor(0x0202, intg_time_msb);
 	s5k4e1_i2c_write_b_sensor(0x0203, intg_time_lsb);
 	s5k4e1_group_hold_off();
@@ -484,7 +471,6 @@ static int32_t s5k4e1_set_pict_exp_gain(uint16_t gain, uint32_t line)
 	return rc;
 }
 */
-/* DTS2011111504200 zhangyu 20111115 end > */
 static int32_t s5k4e1_move_focus(int direction,
 		int32_t num_steps)
 {
@@ -548,7 +534,6 @@ static void s5k4e1_reset_sensor(void)
 	s5k4e1_i2c_write_b_sensor(0x103, 0x1);
 }
 
-/*< DTS2012021006236 zhangyu 20120210 begin */
 static int32_t s5k4e1_sensor_setting(int update_type, int rt)
 {
 
@@ -560,7 +545,6 @@ static int32_t s5k4e1_sensor_setting(int update_type, int rt)
 
 	if (update_type == REG_INIT) {
 		s5k4e1_reset_sensor();
-		/*< DTS2012011301770   songxiaoming 20120204 begin */
 
 			
 		s5k4e1_i2c_write_b_table(s5k4e1_regs.rec_settings,
@@ -571,7 +555,6 @@ static int32_t s5k4e1_sensor_setting(int update_type, int rt)
 		
 		s5k4e1_i2c_write_b_table(s5k4e1_regs.reg_pll_p,
 				s5k4e1_regs.reg_pll_p_size);
-		/* <DTS2011122208447 zhouqiwei 20111222 begin > */
 		s5k4e1_i2c_write_b_table(s5k4e1_regs.reg_lc,
 				s5k4e1_regs.reg_lc_size);
 		CSI_CONFIG = 0;
@@ -589,15 +572,11 @@ static int32_t s5k4e1_sensor_setting(int update_type, int rt)
 				s5k4e1_regs.reg_snap_size);		
 
 		}
-		/* DTS2012011301770  songxiaoming 20120204 end > */						
-		/* < DTS2011122208447 zhouqiwei 20111222 end > */
 		msleep(20);
 		if (!CSI_CONFIG) {
 			msm_camio_vfe_clk_rate_set(192000000);
 			s5k4e1_csi_params.data_format = CSI_10BIT;
-			/*< DTS2012011301770   songxiaoming 20120204 begin */
 			s5k4e1_csi_params.lane_cnt = 2;
-			/* DTS2012011301770  songxiaoming 20120204 end > */
 			s5k4e1_csi_params.lane_assign = 0xe4;
 			s5k4e1_csi_params.dpcm_scheme = 0;
 			s5k4e1_csi_params.settle_cnt = 24;
@@ -610,7 +589,6 @@ static int32_t s5k4e1_sensor_setting(int update_type, int rt)
 	}
 	return rc;
 }
-/* DTS2012021006236 zhangyu 20120210 end > */
 
 static int32_t s5k4e1_video_config(int mode)
 {
@@ -709,13 +687,11 @@ static int s5k4e1_probe_init_done(const struct msm_camera_sensor_info *data)
 	gpio_direction_output(data->sensor_reset, 0);
     gpio_free(data->sensor_reset);
     gpio_free(data->sensor_pwd);
-	/*< DTS2012012901317 yuguangcai 20120131 begin */
 	/*disable the power*/
 	if (data->vreg_disable_func)
 	{
 		data->vreg_disable_func(0);
 	}
-	/* DTS2012012901317 yuguangcai 20120131 end > */
 	return 0;
 }
 
@@ -729,14 +705,12 @@ static int s5k4e1_probe_init_sensor(const struct msm_camera_sensor_info *data)
 
 	CDBG("%s: %d\n", __func__, __LINE__);
 	CDBG(" s5k4e1_probe_init_sensor is called\n");
-	/*< DTS2012012901317 yuguangcai 20120131 begin */
 	/*enable the power*/
 	if (data->vreg_enable_func)
 	{
 		data->vreg_enable_func(1);
 	}
 	mdelay(5);
-	/* DTS2012012901317 yuguangcai 20120131 end > */
 
 	rc = gpio_request(data->sensor_reset, "s5k4e1");
 	CDBG(" s5k4e1_probe_init_sensor\n");
@@ -749,7 +723,7 @@ static int s5k4e1_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	} else
 		goto gpio_req_fail;
 
-    msleep(20);
+	msleep(20);
 
 	s5k4e1_i2c_read(regaddress1, &chipid1, 1);
 	if (chipid1 != 0x4E) {
@@ -781,7 +755,6 @@ init_probe_fail:
 			gpio_free(data->vcm_pwd);
 		}
 	}
-
 gpio_req_fail:
 	return rc;
 }
@@ -877,12 +850,14 @@ static int s5k4e1_init_client(struct i2c_client *client)
 	init_waitqueue_head(&s5k4e1_wait_queue);
 	return 0;
 }
+
 static int s5k4e1_af_init_client(struct i2c_client *client)
 {
 	/* Initialize the MSM_CAMI2C Chip */
 	init_waitqueue_head(&s5k4e1_af_wait_queue);
 	return 0;
 }
+
 static const struct i2c_device_id s5k4e1_af_i2c_id[] = {
 	{"s5k4e1_af", 0},
 	{ }
@@ -974,6 +949,7 @@ static struct i2c_driver s5k4e1_i2c_driver = {
 		.name = "s5k4e1",
 	},
 };
+
 static struct i2c_driver s5k4e1_af_i2c_driver = {
 	.id_table = s5k4e1_af_i2c_id,
 	.probe  = s5k4e1_af_i2c_probe,
@@ -1107,13 +1083,11 @@ static int s5k4e1_sensor_release(void)
 		gpio_set_value_cansleep(s5k4e1_ctrl->sensordata->vcm_pwd, 0);
 		gpio_free(s5k4e1_ctrl->sensordata->vcm_pwd);
 	}
-	/*< DTS2012012901317 yuguangcai 20120131 begin */
 	/*disable the power*/
 	if (s5k4e1_ctrl->sensordata->vreg_disable_func)
 	{
 		s5k4e1_ctrl->sensordata->vreg_disable_func(0);
 	}
-	/* DTS2012012901317 yuguangcai 20120131 end > */
 	kfree(s5k4e1_ctrl);
 	s5k4e1_ctrl = NULL;
 	CDBG("s5k4e1_release completed\n");
@@ -1147,13 +1121,6 @@ static int s5k4e1_sensor_probe(const struct msm_camera_sensor_info *info,
 	if (rc < 0)
 		goto probe_fail_3;
 
-    /* <DTS2012041003722 sibingsong 20120410 begin */
-    /* < DTS2012031904303 zhouqiwei 20130319 begin */
-    /*camera name for project menu to display*/
-    strncpy((char *)info->sensor_name, "23060069FA-SAM-L", strlen("23060069FA-SAM-L"));
-    /* DTS2012031904303 zhouqiwei 20130319 end > */
-    /* DTS2012041003722 sibingsong 20120410 end> */
-    
 	s->s_init = s5k4e1_sensor_open_init;
 	s->s_release = s5k4e1_sensor_release;
 	s->s_config  = s5k4e1_sensor_config;
@@ -1164,7 +1131,6 @@ static int s5k4e1_sensor_probe(const struct msm_camera_sensor_info *info,
 #endif
 	gpio_set_value_cansleep(info->sensor_reset, 0);
 	s5k4e1_probe_init_done(info);
-
 	/* Keep vcm_pwd to OUT Low */
 	if (info->vcm_enable) { // info->vcm_enable) {
 		rc = gpio_request(info->vcm_pwd, "s5k4e1_af");
@@ -1179,13 +1145,11 @@ static int s5k4e1_sensor_probe(const struct msm_camera_sensor_info *info,
 		}
 	}
 
-/* <DTS2011112400871 sunwenyong 20111124 begin */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
     /* detect current device successful, set the flag as present */
     set_hw_dev_flag(DEV_I2C_CAMERA_MAIN);
 #endif
     
-/* DTS2011112400871 sunwenyong 20111124 end> */
 	return rc;
 
 probe_fail_3:
@@ -1218,5 +1182,3 @@ static int __init s5k4e1_init(void)
 module_init(s5k4e1_init);
 MODULE_DESCRIPTION("Samsung 5 MP Bayer sensor driver");
 MODULE_LICENSE("GPL v2");
-/* DTS2012020400396 zhangyu 20120206 end > */
-/* DTS2012032603420 sibingsong 20120326 end> */

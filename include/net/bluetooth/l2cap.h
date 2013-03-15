@@ -23,7 +23,8 @@
    COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS, RELATING TO USE OF THIS
    SOFTWARE IS DISCLAIMED.
 */
-/*DTS2012051403908 sihongfang 20120515 modify for roll back qcom bluetooth stack*/
+
+// rollback to original BlueZ
 
 #ifndef __L2CAP_H
 #define __L2CAP_H
@@ -535,6 +536,7 @@ struct l2cap_pinfo {
 
 	__u16		tx_win;
 	__u16		tx_win_max;
+	__u16		ack_win;
 	__u8		max_tx;
 	__u8		amp_pref;
 	__u16		remote_tx_win;
@@ -652,13 +654,14 @@ struct l2cap_pinfo {
 #define L2CAP_ATT_ERROR				0x01
 #define L2CAP_ATT_RESPONSE_BIT			0x01
 #define L2CAP_ATT_INDICATE			0x1D
+#define L2CAP_ATT_CONFIRM			0x1E
 #define L2CAP_ATT_NOT_SUPPORTED			0x06
 
 #define __delta_seq(x, y, pi) ((x) >= (y) ? (x) - (y) : \
 				(pi)->tx_win_max + 1 - (y) + (x))
 #define __next_seq(x, pi) ((x + 1) & ((pi)->tx_win_max))
 
-extern int disable_ertm;
+extern bool disable_ertm;
 extern const struct proto_ops l2cap_sock_ops;
 extern struct bt_sock_list l2cap_sk_list;
 

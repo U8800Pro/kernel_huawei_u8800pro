@@ -12,12 +12,10 @@
  * add themselves as children of the system bus.
  */
 
-/*< DTS2011082200901 genghua 20110822 begin*/
 /* merge qcom DEBUG_CODE for RPC crashes */
 #ifdef CONFIG_HUAWEI_RPC_CRASH_DEBUG
 #define DEBUG
 #endif
-/* DTS2011082200901 genghua 20110822 end >*/
 
 #include <linux/sysdev.h>
 #include <linux/err.h>
@@ -35,6 +33,7 @@
 #define to_sysdev(k) container_of(k, struct sys_device, kobj)
 #define to_sysdev_attr(a) container_of(a, struct sysdev_attribute, attr)
 
+extern struct kset *system_kset;
 
 static ssize_t
 sysdev_show(struct kobject *kobj, struct attribute *attr, char *buffer)
@@ -132,8 +131,6 @@ void sysdev_class_remove_file(struct sysdev_class *c,
 	sysfs_remove_file(&c->kset.kobj, &a->attr);
 }
 EXPORT_SYMBOL_GPL(sysdev_class_remove_file);
-
-static struct kset *system_kset;
 
 int sysdev_class_register(struct sysdev_class *cls)
 {
@@ -337,14 +334,6 @@ void sysdev_unregister(struct sys_device *sysdev)
 
 EXPORT_SYMBOL_GPL(sysdev_register);
 EXPORT_SYMBOL_GPL(sysdev_unregister);
-
-int __init system_bus_init(void)
-{
-	system_kset = kset_create_and_add("system", NULL, &devices_kset->kobj);
-	if (!system_kset)
-		return -ENOMEM;
-	return 0;
-}
 
 #define to_ext_attr(x) container_of(x, struct sysdev_ext_attribute, attr)
 

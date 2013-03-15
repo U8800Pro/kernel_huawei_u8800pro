@@ -1,4 +1,3 @@
-/* < DTS2011071802246 zhangyu 20110718 BEGIN */
 /*
 Copyright (c) 2010, Code Aurora Forum. All rights reserved.
 
@@ -59,4 +58,3 @@ struct s5k4e1_reg
 };
 
 #endif /* CAMSENSOR_S5K4E1GX */
-/* DTS2011071802246 zhangyu 20110718 END > */ 

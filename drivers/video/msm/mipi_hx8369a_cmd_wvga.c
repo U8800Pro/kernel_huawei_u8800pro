@@ -1,4 +1,3 @@
-/* <DTS2011120603230 liuyuntao 20111206 begin */
 /* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -19,21 +18,22 @@
 
 static lcd_panel_type lcd_panel_wvga = LCD_NONE;
 
+/* increase the DSI bit clock to 490 MHz */
 /*mipi dsi register setting , help qualcomm to set.*/
 static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db = 
 {
-    /* DSI Bit Clock at 300 MHz, 2 lane, RGB888 */ 
+    /* DSI Bit Clock at 490 MHz, 2 lane, RGB888 */ 
 	/* regulator */ 
 	{0x03, 0x01, 0x01, 0x00}, 
 	/* timing */ 
-	{0x5D, 0x28, 0xB, 0x00, 0x33, 0x38, 0x10, 0x2C, 
-	0xE, 0x3, 0x04}, 
+	{0x88, 0x32, 0x14, 0x00, 0x44, 0x4F, 0x18, 0x35, 
+	0x17, 0x3, 0x04, 0x00}, 
 	/* phy ctrl */ 
 	{0x7f, 0x00, 0x00, 0x00}, 
 	/* strength */ 
 	{0xbb, 0x02, 0x06, 0x00}, 
 	/* pll control */ 
-	{0x01, 0x27, 0x31, 0xd2, 0x00, 0x40, 0x37, 0x62, 
+	{0x1, 0xE3, 0x31, 0xd2, 0x00, 0x40, 0x37, 0x62, 
 	0x01, 0x0f, 0x07, 
 	0x05, 0x14, 0x03, 0x0, 0x0, 0x0, 0x20, 0x0, 0x02, 0x0}, 
 };
@@ -42,14 +42,12 @@ static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db =
 static struct dsi_buf hx8369a_tx_buf;
 static struct sequence *hx8369a_lcd_init_table_debug = NULL;
 
-/*< DTS2011122306018 fengwei 20111224 begin */
 static struct sequence hx8369a_wvga_write_cabc_brightness_table[]= 
 {
 	{0x00051,MIPI_DCS_COMMAND,0},
 	{0x000FF,TYPE_PARAMETER,0},
 	{0x00029,MIPI_TYPE_END,0},
 };
-/* DTS2011122306018 fengwei 20111224 end >*/
 
 static const struct sequence hx8369a_wvga_standby_enter_table[]= 
 {
@@ -119,6 +117,52 @@ static int mipi_hx8369a_lcd_off(struct platform_device *pdev)
 	pr_info("leave mipi_hx8369a_lcd_off \n");
 	return 0;
 }
+#ifdef CONFIG_FB_AUTO_CABC
+
+static struct sequence hx8369a_auto_cabc_set_table[] =
+{
+	{0x00055,MIPI_DCS_COMMAND,0}, 
+	{0x00001,TYPE_PARAMETER,0},
+	{0x00029,MIPI_TYPE_END,0}, 
+    {0xFFFFF,MIPI_TYPE_END,0},
+};
+
+/***************************************************************
+Function: hx8369a_config_auto_cabc
+Description: Set CABC configuration
+Parameters:
+    struct msmfb_cabc_config cabc_cfg: CABC configuration struct
+Return:
+    0: success
+***************************************************************/
+static int hx8369a_config_auto_cabc(struct msmfb_cabc_config cabc_cfg,struct msm_fb_data_type *mfd)
+{
+    int ret = 0;
+
+	switch(cabc_cfg.mode)
+	{
+		case CABC_MODE_UI:
+			hx8369a_auto_cabc_set_table[1].reg = 0x0001;
+			break;
+		case CABC_MODE_MOVING:
+		case CABC_MODE_STILL:
+			hx8369a_auto_cabc_set_table[1].reg = 0x0003;
+			break;
+		default:
+			LCD_DEBUG("%s: invalid cabc mode: %d\n", __func__, cabc_cfg.mode);
+	        ret = -EINVAL;
+			break;
+	}
+	if(likely(0 == ret))
+	{
+		process_mipi_table(mfd,&hx8369a_tx_buf,(struct sequence*)&hx8369a_auto_cabc_set_table,
+			 ARRAY_SIZE(hx8369a_auto_cabc_set_table), lcd_panel_wvga);
+	}
+
+    LCD_DEBUG("%s: change cabc mode to %d\n",__func__,cabc_cfg.mode);
+    return ret;
+}
+#endif // CONFIG_FB_AUTO_CABC
 
 static int __devinit mipi_hx8369a_lcd_probe(struct platform_device *pdev)
 {
@@ -126,7 +170,6 @@ static int __devinit mipi_hx8369a_lcd_probe(struct platform_device *pdev)
 
 	return 0;
 }
-/*< DTS2011122306018 fengwei 20111224 begin */
 /*lcd cabc control function*/
 void hx8369a_set_cabc_backlight(struct msm_fb_data_type *mfd,uint32 bl_level)
 {	
@@ -135,7 +178,6 @@ void hx8369a_set_cabc_backlight(struct msm_fb_data_type *mfd,uint32 bl_level)
 	process_mipi_table(mfd,&hx8369a_tx_buf,(struct sequence*)&hx8369a_wvga_write_cabc_brightness_table,
 		 ARRAY_SIZE(hx8369a_wvga_write_cabc_brightness_table), lcd_panel_wvga);
 }
-/* DTS2011122306018 fengwei 20111224 end >*/
 
 static struct platform_driver this_driver = {
 	.probe  = mipi_hx8369a_lcd_probe,
@@ -146,11 +188,12 @@ static struct platform_driver this_driver = {
 static struct msm_fb_panel_data hx8369a_panel_data = {
 	.on		= mipi_hx8369a_lcd_on,
 	.off	= mipi_hx8369a_lcd_off,
-/*< DTS2011122306018 fengwei 20111224 begin */
 	.set_backlight = pwm_set_backlight,
 	/*add cabc control backlight*/
 	.set_cabc_brightness = hx8369a_set_cabc_backlight,
-/* DTS2011122306018 fengwei 20111224 end >*/
+#ifdef CONFIG_FB_AUTO_CABC
+    .config_cabc = hx8369a_config_auto_cabc,
+#endif
 };
 static struct platform_device this_device = {
 	.name   = LCD_DEVICE_NAME,
@@ -165,10 +208,8 @@ static int __init mipi_cmd_hx8369a_wvga_init(void)
 	int ret = 0;
 	struct msm_panel_info *pinfo = NULL;
 
-	/*< DTS2011122306018 fengwei 20111224 begin */
 	lcd_panel_wvga = get_lcd_panel_type();
-	/* DTS2011122306018 fengwei 20111224 end >*/
-	if ((MIPI_HX8369A_TIANMA_WVGA!= lcd_panel_wvga ))
+	if ((MIPI_CMD_HX8369A_TIANMA_WVGA!= lcd_panel_wvga ))
 	{
 		return 0;
 	}
@@ -190,8 +231,9 @@ static int __init mipi_cmd_hx8369a_wvga_init(void)
 		pinfo->bl_min = 30;		
 		
 		pinfo->fb_num = 2;
-		
-        pinfo->clk_rate = 300000000;
+
+        /* increase the DSI bit clock to 490 MHz */		
+        pinfo->clk_rate = 490000000;
 		
 		pinfo->lcd.refx100 = 6000; /* adjust refx100 to prevent tearing */
 
@@ -206,11 +248,9 @@ static int __init mipi_cmd_hx8369a_wvga_init(void)
 		pinfo->mipi.stream = 0; /* dma_p */
 		pinfo->mipi.mdp_trigger = DSI_CMD_TRIGGER_SW;
 		pinfo->mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
-		/* <DTS2012010200256 liuyuntao 20120111 begin */
 		/*set hw te sync*/
 		pinfo->lcd.hw_vsync_mode = TRUE;
 		pinfo->lcd.vsync_enable = TRUE;		
-		/* DTS2012010200256 liuyuntao 20120111 end >*/
 		pinfo->mipi.te_sel = 1; /* TE from vsync gpio */
 		pinfo->mipi.interleave_max = 1;
 		pinfo->mipi.insert_dcs_cmd = TRUE;
@@ -231,4 +271,3 @@ static int __init mipi_cmd_hx8369a_wvga_init(void)
 }
 
 module_init(mipi_cmd_hx8369a_wvga_init);
-/* DTS2011120603230 liuyuntao 20111206 end >*/

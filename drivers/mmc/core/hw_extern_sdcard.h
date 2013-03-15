@@ -1,4 +1,3 @@
-/* <DTS2010092002892 duangan 20100926 begin */
 /*
  * Copyright (c) 2010, HUAWEI. All rights reserved.
  *
@@ -23,4 +22,3 @@ void hw_extern_sdcard_insert(void);
 void hw_extern_sdcard_remove(void);
 
 #endif /* HW_EXTERN_SDCARD_H */
-/* DTS2010092002892 duangan 20100926 end> */

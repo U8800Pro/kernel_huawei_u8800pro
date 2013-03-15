@@ -98,7 +98,6 @@ void switch_set_state(struct switch_dev *sdev, int state)
 }
 EXPORT_SYMBOL_GPL(switch_set_state);
 
-/* <DTS2010060900262, liyuping 20100805 begin */
 /* support switch udisk interface from pc */
 #ifdef CONFIG_USB_AUTO_INSTALL
 void switch_set_udisk_state(struct switch_dev *sdev, const char* cmd)
@@ -143,7 +142,6 @@ void switch_set_udisk_state(struct switch_dev *sdev, const char* cmd)
 }
 EXPORT_SYMBOL_GPL(switch_set_udisk_state);
 #endif
-/* DTS2010060900262 liyuping 20100805 end > */
 static int create_switch_class(void)
 {
 	if (!switch_class) {

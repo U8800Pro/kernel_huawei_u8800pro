@@ -1,7 +1,7 @@
 /* linux/include/asm-arm/arch-msm/dma.h
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -35,7 +35,10 @@ struct msm_dmov_cmd {
 			      unsigned int result,
 			      struct msm_dmov_errdata *err);
 	void (*exec_func)(struct msm_dmov_cmd *cmd);
+	struct work_struct work;
+	unsigned id;    /* For internal use */
 	void *user;	/* Pointer for caller's reference */
+	u8 toflush;
 };
 
 struct msm_dmov_pdata {
@@ -45,8 +48,7 @@ struct msm_dmov_pdata {
 
 void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd);
 void msm_dmov_enqueue_cmd_ext(unsigned id, struct msm_dmov_cmd *cmd);
-void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful);
-void msm_dmov_flush(unsigned int id);
+void msm_dmov_flush(unsigned int id, int graceful);
 int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 
 #define DMOV_CRCIS_PER_CONF 10
@@ -177,11 +179,20 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #define DMOV_CE_OUT_CHAN       1
 #define DMOV_CE_OUT_CRCI       3
 
+#define DMOV_TSIF_CHAN         2
+#define DMOV_TSIF_CRCI         11
+
 #define DMOV_HSUART_GSBI6_TX_CHAN	7
 #define DMOV_HSUART_GSBI6_TX_CRCI	6
 
 #define DMOV_HSUART_GSBI6_RX_CHAN	8
 #define DMOV_HSUART_GSBI6_RX_CRCI	11
+
+#define DMOV_HSUART_GSBI9_TX_CHAN	4
+#define DMOV_HSUART_GSBI9_TX_CRCI	13
+
+#define DMOV_HSUART_GSBI9_RX_CHAN	3
+#define DMOV_HSUART_GSBI9_RX_CRCI	12
 
 #elif defined(CONFIG_ARCH_MSM9615)
 
@@ -215,48 +226,43 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #define DMOV_NAND_CRCI_CMD    5
 #define DMOV_NAND_CRCI_DATA   4
 
-/*< DTS2012052308313 chendeng 20120621 begin */
+/*
+ * Four sdcc slots share the same dma channel.
+ * This slot is for sd which will be pluged in/out randomly
+ * According to Qcomm's manual:
+ *     "Host initiated flush operations only terminate the top-level pointer that is currently being executed.
+ *     If a second top-level pointer is valid, it will not be affected by the flush. On the other hand, a flush
+ *     due to an error condition will flush all top-level pointers."
+ * When sd is pluged out ,error condition will be trigged and the dma channel is flushed.If at the same time,there is
+ * a pending dma request for emmc which will be flushed too, and which will cause the partition damaged on the the emmc.
+ * So we allocate a seperate dma channel for sd slot here to avoid this question.
+ *
+ * On the 8X25 platform SDC1 is for sd card. We use channel 10 for sd card on 8X25 platform.
+ */
+#ifdef CONFIG_HUAWEI_KERNEL
+#ifdef CONFIG_ARCH_MSM8625
+#define DMOV_SDC1_CHAN        10
+#else
+#define DMOV_SDC1_CHAN        8
+#endif
+#else
+#define DMOV_SDC1_CHAN        8
+#endif
+#define DMOV_SDC1_CRCI        6
+
 /* 
  * Separate the DMA channel of eMMC, sd card and WIFI.
  * Fix the DMA flushing destroy ext4 file system issue.
  */
 #ifdef CONFIG_HUAWEI_KERNEL
-#ifdef CONFIG_ARCH_MSM7X27A
-/* Assign NO.10 DMA channel to SD card. */
-#define DMOV_SDC1_CHAN        10
-#define DMOV_SDC1_CRCI        6
-
-/* Assign NO.7 DMA channel to WIFI. */
+#ifdef CONFIG_ARCH_MSM8625
 #define DMOV_SDC2_CHAN        7
-#define DMOV_SDC2_CRCI        7
-
-/* Assign NO.8 DMA channel to eMMC. */
-#define DMOV_SDC3_CHAN        8
-#define DMOV_SDC3_CRCI        12
-
-#define DMOV_SDC4_CHAN        8
-#define DMOV_SDC4_CRCI        13
-#elif defined(CONFIG_ARCH_MSM7X30)
-#define DMOV_SDC1_CHAN        8
-#define DMOV_SDC1_CRCI        6
-
-/* Assign NO.7 DMA channel to eMMC. */
-#define DMOV_SDC2_CHAN        7
-#define DMOV_SDC2_CRCI        7
-
-/* Assign NO.8 DMA channel to WIFI. */
-#define DMOV_SDC3_CHAN        8
-#define DMOV_SDC3_CRCI        12
-
-/* Assign NO.8 DMA channel to SD card. */
-#define DMOV_SDC4_CHAN        8
-#define DMOV_SDC4_CRCI        13
+#else
+#define DMOV_SDC2_CHAN        8
 #endif
 #else
-#define DMOV_SDC1_CHAN        8
-#define DMOV_SDC1_CRCI        6
-
 #define DMOV_SDC2_CHAN        8
+#endif
 #define DMOV_SDC2_CRCI        7
 
 #define DMOV_SDC3_CHAN        8
@@ -264,12 +270,9 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 
 #define DMOV_SDC4_CHAN        8
 #define DMOV_SDC4_CRCI        13
-#endif
-/* DTS2012052308313 chendeng 20120621 end>*/
-
+/*DMA channel num 10 is assigned for sd card, because of CONFIG_TSIF is not set on soc MSM8625*/
 #define DMOV_TSIF_CHAN        10
 #define DMOV_TSIF_CRCI        10
-
 #define DMOV_USB_CHAN         11
 
 #define DMOV_HSUART1_TX_CHAN   4
@@ -286,10 +289,10 @@ int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
 #endif
 
 /* channels for APQ8064 */
-#define DMOV8064_CE_IN_CHAN        2
+#define DMOV8064_CE_IN_CHAN        0
 #define DMOV8064_CE_IN_CRCI       14
 
-#define DMOV8064_CE_OUT_CHAN       3
+#define DMOV8064_CE_OUT_CHAN       1
 #define DMOV8064_CE_OUT_CRCI       15
 
 

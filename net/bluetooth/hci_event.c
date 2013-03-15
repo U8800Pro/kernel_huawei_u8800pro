@@ -21,9 +21,9 @@
    COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS, RELATING TO USE OF THIS
    SOFTWARE IS DISCLAIMED.
 */
-/*DTS2012051403908 sihongfang 20120515 modify for roll back qcom bluetooth stack*/
 
 /* Bluetooth HCI event handling. */
+// rollback to original BlueZ
 
 #include <linux/module.h>
 
@@ -1327,13 +1327,11 @@ static void hci_cs_exit_sniff_mode(struct hci_dev *hdev, __u8 status)
 	if (conn) {
 		clear_bit(HCI_CONN_MODE_CHANGE_PEND, &conn->pend);
 
-		/* < DTS2012011905684 zhangyun 20120202 begin */                
         // when exit sniffer mode cmd failed error code equal 12 means command diallowed, we don't setup sco link.
         if (12 == status) {
             hci_dev_unlock(hdev);
             return;
         }
-		/* DTS2012011905684 zhangyun 20120202 end > */
 
 		if (test_and_clear_bit(HCI_CONN_SCO_SETUP_PEND, &conn->pend))
 			hci_sco_setup(conn, status);
@@ -1633,30 +1631,7 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 							sizeof(cp), &cp);
 		}
 
-/* < DTS2011081800775 xuhui 20110913 begin */                
-#ifdef CONFIG_HUAWEI_KERNEL
-        /*If there are more than 1 ACL connections,
-        *we should try to switch to master for BCM bt chip performance
-        */
-        if ((ACL_LINK == conn->type )&&(hdev->conn_hash.acl_num > 1)) 
-        {
-            struct hci_conn_hash *h = &hdev->conn_hash;
-            struct list_head *p = NULL;
-            struct hci_conn  *c = NULL;
 
-            list_for_each(p, &h->list)
-            {
-                c = list_entry(p, struct hci_conn, list);
-                if (ACL_LINK == c->type)
-                {
-                    /* 0x00 is the master role in bt scatter net,define by bt core spec */
-                    hci_conn_switch_role(c, 0x00);
-                    BT_DBG(" force to master when there are two ACL connections");
-                }
-            }
-        }
-#endif
-/* DTS2011081800775 xuhui 20110913 end > */
 
 	} else {
 		conn->state = BT_CLOSED;
@@ -1971,46 +1946,8 @@ static inline void hci_remote_features_evt(struct hci_dev *hdev, struct sk_buff 
 		hci_send_cmd(hdev, HCI_OP_READ_REMOTE_EXT_FEATURES,
 							sizeof(cp), &cp);
 		goto unlock;
-	} else {
-        /* < DTS2011061704331 kangyanjun 20110620 begin */
-        if (!(conn->features[3]&(0x02|0x04)))   /* not support 2M/3M EDR. 0x02=2M  0x04=3M */
-        {                    
-            if (!(conn->link_mode & HCI_LM_MASTER)) /* act as slave */
-            {                        
-                if (!test_and_set_bit(HCI_CONN_RSWITCH_PEND, &conn->pend)) 
-                {
-                    struct hci_cp_switch_role cp;
-                    cp.bdaddr.b[0]= 0;    //init
-                    cp.bdaddr.b[1]= 0;
-                    cp.bdaddr.b[2]= 0;
-                    cp.bdaddr.b[3]= 0;
-                    cp.bdaddr.b[4]= 0;
-                    cp.bdaddr.b[5]= 0;
-                    cp.role = 0; 
-                    
-                    bacpy(&cp.bdaddr, &conn->dst);
-                    /* switch to master */
-                    cp.role = 0x0; 
-                    BT_DBG("switch to master");
-                    hci_send_cmd(conn->hdev, HCI_OP_SWITCH_ROLE, sizeof(cp), &cp);
-                }
-            }
-            else 
-            {
-                struct hci_cp_write_link_policy cp;
-                cp.handle = 0; //init
-                cp.policy = 0;
 
-                /* disable role_switch if already act as master */
-                cp.handle = cpu_to_le16(conn->handle);
-                conn->link_policy |= HCI_LP_SNIFF;
-                conn->link_policy |= HCI_LP_HOLD;
-                conn->link_policy &= ~HCI_LP_RSWITCH;
-                cp.policy = cpu_to_le16(conn->link_policy);
-                hci_send_cmd(conn->hdev, HCI_OP_WRITE_LINK_POLICY, sizeof(cp), &cp);
-            }
-        }                        
-        /* DTS2011061704331 kangyanjun 20110620 end > */
+                    
 	}
 
 	if (!ev->status) {
@@ -2045,9 +1982,7 @@ static inline void hci_cmd_complete_evt(struct hci_dev *hdev, struct sk_buff *sk
 {
 	struct hci_ev_cmd_complete *ev = (void *) skb->data;
 	__u16 opcode;
-    /* < DTS2011070200434  sihongfang 20110702 begin */
     extern unsigned char fm_command_pending;
-    /* DTS2011070200434  sihongfang 20110702 end > */
 
 	skb_pull(skb, sizeof(*ev));
 
@@ -2241,15 +2176,11 @@ static inline void hci_cmd_complete_evt(struct hci_dev *hdev, struct sk_buff *sk
 
 	default:
 		BT_DBG("%s opcode 0x%x", hdev->name, opcode);
-        /* < DTS2011070200434  sihongfang 20110702 begin */
-        /* < DTS2011062302029  yangyuan 20110627 begin */
         //delete
         if (opcode == 0xfc15) //0xfc15 means fm cmd
         {
             fm_command_pending = 0;
         }
-        /* DTS2011062302029  yangyuan 20110627 end > */
-        /* DTS2011070200434  sihongfang 20110702 end > */
 		break;
 	}
 
@@ -2384,25 +2315,8 @@ static inline void hci_role_change_evt(struct hci_dev *hdev, struct sk_buff *skb
 			if (ev->role)
 				conn->link_mode &= ~HCI_LM_MASTER;
 			else
-            /* < DTS2011061704331 kangyanjun 20110620 begin */
-            {
                 conn->link_mode |= HCI_LM_MASTER;
-                if (!(conn->features[3]&(0x02|0x04)))   /* not support 2M/3M EDR. 0x02=2M  0x04=3M */
-                {                   
-                    struct hci_cp_write_link_policy cp; 
-                    cp.handle = 0; //init
-                    cp.policy = 0;
-                  
-                    /* disable role_switch when changed to master */
-                    cp.handle = cpu_to_le16(conn->handle);
-                    conn->link_policy |= HCI_LP_SNIFF;
-                    conn->link_policy |= HCI_LP_HOLD;
-                    conn->link_policy &= ~HCI_LP_RSWITCH;
-                    cp.policy = cpu_to_le16(conn->link_policy);
-                    hci_send_cmd(conn->hdev, HCI_OP_WRITE_LINK_POLICY, sizeof(cp), &cp);
-                }
-            }
-            /* DTS2011061704331 kangyanjun 20110620 end > */
+                
 		}
 
 		clear_bit(HCI_CONN_RSWITCH_PEND, &conn->pend);
@@ -2906,8 +2820,16 @@ static inline void hci_sync_conn_changed_evt(struct hci_dev *hdev, struct sk_buf
 static inline void hci_sniff_subrate_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_ev_sniff_subrate *ev = (void *) skb->data;
+	struct hci_conn *conn =
+		hci_conn_hash_lookup_handle(hdev, __le16_to_cpu(ev->handle));
 
 	BT_DBG("%s status %d", hdev->name, ev->status);
+	if (conn && (ev->max_rx_latency > hdev->sniff_max_interval)) {
+		BT_ERR("value of rx_latency:%d", ev->max_rx_latency);
+		hci_dev_lock(hdev);
+		hci_conn_enter_active_mode(conn, 1);
+		hci_dev_unlock(hdev);
+	}
 }
 
 static inline void hci_extended_inquiry_result_evt(struct hci_dev *hdev, struct sk_buff *skb)
@@ -3168,12 +3090,47 @@ static inline void hci_le_conn_complete_evt(struct hci_dev *hdev, struct sk_buff
 	conn->state = BT_CONNECTED;
 	conn->disc_timeout = HCI_DISCONN_TIMEOUT;
 	mgmt_connected(hdev->id, &ev->bdaddr, 1);
+	mgmt_le_conn_params(hdev->id, &ev->bdaddr,
+			__le16_to_cpu(ev->interval),
+			__le16_to_cpu(ev->latency),
+			__le16_to_cpu(ev->supervision_timeout));
 
 	hci_conn_hold(conn);
 	hci_conn_hold_device(conn);
 	hci_conn_add_sysfs(conn);
 
 	hci_proto_connect_cfm(conn, ev->status);
+
+unlock:
+	hci_dev_unlock(hdev);
+}
+
+static inline void hci_le_conn_update_complete_evt(struct hci_dev *hdev,
+							struct sk_buff *skb)
+{
+	struct hci_ev_le_conn_update_complete *ev = (void *) skb->data;
+	struct hci_conn *conn;
+
+	BT_DBG("%s status %d", hdev->name, ev->status);
+
+	hci_dev_lock(hdev);
+
+	conn = hci_conn_hash_lookup_handle(hdev,
+				__le16_to_cpu(ev->handle));
+	if (conn == NULL) {
+		BT_ERR("Unknown connection update");
+		goto unlock;
+	}
+
+	if (ev->status) {
+		BT_ERR("Connection update unsuccessful");
+		goto unlock;
+	}
+
+	mgmt_le_conn_params(hdev->id, &conn->dst,
+			__le16_to_cpu(ev->interval),
+			__le16_to_cpu(ev->latency),
+			__le16_to_cpu(ev->supervision_timeout));
 
 unlock:
 	hci_dev_unlock(hdev);
@@ -3246,6 +3203,10 @@ static inline void hci_le_meta_evt(struct hci_dev *hdev, struct sk_buff *skb)
 	switch (le_ev->subevent) {
 	case HCI_EV_LE_CONN_COMPLETE:
 		hci_le_conn_complete_evt(hdev, skb);
+		break;
+
+	case HCI_EV_LE_CONN_UPDATE_COMPLETE:
+		hci_le_conn_update_complete_evt(hdev, skb);
 		break;
 
 	case HCI_EV_LE_LTK_REQ:

@@ -1,5 +1,3 @@
-/*< DTS2012020400396 zhangyu 20120206 begin */
-/* < DTS2011123001368 zhouqiwei 20111219 begin */
 
 
 /*
@@ -25,6 +23,4 @@
 
 #include <mach/board.h>
 #endif /* MT9V113_H */
-/* DTS2011123001368 zhouqiwei 20111219 end > */
-/* DTS2012020400396 zhangyu 20120206 end > */
 

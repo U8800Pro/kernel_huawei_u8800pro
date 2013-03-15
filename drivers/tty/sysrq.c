@@ -32,7 +32,6 @@
 #include <linux/module.h>
 #include <linux/suspend.h>
 #include <linux/writeback.h>
-#include <linux/buffer_head.h>		/* for fsync_bdev() */
 #include <linux/swap.h>
 #include <linux/spinlock.h>
 #include <linux/vt_kern.h>
@@ -41,20 +40,13 @@
 #include <linux/oom.h>
 #include <linux/slab.h>
 #include <linux/input.h>
+#include <linux/uaccess.h>
 
 #include <asm/ptrace.h>
 #include <asm/irq_regs.h>
 
-/* <DTS2011092706493 hufeng 20110927 begin */
-/** port the volumedown + volumeup + power key to trigger sysrq crash function **/
 /* Whether we react on sysrq keys or just ignore them */
-/* disable the sysrq function , 0 presents disable*/ 
-#ifdef CONFIG_HUAWEI_KERNEL
-static int __read_mostly sysrq_enabled = 0;
-#else
 static int __read_mostly sysrq_enabled = SYSRQ_DEFAULT_ENABLE;
-#endif
-/* DTS2011092706493 hufeng 20110927 end> */
 static bool __read_mostly sysrq_always_enabled;
 
 static bool sysrq_on(void)
@@ -74,8 +66,13 @@ static bool sysrq_on_mask(int mask)
 
 static int __init sysrq_always_enabled_setup(char *str)
 {
+#ifdef CONFIG_HUAWEI_KERNEL
+    /* make sure sysrq_always_enabled is zero, then the enable state depends on by sysrq_enabled */
+    pr_info("sysrq_always_enabled is ignored, sysrq depends on sysrq_enabled\n");
+#else    
 	sysrq_always_enabled = true;
 	pr_info("sysrq always enabled.\n");
+#endif	
 
 	return 1;
 }
@@ -118,11 +115,9 @@ static struct sysrq_key_op sysrq_SAK_op = {
 #ifdef CONFIG_VT
 static void sysrq_handle_unraw(int key)
 {
-	struct kbd_struct *kbd = &kbd_table[fg_console];
-
-	if (kbd)
-		kbd->kbdmode = default_utf8 ? VC_UNICODE : VC_XLATE;
+	vt_reset_unicode(fg_console);
 }
+
 static struct sysrq_key_op sysrq_unraw_op = {
 	.handler	= sysrq_handle_unraw,
 	.help_msg	= "unRaw",
@@ -330,11 +325,16 @@ static void send_sig_all(int sig)
 {
 	struct task_struct *p;
 
+	read_lock(&tasklist_lock);
 	for_each_process(p) {
-		if (p->mm && !is_global_init(p))
-			/* Not swapper, init nor kernel thread */
-			force_sig(sig, p);
+		if (p->flags & PF_KTHREAD)
+			continue;
+		if (is_global_init(p))
+			continue;
+
+		do_send_sig_info(sig, SEND_SIG_FORCED, p, true);
 	}
+	read_unlock(&tasklist_lock);
 }
 
 static void sysrq_handle_term(int key)
@@ -351,7 +351,7 @@ static struct sysrq_key_op sysrq_term_op = {
 
 static void moom_callback(struct work_struct *ignored)
 {
-	out_of_memory(node_zonelist(0, GFP_KERNEL), GFP_KERNEL, 0, NULL);
+	out_of_memory(node_zonelist(0, GFP_KERNEL), GFP_KERNEL, 0, NULL, true);
 }
 
 static DECLARE_WORK(moom_work, moom_callback);
@@ -608,7 +608,6 @@ static void sysrq_reinject_alt_sysrq(struct work_struct *work)
 	}
 }
 
-/* <DTS2011092706493 hufeng 20110927 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 static bool sysrq_down;
 static int sysrq_alt_use;
@@ -667,7 +666,6 @@ out:
 }
 
 #else
-/* DTS2011092706493 hufeng 20110927 end> */
 static bool sysrq_filter(struct input_handle *handle,
 			 unsigned int type, unsigned int code, int value)
 {
@@ -771,9 +769,7 @@ static bool sysrq_filter(struct input_handle *handle,
 
 	return suppress;
 }
-/* <DTS2011092706493 hufeng 20110927 begin */
 #endif
-/* DTS2011092706493 hufeng 20110927 end> */
 
 static int sysrq_connect(struct input_handler *handler,
 			 struct input_dev *dev,
@@ -782,13 +778,11 @@ static int sysrq_connect(struct input_handler *handler,
 	struct sysrq_state *sysrq;
 	int error;
 
-/* <DTS2011092706493 hufeng 20110927 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
     sysrq_down = false;
     sysrq_alt = 0;
 #endif
 
-/* DTS2011092706493 hufeng 20110927 end> */
 	sysrq = kzalloc(sizeof(struct sysrq_state), GFP_KERNEL);
 	if (!sysrq)
 		return -ENOMEM;
@@ -838,7 +832,6 @@ static void sysrq_disconnect(struct input_handle *handle)
  * later, but we expect all such keyboards to have left alt.
  */
 static const struct input_device_id sysrq_ids[] = {
-/* <DTS2011092706493 hufeng 20110927 begin */
 /* remove the keybit of KEY_LEFTALT for sysrq function */ 
 #ifdef CONFIG_HUAWEI_KERNEL
 	{
@@ -853,7 +846,6 @@ static const struct input_device_id sysrq_ids[] = {
 		.keybit = { BIT_MASK(KEY_LEFTALT) },
 	},
 #endif
-/* DTS2011092706493 hufeng 20110927 end> */
 	{ },
 };
 

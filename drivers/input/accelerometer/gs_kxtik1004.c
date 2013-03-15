@@ -1,4 +1,3 @@
-/* < DTS2012022405847 zhangmin 20120224 begin */
 /* drivers/input/accelerometer/gs_kxtik1004.c*/
 /*
  * Copyright (C) 2012 HUAWEI, Inc.
@@ -33,18 +32,22 @@
 #include <linux/gs_kxtik1004.h>
 #include "linux/hardware_self_adapt.h"
 
-/* <DTS2011021804534 shenjinming 20110218 begin */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
 #endif
-/* DTS2011021804534 shenjinming 20110218 end> */
-
+#include <linux/sensors.h>
 #ifdef GS_DEBUG
 #define GS_DEBUG(fmt, args...) printk(KERN_ERR fmt, ##args)
 #else
 #define GS_DEBUG(fmt, args...)
 #endif
 /*DBG */
+/*This is the classcial Delay_time from framework and the units is ms*/
+#define DELAY_FASTEST  10
+#define DELAY_GAME     20
+#define DELAY_UI       68
+#define DELAY_NORMAL  200
+#define DELAY_ERROR 10000
 /*
  * The following table lists the maximum appropriate poll interval for each
  * available output data rate.
@@ -53,10 +56,11 @@ static const struct {
 	unsigned int cutoff;
 	u8 mask;
 } kxtik_odr_table[] = {
-	{ 20,ODR100F },
-	{ 40,ODR50F  },
-	{ 80,ODR25F  },
-	{ 0, ODR12_5F},
+	{ DELAY_FASTEST,ODR200F},
+	{ DELAY_GAME,   ODR100F},
+	{ DELAY_UI,      ODR25F},
+	{ DELAY_NORMAL,ODR12_5F},
+	{ DELAY_ERROR, ODR12_5F},
 };
 static int kxtik_debug_mask ;
 module_param_named(kxtik_debug, kxtik_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -97,7 +101,6 @@ static void gs_late_resume(struct early_suspend *h);
 
 static inline int reg_read(struct gs_data *gs , int reg)
 {
-    /*< DTS2012053102470 jiangweizheng 20120531 begin */
     int val;
     mutex_lock(&gs->mlock);
     val = i2c_smbus_read_byte_data(gs->client, reg);
@@ -107,12 +110,10 @@ static inline int reg_read(struct gs_data *gs , int reg)
     }
     mutex_unlock(&gs->mlock);
     return val;
-    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 
 static inline int reg_write(struct gs_data *gs, int reg, uint8_t val)
 {
-    /*< DTS2012053102470 jiangweizheng 20120531 begin */
     int ret;
     mutex_lock(&gs->mlock);
     ret = i2c_smbus_write_byte_data(gs->client, reg, val);
@@ -123,7 +124,6 @@ static inline int reg_write(struct gs_data *gs, int reg, uint8_t val)
     mutex_unlock(&gs->mlock);
 
     return ret;
-    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 
 static signed short gs_sensor_data[3];
@@ -140,15 +140,19 @@ static int gs_data_to_compass(signed short accel_data [3])
 static void gs_kxtik_update_odr(struct gs_data  *gs)
 {
 	int i;
-	int reg;
-	int ret;
+	int reg = 0;
+	int ret = 0;
 	short time_reg;
 	for (i = 0; i < ARRAY_SIZE(kxtik_odr_table); i++) 
 	{
 		time_reg = kxtik_odr_table[i].mask;
-		if (accel_delay < kxtik_odr_table[i].cutoff)
+		if (accel_delay <= kxtik_odr_table[i].cutoff)
+		{
+			accel_delay = kxtik_odr_table[i].cutoff;
 			break;
+		}
 	}
+	/*kxtik doesn't need to use mask,this register's fuction is independence*/
 	reg  = reg_read(gs, CTRL_REG1);
 	ret  = reg_write(gs, CTRL_REG1,0x00);
 	ret |= reg_write(gs,DATA_CTRL,time_reg);
@@ -288,7 +292,6 @@ static struct miscdevice gsensor_device = {
 
 static void gs_work_func(struct work_struct *work)
 {
-    /*< DTS2012053102470 jiangweizheng 20120531 begin */
     int x, y, z;
     s16 s14x, s14y, s14z;
     u8 u8xl, u8xh, u8yl, u8yh, u8zl, u8zh;
@@ -352,7 +355,6 @@ static void gs_work_func(struct work_struct *work)
             printk(KERN_ERR "%s, line %d: hrtimer_start fail! sec=%d, nsec=%d\n", __func__, __LINE__, sesc, nsesc);
         }
     }
-    /* DTS2012053102470 jiangweizheng 20120531 end >*/
 }
 
 
@@ -409,7 +411,6 @@ static int gs_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 	pdata = client->dev.platform_data;
 	if (pdata){
-/* < DTS2012013004920 zhangmin 20120130 begin */
 #ifdef CONFIG_ARCH_MSM7X30
 		if(pdata->gs_power != NULL){
 			ret = pdata->gs_power(IC_PM_ON);
@@ -418,7 +419,6 @@ static int gs_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			}
 		}
 #endif
-/* DTS2012013004920 zhangmin 20120130 end > */
 		if(pdata->adapt_fn != NULL){
 			ret = pdata->adapt_fn();
 			if(ret > 0){
@@ -474,12 +474,10 @@ static int gs_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	{
 		printk("ret is %d\n",ret);
 	}
-	/* <DTS2011021804534 shenjinming 20110218 begin */
 	#ifdef CONFIG_HUAWEI_HW_DEV_DCT
 	/* detect current device successful, set the flag as present */
 	set_hw_dev_flag(DEV_I2C_G_SENSOR);
 	#endif
-	/* DTS2011021804534 shenjinming 20110218 end> */  
 	
 	if (sensor_dev == NULL)
 	{
@@ -542,7 +540,6 @@ static int gs_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	register_early_suspend(&gs->early_suspend);
 #endif
 
-/*< DTS2012053102470 jiangweizheng 20120531 begin */
     gs_wq = create_singlethread_workqueue("gs_wq");
     if (!gs_wq)
     {
@@ -551,11 +548,15 @@ static int gs_probe(struct i2c_client *client, const struct i2c_device_id *id)
         goto err_create_workqueue_failed;
     }
     this_gs_data =gs;
-    /* < DTS2011011905410   liujinggang 20110119 begin */
     if(pdata && pdata->init_flag)
         *(pdata->init_flag) = 1;
-    /* DTS2011011905410   liujinggang 20110119 end > */
+    ret = set_sensor_input(ACC, gs->input_dev->dev.kobj.name);
+    if (ret) {
+        dev_err(&client->dev, "%s set_sensor_input failed\n", __func__);
+        goto err_create_workqueue_failed;
+    }
     printk(KERN_INFO "gs_probe: Start KXTIK  in %s mode\n", gs->use_irq ? "interrupt" : "polling");
+    set_sensors_list(G_SENSOR);
     return 0;
 
 err_create_workqueue_failed:
@@ -571,7 +572,6 @@ err_create_workqueue_failed:
     {
         hrtimer_cancel(&gs->timer);
     }
-/* DTS2012053102470 jiangweizheng 20120531 end >*/
 err_misc_device_register_failed:
 		misc_deregister(&gsensor_device);
 err_input_register_device_failed:
@@ -583,16 +583,13 @@ err_alloc_data_failed:
 #ifndef   GS_POLLING 
 	gs_free_int();
 #endif
-/* < DTS2011043000257  liujinggang 20110503 begin */
 /*turn down the power*/	
 err_power_failed:
-/* < DTS2012013004920 zhangmin 20120130 begin */
 #ifdef CONFIG_ARCH_MSM7X30
 	if(pdata->gs_power != NULL){
 		pdata->gs_power(IC_PM_OFF);
 	}
 #endif
-/* DTS2012013004920 zhangmin 20120130 end > */
 err_check_functionality_failed:
 	return ret;
 }
@@ -600,11 +597,9 @@ err_check_functionality_failed:
 static int gs_remove(struct i2c_client *client)
 {
 	struct gs_data *gs = i2c_get_clientdata(client);
-/*< DTS2012053102470 jiangweizheng 20120531 begin */
 #ifdef CONFIG_HAS_EARLYSUSPEND
     unregister_early_suspend(&gs->early_suspend);
 #endif
-/* DTS2012053102470 jiangweizheng 20120531 end >*/
 	if (gs->use_irq)
 		free_irq(client->irq, gs);
 	else
@@ -703,4 +698,3 @@ module_exit(gs_kxtik_exit);
 
 MODULE_DESCRIPTION("accessor  Driver");
 MODULE_LICENSE("GPL");
-/* DTS2012022405847 zhangmin 20120224 end > */

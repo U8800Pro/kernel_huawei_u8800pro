@@ -1,4 +1,3 @@
-/*< DTS2012011801998 chenxi 20120203 begin */
 /* modify for platform 8255 and 7x25a/27a */
 /*
  * Copyright (C) 2012 The HUAWEI ,inc
@@ -27,7 +26,8 @@ smem_huawei_vender usb_para_data;
 static void import_kernel_nv(char *name)
 {
 	unsigned long pid_index;
-	char local_property_info[65];
+    /* init the variable */
+	char local_property_info[65] = {0};
 	char *country_name;
 	
     if (*name != '\0') 
@@ -54,8 +54,8 @@ static void import_kernel_nv(char *name)
             else if (!strcmp(name,"androidboot.localproppath")) 
             {
                 strlcpy(local_property_info, value, sizeof(local_property_info));
-
-                if(0 == *local_property_info || '/' == *local_property_info) 
+                /* solve the problem that phone can't start up due to command line error */
+                if(0 == *local_property_info || '/' == *local_property_info || !strchr(local_property_info, '/')) 
                 {
                     memcpy(local_property_info, "hw/default", strlen("hw/default"));
                 }
@@ -81,7 +81,8 @@ static void import_kernel_nv(char *name)
  */
 void import_kernel_cmdline(void)
 {
-    char cmdline[512];
+    /* init the variable */
+    char cmdline[512] = {0};
     char *ptr;
     
 	printk(KERN_INFO "%s\n", __func__);
@@ -103,5 +104,4 @@ void import_kernel_cmdline(void)
             usb_para_data.vender_para.country_name);
 }
 
-/* DTS2012011801998 chenxi 20120203 end >*/
 

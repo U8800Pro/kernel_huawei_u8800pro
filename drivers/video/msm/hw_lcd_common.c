@@ -88,12 +88,13 @@ typedef enum
     GPIO_HIGH_VALUE = 1
 } gpio_value_type;
 
+#ifdef CONFIG_FB_MSM_LCDC
 static int spi_cs;
 static int spi_sclk;
 static int spi_sdo;
 static int spi_sdi;
 static int lcd_reset_gpio;
-
+#endif
 #ifdef CONFIG_FB_MSM_MDDI
 int mddi_multi_register_write(uint32 reg,uint32 value)
 {
@@ -128,7 +129,6 @@ int mddi_multi_register_write(uint32 reg,uint32 value)
 	}	
 	return ret;
 }
-/* DTS2011090102706 jiaoshuangwei 20110901 end >*/
 int process_mddi_table(struct sequence *table, size_t count, lcd_panel_type lcd_panel)
 {
 	unsigned int i;
@@ -162,24 +162,13 @@ int process_mddi_table(struct sequence *table, size_t count, lcd_panel_type lcd_
                 }
                 up(&mdp_pipe_ctrl_mutex);
 				break;
-			/*< DTS2012021007223 lijianzhao 20120211 begin */
-			/*< DTS2012021602342 zhongjinrong 20120224 begin */
 			case MDDI_RSP61408_CHIMEI_WVGA:
 			case MDDI_RSP61408_BYD_WVGA:
 			case MDDI_HX8369A_TIANMA_WVGA:
-			/* DTS2012021602342 zhongjinrong 20120224 end >*/	
 			case MDDI_HX8357C_CHIMEI_HVGA:
 			case MDDI_HX8357C_TIANMA_HVGA:
 			case MDDI_HX8357C_CHIMEI_IPS_HVGA:
-			/* DTS2012021007223 lijianzhao 20120211 end >*/
-/*< DTS2012042605475 zhongjinrong 20120426 begin  */
-/*< DTS2012022401352 qitongliang 20120224 begin */
-			case MDDI_HX8357C_TIANMA_IPS_HVGA:
-/* DTS2012022401352 qitongliang 20120224 end >*/
-/* <DTS2012030102766 sunkai 20120301 begin */
-            case MDDI_RSP61408_TRULY_WVGA:
-/* DTS2012030102766 sunkai 20120301 end> */
-/* DTS2012042605475 zhongjinrong 20120426 end >*/
+				
 				down(&mdp_pipe_ctrl_mutex);
                 clk_on = pmdh_clk_func(2);
                 pmdh_clk_func(1);
@@ -204,7 +193,6 @@ int process_mddi_table(struct sequence *table, size_t count, lcd_panel_type lcd_
 #endif
 
 #ifdef CONFIG_FB_MSM_MIPI_DSI
-/*< DTS2011090203258 fengwei 20110903 begin */
 /*****************************************
   @brief : transfor struct sequence to struct mipi packet,  
   @param reg:register and param, value: reg type.
@@ -284,7 +272,7 @@ void mipi_lcd_register_write(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
 		dsi_cmd.dlen = param_num;
 		dsi_cmd.payload = mipi_packet_struct;
 		
-		mipi_dsi_cmds_tx(mfd, tp, &dsi_cmd,1);
+		mipi_dsi_cmds_tx( tp, &dsi_cmd,1);
 		packet_ok = FALSE;
 		param_num = 0;
 		last_datatype = 0;
@@ -336,16 +324,32 @@ void process_mipi_table(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
         time = table[i].time;
 		switch(lcd_panel)
 		{
-			case MIPI_RSP61408_CHIMEI_WVGA:
-			case MIPI_RSP61408_BYD_WVGA:
-			/* <DTS2012022501992 liguosheng 20120229 begin */
-			case MIPI_RSP61408_TRULY_WVGA:
-			case MIPI_HX8357C_TIANMA_IPS_HVGA:
-			/* DTS2012022501992 liguosheng 20120229 end> */
-			case MIPI_HX8357C_CHIMEI_HVGA:
-			case MIPI_HX8357C_TIANMA_HVGA:
-			case MIPI_HX8369A_TIANMA_WVGA:
-			case MIPI_HX8357C_CHIMEI_IPS_HVGA:
+			case MIPI_CMD_RSP61408_CHIMEI_WVGA:
+			case MIPI_CMD_RSP61408_BYD_WVGA:
+			case MIPI_CMD_RSP61408_TRULY_WVGA:
+			case MIPI_CMD_HX8357C_TIANMA_IPS_HVGA:
+			case MIPI_CMD_HX8357C_CHIMEI_HVGA:
+			case MIPI_CMD_HX8357C_TIANMA_HVGA:
+			case MIPI_CMD_HX8369A_TIANMA_WVGA:
+			case MIPI_VIDEO_HX8369B_TIANMA_WVGA:
+			case MIPI_CMD_HX8357C_CHIMEI_IPS_HVGA:
+			case MIPI_CMD_NT35516_TIANMA_QHD:
+			case MIPI_CMD_NT35516_CHIMEI_QHD:
+			case MIPI_CMD_NT35510_BOE_WVGA:
+			case MIPI_CMD_HX8369A_TIANMA_FWVGA:
+			case MIPI_CMD_OTM8009A_CHIMEI_WVGA:
+			/*Add otm8018b for video mode*/
+			case MIPI_VIDEO_OTM8018B_CHIMEI_WVGA:
+			/*Add nt35512 for video mode*/
+			case MIPI_VIDEO_NT35512_BOE_WVGA:
+			/*Add nt35512 video mode for byd*/
+			case MIPI_VIDEO_NT35512_BYD_WVGA:
+			case MIPI_CMD_NT35510_BOE_FWVGA:
+			case MIPI_CMD_NT35310_TIANMA_HVGA:
+			case MIPI_CMD_NT35310_BYD_HVGA:
+			case MIPI_CMD_NT35310_BOE_HVGA:
+			case MIPI_CMD_OTM8009A_CHIMEI_FWVGA:
+			case MIPI_CMD_NT35510_CHIMEI_WVGA:
 				mipi_lcd_register_write(mfd,tp,reg,value,0);
 				break;
 			default:
@@ -358,7 +362,54 @@ void process_mipi_table(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
 	}
 			
 }
-/* DTS2011090203258 fengwei 20110903 end >*/
+#if (LCD_HX8369A_TIANMA_ESD_SIGN || LCD_OTM8009A_CMI_ESD_SIGN)
+/*****************************************
+  @brief   process mipi read sequence table
+  @param table: lcd init code, count: sizeof(table), read_data: data of registers
+			    mfd:mipi need ,tp: process mipi buffer, rp: read data buffer
+  @return none
+******************************************/
+
+int process_mipi_read_table(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
+					struct dsi_buf *rp,struct read_sequence *table)
+{	
+	struct dsi_cmd_desc dsi_cmd;
+	uint32 datatype = 0;
+	uint8 reg = 0;
+	uint32 value = 0;
+	uint32 len = 0;
+	
+	reg = table[0].reg;
+    value = table[0].value;
+    len = table[0].len;
+	
+	if (MIPI_DCS_COMMAND == value)
+	{
+		datatype = DTYPE_DCS_READ;
+	}
+	else if (MIPI_GEN_COMMAND == value)
+	{
+		datatype = DTYPE_GEN_READ;
+	}
+	else
+	{
+		return -1;
+	}
+
+	dsi_cmd.dtype = datatype;
+	dsi_cmd.last = 1;
+	dsi_cmd.vc = 0;
+	dsi_cmd.ack = 1;
+	dsi_cmd.wait = 5;
+	dsi_cmd.dlen = 2;
+	dsi_cmd.payload = &reg;
+
+	mipi_dsi_cmds_rx(mfd, tp, rp, &dsi_cmd, len);
+	
+	return 0;
+
+}
+#endif
 #endif
 #ifdef CONFIG_FB_MSM_LCDC
 void seriout_ext(uint16 reg, uint16 data, uint16 time)
@@ -675,81 +726,10 @@ void truly_r61529_set_cs(struct msm_panel_common_pdata * lcdc_pnael_data){
 }
 
 #endif
-/*< DTS2011081601583 pengyu 20110816 begin */
-#ifdef CONFIG_FB_DYNAMIC_GAMMA
-/***************************************************************
-Function: is_panel_support_dynamic_gamma
-Description: Check whether the panel supports dynamic gamma function
-Parameters:
-    void
-Return:
-    1: Panel support dynamic gamma
-    0: Panel doesn't support dynamic gamma
-***************************************************************/
-int is_panel_support_dynamic_gamma(void)
-{
-    int ret = FALSE;
-    static lcd_panel_type lcd_panel = LCD_NONE;
 
-    if (lcd_panel == LCD_NONE)
-    {
-        lcd_panel = get_lcd_panel_type();
-    }
+/* remove the function is_panel_support_dynamic_gamma(void) */
+/* and is_panel_support_auto_cabc */
 
-    switch (lcd_panel)
-    {
-        case LCD_NT35560_TOSHIBA_FWVGA:
-            ret = TRUE;
-            break;
-        default:
-            ret = FALSE;
-            break;
-    }
-
-    return ret;
-}
-#endif
-/* DTS2011081601583 pengyu 20110816 end >*/
-
-/*< DTS2011081800466 pengyu 20110818 begin */
-#ifdef CONFIG_FB_AUTO_CABC
-/***************************************************************
-Function: is_panel_support_auto_cabc
-Description: Check whether the panel supports auto cabc function
-Parameters:
-    void
-Return:
-    1: Panel support cabc
-    0: Panel doesn't support cabc
-***************************************************************/
-int is_panel_support_auto_cabc(void)
-{
-    int ret = FALSE;
-    static lcd_panel_type lcd_panel = LCD_NONE;
-
-    lcd_panel = get_lcd_panel_type();
-    if (machine_is_msm8255_u8860lp()
-    /* < DTS2012022905490 ganfan 20120301 begin */
-    || machine_is_msm8255_u8860_r()
-    /* DTS2012022905490 ganfan 20120301 end > */
-/*<DTS2011091502092 liyuping 20110915 begin */
-	  ||machine_is_msm8255_u8860_51())
-/* DTS2011091502092 liyuping 20110915 end> */
-    {
-        switch (lcd_panel)
-        {
-            case LCD_NT35560_TOSHIBA_FWVGA:
-                ret = TRUE;
-                break;
-            default:
-                ret = FALSE;
-                break;
-        }
-    }
-
-    return ret;
-}
-#endif
 int lcd_reset(void)
 {
 	hw_lcd_interface_type lcd_interface_type=get_hw_lcd_interface_type();
@@ -757,7 +737,7 @@ int lcd_reset(void)
 	if((LCD_IS_MDDI_TYPE1 == lcd_interface_type)
 		||(LCD_IS_MDDI_TYPE2 == lcd_interface_type))
 	{
-		gpio_tlmm_config(GPIO_CFG(GPIO_OUT_31, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+		gpio_tlmm_config(GPIO_CFG(GPIO_OUT_31, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_ENABLE);
 		gpio_set_value(GPIO_OUT_31,1);
 		LCD_MDELAY(1);
 		gpio_set_value(GPIO_OUT_31,0);
@@ -768,12 +748,15 @@ int lcd_reset(void)
 	else if((LCD_IS_MIPI_CMD == lcd_interface_type)
 		||(LCD_IS_MIPI_VIDEO == lcd_interface_type))
 	{
-		gpio_tlmm_config(GPIO_CFG(GPIO_OUT_129, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+		gpio_tlmm_config(GPIO_CFG(GPIO_OUT_129, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_ENABLE);
+		gpio_set_value(GPIO_OUT_129,1);
+		LCD_MDELAY(1);
 		gpio_set_value(GPIO_OUT_129,0);
-		LCD_MDELAY(30);
+		LCD_MDELAY(5);
 		gpio_set_value(GPIO_OUT_129,1);
 		LCD_MDELAY(120);
 	}
+	#ifdef CONFIG_FB_MSM_LCDC
 	else
 	{
 		gpio_set_value(lcd_reset_gpio, 1);
@@ -783,5 +766,6 @@ int lcd_reset(void)
 		gpio_set_value(lcd_reset_gpio, 1);
 		LCD_MDELAY(120);
 	}
+	#endif
 	return 0;
 }

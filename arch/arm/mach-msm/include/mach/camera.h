@@ -18,14 +18,14 @@
 #include <linux/poll.h>
 #include <linux/cdev.h>
 #include <linux/platform_device.h>
-#include <linux/wakelock.h>
+#include <linux/pm_qos.h>
 #include <linux/regulator/consumer.h>
 #include "linux/types.h"
 
 #include <mach/board.h>
 #include <media/msm_camera.h>
-#include <mach/msm_subsystem_map.h>
 #include <linux/ion.h>
+#include <mach/iommu_domains.h>
 
 #define CONFIG_MSM_CAMERA_DEBUG
 #ifdef CONFIG_MSM_CAMERA_DEBUG
@@ -94,6 +94,8 @@ enum vfe_resp_msg {
 	VFE_MSG_V2X_CAPTURE,
 	VFE_MSG_OUTPUT_PRIMARY,
 	VFE_MSG_OUTPUT_SECONDARY,
+	VFE_MSG_OUTPUT_TERTIARY1,
+	VFE_MSG_OUTPUT_TERTIARY2,
 };
 
 enum vpe_resp_msg {
@@ -114,64 +116,16 @@ enum msm_stereo_state {
 	STEREO_RAW_SNAP_STARTED,
 };
 
-enum msm_ispif_intftype {
-	PIX0,
-	RDI0,
-	PIX1,
-	RDI1,
-	PIX2,
-	RDI2,
-};
-
-enum msm_ispif_vc {
-	VC0,
-	VC1,
-	VC2,
-	VC3,
-};
-
-enum msm_ispif_cid {
-	CID0,
-	CID1,
-	CID2,
-	CID3,
-	CID4,
-	CID5,
-	CID6,
-	CID7,
-	CID8,
-	CID9,
-	CID10,
-	CID11,
-	CID12,
-	CID13,
-	CID14,
-	CID15,
-};
-
-struct msm_ispif_params {
-	uint8_t intftype;
-	uint16_t cid_mask;
-	uint8_t csid;
-};
-
-struct msm_ispif_params_list {
-	uint32_t len;
-	struct msm_ispif_params params[3];
-};
-
 struct msm_vpe_phy_info {
 	uint32_t sbuf_phy;
-	uint32_t y_phy;
-	uint32_t cbcr_phy;
+	uint32_t planar0_off;
+	uint32_t planar1_off;
+	uint32_t planar2_off;
+	uint32_t p0_phy;
+	uint32_t p1_phy;
+	uint32_t p2_phy;
 	uint8_t  output_id; /* VFE31_OUTPUT_MODE_PT/S/V */
 	uint32_t frame_id;
-};
-
-struct msm_camera_csid_vc_cfg {
-	uint8_t cid;
-	uint8_t dt;
-	uint8_t decode_format;
 };
 
 struct msm_camera_csid_lut_params {
@@ -188,6 +142,7 @@ struct msm_camera_csid_params {
 struct msm_camera_csiphy_params {
 	uint8_t lane_cnt;
 	uint8_t settle_cnt;
+	uint8_t lane_mask;
 };
 
 struct msm_camera_csi2_params {
@@ -195,27 +150,23 @@ struct msm_camera_csi2_params {
 	struct msm_camera_csiphy_params csiphy_params;
 };
 
+#ifndef CONFIG_MSM_CAMERA_V4L2
 #define VFE31_OUTPUT_MODE_PT (0x1 << 0)
 #define VFE31_OUTPUT_MODE_S (0x1 << 1)
 #define VFE31_OUTPUT_MODE_V (0x1 << 2)
 #define VFE31_OUTPUT_MODE_P (0x1 << 3)
 #define VFE31_OUTPUT_MODE_T (0x1 << 4)
-
-#define CSI_EMBED_DATA 0x12
-#define CSI_YUV422_8  0x1E
-#define CSI_RAW8    0x2A
-#define CSI_RAW10   0x2B
-#define CSI_RAW12   0x2C
-
-#define CSI_DECODE_6BIT 0
-#define CSI_DECODE_8BIT 1
-#define CSI_DECODE_10BIT 2
-#define CSI_DECODE_DPCM_10_8_10 5
+#define VFE31_OUTPUT_MODE_P_ALL_CHNLS (0x1 << 5)
+#endif
 
 struct msm_vfe_phy_info {
 	uint32_t sbuf_phy;
-	uint32_t y_phy;
-	uint32_t cbcr_phy;
+	uint32_t planar0_off;
+	uint32_t planar1_off;
+	uint32_t planar2_off;
+	uint32_t p0_phy;
+	uint32_t p1_phy;
+	uint32_t p2_phy;
 	uint8_t  output_id; /* VFE31_OUTPUT_MODE_PT/S/V */
 	uint32_t frame_id;
 };
@@ -246,8 +197,8 @@ struct video_crop_t{
 };
 
 struct msm_vpe_buf_info {
-	uint32_t y_phy;
-	uint32_t cbcr_phy;
+	uint32_t p0_phy;
+	uint32_t p1_phy;
 	struct   timespec ts;
 	uint32_t frame_id;
 	struct	 video_crop_t vpe_crop;
@@ -311,7 +262,7 @@ struct msm_mctl_pp_params {
 struct msm_camvpe_fn {
 	int (*vpe_reg)(struct msm_vpe_callback *);
 	int (*vpe_cfg_update) (void *);
-	void (*send_frame_to_vpe) (uint32_t y_phy, uint32_t cbcr_phy,
+	void (*send_frame_to_vpe) (uint32_t planar0_off, uint32_t planar1_off,
 		struct timespec *ts, int output_id);
 	int (*vpe_config)(struct msm_vpe_cfg_cmd *, void *);
 	void (*vpe_cfg_offset)(int frame_pack, uint32_t pyaddr,
@@ -324,21 +275,10 @@ struct msm_sensor_ctrl {
 	int (*s_init)(const struct msm_camera_sensor_info *);
 	int (*s_release)(void);
 	int (*s_config)(void __user *);
-	/* < DTS2012052201247 tangying 20120522 begin */
-	int (*s_reset_regs)(void);
-	/* DTS2012052201247 tangying 20120522 end > */
 	enum msm_camera_type s_camera_type;
 	uint32_t s_mount_angle;
 	enum msm_st_frame_packing s_video_packing;
 	enum msm_st_frame_packing s_snap_packing;
-};
-
-struct msm_actuator_ctrl {
-	int (*a_init_table)(void);
-	int (*a_power_up)(void *);
-	int (*a_power_down)(void *);
-	int (*a_create_subdevice)(void *, void *);
-	int (*a_config)(void __user *);
 };
 
 struct msm_strobe_flash_ctrl {
@@ -356,6 +296,7 @@ struct msm_queue_cmd {
 	struct list_head list_frame;
 	struct list_head list_pict;
 	struct list_head list_vpe_frame;
+	struct list_head list_eventdata;
 	enum msm_queue type;
 	void *command;
 	atomic_t on_heap;
@@ -370,6 +311,11 @@ struct msm_device_queue {
 	int max;
 	int len;
 	const char *name;
+};
+
+struct msm_mctl_stats_t {
+	struct hlist_head pmem_stats_list;
+	spinlock_t pmem_stats_spinlock;
 };
 
 struct msm_sync {
@@ -406,8 +352,7 @@ struct msm_sync {
 	struct msm_camvpe_fn vpefn;
 	struct msm_sensor_ctrl sctrl;
 	struct msm_strobe_flash_ctrl sfctrl;
-	struct msm_actuator_ctrl actctrl;
-	struct wake_lock wake_lock;
+	struct pm_qos_request idle_pm_qos;
 	struct platform_device *pdev;
 	int16_t ignore_qcmd_type;
 	uint8_t ignore_qcmd;
@@ -486,8 +431,6 @@ struct msm_pmem_region {
 	unsigned long len;
 	struct file *file;
 	struct msm_pmem_info info;
-	struct msm_mapped_buffer *msm_buffer;
-	int subsys_id;
 	struct ion_handle *handle;
 };
 
@@ -525,7 +468,6 @@ static inline int msm_flash_ctrl(
 }
 #endif
 
-/*< DTS2011091402372   yuguangcai 20110914 begin */
 /*Add function for new flash tps61310*/
 #ifdef CONFIG_HUAWEI_FEATURE_TPS61310
 int tps61310_set_flash(unsigned led_state);
@@ -535,7 +477,6 @@ static int tps61310_set_flash(unsigned led_state)
 	return -ENOTSUPP;
 }
 #endif
-/* DTS2011091402372   yuguangcai 20110914 end > */
 
 
 void msm_camvfe_init(void);
@@ -584,6 +525,7 @@ enum msm_camio_clk_type {
 	CAMIO_CSI0_PHY_CLK,
 	CAMIO_CSI1_PHY_CLK,
 	CAMIO_CSIPHY_TIMER_SRC_CLK,
+	CAMIO_IMEM_CLK,
 
 	CAMIO_MAX_CLK
 };
@@ -635,24 +577,16 @@ enum msm_bus_perf_setting {
 	S_EXIT
 };
 
-enum msm_cam_mode {
-	MODE_R,
-	MODE_L,
-	MODE_DUAL
-};
-
 struct msm_cam_clk_info {
 	const char *clk_name;
 	long clk_rate;
 };
 
 int msm_camio_enable(struct platform_device *dev);
-int msm_camio_jpeg_clk_enable(void);
-int msm_camio_jpeg_clk_disable(void);
 int msm_camio_vpe_clk_enable(uint32_t);
 int msm_camio_vpe_clk_disable(void);
 
-void msm_camio_mode_config(enum msm_cam_mode mode);
+void msm_camio_mode_config(enum msm_camera_i2c_mux_mode mode);
 int  msm_camio_clk_enable(enum msm_camio_clk_type clk);
 int  msm_camio_clk_disable(enum msm_camio_clk_type clk);
 int  msm_camio_clk_config(uint32_t freq);
@@ -666,6 +600,8 @@ void msm_camio_camif_pad_reg_reset(void);
 void msm_camio_camif_pad_reg_reset_2(void);
 
 void msm_camio_vfe_blk_reset(void);
+void msm_camio_vfe_blk_reset_2(void);
+void msm_camio_vfe_blk_reset_3(void);
 
 int32_t msm_camio_3d_enable(const struct msm_camera_sensor_info *sinfo);
 void msm_camio_3d_disable(void);
@@ -678,16 +614,16 @@ int msm_camio_sensor_clk_on(struct platform_device *);
 int msm_camio_csi_config(struct msm_camera_csi_params *csi_params);
 int msm_camio_csiphy_config(struct msm_camera_csiphy_params *csiphy_params);
 int msm_camio_csid_config(struct msm_camera_csid_params *csid_params);
-void msm_io_read_interrupt(void);
 int add_axi_qos(void);
 int update_axi_qos(uint32_t freq);
 void release_axi_qos(void);
-void msm_io_w(u32 data, void __iomem *addr);
-void msm_io_w_mb(u32 data, void __iomem *addr);
-u32 msm_io_r(void __iomem *addr);
-u32 msm_io_r_mb(void __iomem *addr);
-void msm_io_dump(void __iomem *addr, int size);
-void msm_io_memcpy(void __iomem *dest_addr, void __iomem *src_addr, u32 len);
+void msm_camera_io_w(u32 data, void __iomem *addr);
+void msm_camera_io_w_mb(u32 data, void __iomem *addr);
+u32 msm_camera_io_r(void __iomem *addr);
+u32 msm_camera_io_r_mb(void __iomem *addr);
+void msm_camera_io_dump(void __iomem *addr, int size);
+void msm_camera_io_memcpy(void __iomem *dest_addr,
+		void __iomem *src_addr, u32 len);
 void msm_camio_set_perf_lvl(enum msm_bus_perf_setting);
 void msm_camio_bus_scale_cfg(
 	struct msm_bus_scale_pdata *, enum msm_bus_perf_setting);

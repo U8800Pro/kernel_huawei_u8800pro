@@ -21,15 +21,9 @@
 #include <linux/slab.h>
 #include <linux/wakelock.h>
 
-/*< DTS2012021602342 zhongjinrong 20120224 begin */
-/* <DTS2012022006879 sunkai 20120220 begin */
 /* Optimize the MMI code */
-/* <DTS2012021004882 sunkai 20120210 begin */
 #include <linux/hardware_self_adapt.h>
 extern bool mmi_keystate[255];
-/* DTS2012021004882 sunkai 20120210 end> */
-/* DTS2012022006879 sunkai 20120220 end> */
-/* DTS2012021602342 zhongjinrong 20120224 end >*/
 struct gpio_kp {
 	struct gpio_event_input_devs *input_devs;
 	struct gpio_event_matrix_info *keypad_info;
@@ -135,14 +129,8 @@ static void report_key(struct gpio_kp *kp, int key_index, int out, int in)
 					out, in, mi->output_gpios[out],
 					mi->input_gpios[in], pressed);
 			input_report_key(kp->input_devs->dev[dev], keycode, pressed);
-			/*< DTS2012021602342 zhongjinrong 20120224 begin */
-			/* <DTS2012022006879 sunkai 20120220 begin */
-            /* <DTS2012021004882 sunkai 20120210 begin */
            	/* Used to save the key state */
             mmi_keystate[keycode] = (pressed)? MMI_KEY_DOWN :MMI_KEY_UP ;
-            /* DTS2012021004882 sunkai 20120210 end> */
-            /* DTS2012022006879 sunkai 20120220 end> */
-			/* DTS2012021602342 zhongjinrong 20120224 end >*/
 		}
 	}
 }
@@ -185,7 +173,6 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 						key_index, kp->keys_pressed);
 		}
 		gpio = mi->output_gpios[out];
-		/*< DTS2012020306500 lijianzhao 20120204 begin */
 		#if defined(CONFIG_HUAWEI_GPIO_KEYPAD)
 		if(mi->noutputs > 1){
 			gpio_direction_input(gpio);}
@@ -195,13 +182,11 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		else
 			gpio_direction_input(gpio);
 		#endif
-		/* DTS2012020306500 lijianzhao 20120204 end >*/
 		out++;
 	}
 	kp->current_output = out;
 	if (out < mi->noutputs) {
 		gpio = mi->output_gpios[out];
-		/*< DTS2012020306500 lijianzhao 20120204 begin */
 		#if defined(CONFIG_HUAWEI_GPIO_KEYPAD)
 		if(mi->noutputs > 1){
 			gpio_direction_output(gpio, polarity);}
@@ -211,15 +196,12 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		else
 			gpio_direction_output(gpio, polarity);
 		#endif
-		/* DTS2012020306500 lijianzhao 20120204 end >*/
-		hrtimer_start(timer, timespec_to_ktime(mi->settle_time),
-			HRTIMER_MODE_REL);
+		hrtimer_start(timer, mi->settle_time, HRTIMER_MODE_REL);
 		return HRTIMER_NORESTART;
 	}
 	if (gpio_keypad_flags & GPIOKPF_DEBOUNCE) {
 		if (kp->key_state_changed) {
-			hrtimer_start(&kp->timer,
-				timespec_to_ktime(mi->debounce_delay),
+			hrtimer_start(&kp->timer, mi->debounce_delay,
 				      HRTIMER_MODE_REL);
 			return HRTIMER_NORESTART;
 		}
@@ -235,14 +217,12 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		report_sync(kp);
 	}
 	if (!kp->use_irq || kp->some_keys_pressed) {
-		hrtimer_start(timer, timespec_to_ktime(mi->poll_time),
-			HRTIMER_MODE_REL);
+		hrtimer_start(timer, mi->poll_time, HRTIMER_MODE_REL);
 		return HRTIMER_NORESTART;
 	}
 
 	/* No keys are pressed, reenable interrupt */
 	for (out = 0; out < mi->noutputs; out++) {
-		/*< DTS2012020306500 lijianzhao 20120204 begin */
 		#if defined(CONFIG_HUAWEI_GPIO_KEYPAD)
 		if(mi->noutputs > 1){
 			gpio_direction_output(mi->output_gpios[out], polarity);}
@@ -252,7 +232,6 @@ static enum hrtimer_restart gpio_keypad_timer_func(struct hrtimer *timer)
 		else
 			gpio_direction_output(mi->output_gpios[out], polarity);
 		#endif
-		/* DTS2012020306500 lijianzhao 20120204 end >*/
 	}
 	for (in = 0; in < mi->ninputs; in++)
 		enable_irq(gpio_to_irq(mi->input_gpios[in]));
@@ -265,11 +244,9 @@ static irqreturn_t gpio_keypad_irq_handler(int irq_in, void *dev_id)
 	int i;
 	struct gpio_kp *kp = dev_id;
 	struct gpio_event_matrix_info *mi = kp->keypad_info;
-	/*< DTS2012020306500 lijianzhao 20120204 begin */
 	#ifndef CONFIG_HUAWEI_GPIO_KEYPAD
 	unsigned gpio_keypad_flags = mi->flags;
 	#endif
-	/* DTS2012020306500 lijianzhao 20120204 end >*/
 
 	if (!kp->use_irq) {
 		/* ignore interrupt while registering the handler */
@@ -281,7 +258,6 @@ static irqreturn_t gpio_keypad_irq_handler(int irq_in, void *dev_id)
 	for (i = 0; i < mi->ninputs; i++)
 		disable_irq_nosync(gpio_to_irq(mi->input_gpios[i]));
 	for (i = 0; i < mi->noutputs; i++) {
-		/*< DTS2012020306500 lijianzhao 20120204 begin */
 		#if defined(CONFIG_HUAWEI_GPIO_KEYPAD)
 		if(mi->noutputs > 1){
 			gpio_direction_input(mi->output_gpios[i]);}
@@ -292,7 +268,6 @@ static irqreturn_t gpio_keypad_irq_handler(int irq_in, void *dev_id)
 		else
 			gpio_direction_input(mi->output_gpios[i]);
 		#endif
-		/* DTS2012020306500 lijianzhao 20120204 end >*/
 	}
 	wake_lock(&kp->wake_lock);
 	hrtimer_start(&kp->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
@@ -404,7 +379,6 @@ int gpio_event_matrix_func(struct gpio_event_input_devs *input_devs,
 				input_set_capability(input_devs->dev[dev],
 							EV_KEY, keycode);
 		}
-		/*< DTS2012020306500 lijianzhao 20120204 begin */
 		#if defined(CONFIG_HUAWEI_GPIO_KEYPAD)
 		if(mi->noutputs > 1){
 		for (i = 0; i < mi->noutputs; i++) {
@@ -453,7 +427,6 @@ int gpio_event_matrix_func(struct gpio_event_input_devs *input_devs,
 			}
 		}
 		#endif
-		/* DTS2012020306500 lijianzhao 20120204 end >*/
 		for (i = 0; i < mi->ninputs; i++) {
 			err = gpio_request(mi->input_gpios[i], "gpio_kp_in");
 			if (err) {

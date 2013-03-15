@@ -10,8 +10,9 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 */
-/*DTS2012051403908 sihongfang 20120515 modify for roll back qcom bluetooth stack*/
+// rollback to original BlueZ
 
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/errno.h>

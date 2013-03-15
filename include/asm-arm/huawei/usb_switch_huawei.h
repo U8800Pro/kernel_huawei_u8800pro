@@ -1,4 +1,3 @@
-/*< DTS2012011801998 chenxi 20120203 begin */
 
 #ifndef __USB_SWITCH_HUAWEI_H__
 #define __USB_SWITCH_HUAWEI_H__
@@ -7,12 +6,8 @@
 #include <asm-arm/huawei/smem_vendor_huawei.h>
 
 #define USB_DEFAULT_SN "0123456789AB"
-/* < DTS2012032106408 chenxi 20120323 begin */
 /* support 3 luns at most, 1 lun for cdrom and 2 luns for udisk */
-/* < DTS2012022400909 chenxi 20120224 begin */
 #define USB_MAX_LUNS   3
-/* DTS2012022400909 chenxi 20120224 end > */
-/* DTS2012032106408 chenxi 20120323 end > */
 
 /* enable printing information about USB switching */
 #define USB_AUTO_DEBUG
@@ -70,13 +65,16 @@ typedef  struct _usbsdms_read_toc_cmd_type
    u8  control;
 } usbsdms_read_toc_cmd_type;
 
+/* vendor and country string */
+#define COUNTRY_JAPAN   "jp"
+#define VENDOR_EMOBILE  "emobile"
+#define COUNTRY_US   "us"
+#define VENDOR_TRACFONE  "tracfone"
 
 extern void usb_port_switch_request(int usb_pid_index);
 
-/* < DTS2012032801176 chenxi 20120328 begin */
 void android_disable_send_uevent(bool disable);
-/* DTS2012032801176 chenxi 20120328 end > */
+void android_usb_force_reset(void);
 
 #endif  /* __USB_SWITCH_HUAWEI_H__ */
 
-/* DTS2012011801998 chenxi 20120203 end >*/

@@ -1,4 +1,3 @@
-/* < DTS2011061801881 zhangyu 20110620 BEGIN */
 
 /*
  * Copyright (c) 2008-2009 QUALCOMM USA, INC.
@@ -23,4 +22,3 @@
 
 #include <mach/board.h>
 #endif /* MT9V114_SUNNY_H */
-/* DTS2011061801881 zhangyu 20110620 END > */ 

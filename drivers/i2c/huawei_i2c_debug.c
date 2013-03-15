@@ -1,11 +1,8 @@
-/*< DTS2012021003176 yanzhijun 20120210 begin */
-/* merge DTS2011110800980 fangxinyong  */
 /*
 * huawei_i2c_debug.c - i2c-bus driver, char device interface.
 * used to debug i2c devices.
 *
 * Copyright (c) 2011 huawei 
-* Author: mazhenhua 
 *
 * This file may be distributed under the terms of the GNU GPL license.
 */
@@ -18,9 +15,7 @@
 #include <linux/list.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
-/*< DTS2011102804700 yanzhijun 20111028 begin */
 /* del smp_lock.h for no kernel lock in kernel3.0 */
-/* DTS2011102804700 yanzhijun 20111028 end >*/ 
 #include <linux/jiffies.h>
 #include <asm/uaccess.h>
 #include <linux/cdev.h>
@@ -234,9 +229,7 @@ static int i2cdev_debug_open(struct inode *inode, struct file *file)
     int ret = 0;
 
     I2C_DEBUG_MACRO("%s entry\n", __FUNCTION__);
-	/*< DTS2011102804700 yanzhijun 20111028 begin */
 	/* del lock_kernel for no kernel lock in kernel3.0 */
-	/* DTS2011102804700 yanzhijun 20111028 end >*/ 
     i2c_dev = i2c_dev_get_by_minor(minor);
     if (!i2c_dev)
     {
@@ -248,9 +241,7 @@ static int i2cdev_debug_open(struct inode *inode, struct file *file)
 
     I2C_DEBUG_MACRO("%s\n",__FUNCTION__);
 out:
-	/*< DTS2011102804700 yanzhijun 20111028 begin */
 	/* del unlock_kernel for no kernel lock in kernel3.0 */
-	/* DTS2011102804700 yanzhijun 20111028 end >*/ 
     return ret;
 }
 
@@ -1132,4 +1123,3 @@ MODULE_LICENSE("GPL");
 
 module_init(i2c_debug_dev_init);
 module_exit(i2c_debug_dev_exit);
-/* DTS2012021003176 yanzhijun 20120210 end >*/ 

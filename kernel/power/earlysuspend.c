@@ -27,23 +27,19 @@ enum {
 	DEBUG_SUSPEND = 1U << 2,
 	DEBUG_VERBOSE = 1U << 3,
 };
-/* <DTS2010092703937 hufeng 20100927 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
-/*<BU5D00025, jialin, 20091223, add log information, begin */
 static int debug_mask = DEBUG_USER_STATE | DEBUG_SUSPEND;
-/*BU5D00025, jialin, 20091223, add log information, end> */
 #else
 static int debug_mask = DEBUG_USER_STATE;
-/* DTS2010092703937 hufeng 20100927 end> */
 #endif
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
-/* < DTS2012021302632 lixiangyu 00111074 20120213 begin */
-/* merge DTS2012011904179 */
 #ifdef CONFIG_HUAWEI_KERNEL
 void set_sampling_rate(int screen_on);
 void set_up_threshold(int screen_on);
 #endif
-/* DTS2012021302632 lixiangyu 00111074 20120213 end > */
+
+/* power key detect solution for ANR */
+void del_power_key_timer(void);
 
 static DEFINE_MUTEX(early_suspend_lock);
 static LIST_HEAD(early_suspend_handlers);
@@ -116,14 +112,11 @@ static void early_suspend(struct work_struct *work)
 		}
 	}
 
-	/* < DTS2012021302632 lixiangyu 00111074 20120213 begin */
-	/* merge DTS2012011904179 */
 	/* set sample rate and up_threshold to the idle state value */
 #ifdef CONFIG_HUAWEI_KERNEL
 	set_sampling_rate(0);
 	set_up_threshold(0);
 #endif
-	/* DTS2012021302632 lixiangyu 00111074 20120213 end > */
 
 	mutex_unlock(&early_suspend_lock);
 
@@ -133,6 +126,10 @@ abort:
 	if (state == SUSPEND_REQUESTED_AND_SUSPENDED)
 		wake_unlock(&main_wake_lock);
 	spin_unlock_irqrestore(&state_lock, irqflags);
+
+	/* power key detect solution for ANR */
+	del_power_key_timer();
+
 }
 
 static void late_resume(struct work_struct *work)
@@ -142,14 +139,11 @@ static void late_resume(struct work_struct *work)
 	int abort = 0;
 
 	mutex_lock(&early_suspend_lock);
-	/* < DTS2012021302632 lixiangyu 00111074 20120213 begin */
-	/* merge DTS2012011904179 */
 	/* set sample rate and up_threshold to non-idle state value */
 #ifdef CONFIG_HUAWEI_KERNEL
 	set_sampling_rate(1);
 	set_up_threshold(1);
 #endif
-	/* DTS2012021302632 lixiangyu 00111074 20120213 end > */
     
 	spin_lock_irqsave(&state_lock, irqflags);
 	if (state == SUSPENDED)
@@ -177,6 +171,10 @@ static void late_resume(struct work_struct *work)
 		pr_info("late_resume: done\n");
 abort:
 	mutex_unlock(&early_suspend_lock);
+
+	/* power key detect solution for ANR */
+	del_power_key_timer();
+
 }
 
 void request_suspend_state(suspend_state_t new_state)

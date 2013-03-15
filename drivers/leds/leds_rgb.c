@@ -1,4 +1,3 @@
-/*< DTS2012020306500 lijianzhao 20120204 begin */
 /*add led driver*/
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -27,9 +26,7 @@
 
 #define GPIO_LED_RED 4
 #define GPIO_LED_GREEN 11
-/*<BU5D10119 sibingsong 20100518 begin*/
 #define LEVEL 2
-/*BU5D10119 sibingsong 20100518 end>*/
 #ifdef RGB_DEBUG
 #define RGB_PRINT(x...) do{ \
 		printk(KERN_INFO "[RGB_LED] "x); \
@@ -37,31 +34,20 @@
 #else
 #define RGB_PRINT(x...) do{}while(0)
 #endif
-/*< DTS2011122703714 duanfei 20111227 begin */
-/*< DTS2012021602342 zhongjinrong 20120224 begin */
 #ifdef CONFIG_ARCH_MSM7X27A
-/* DTS2012021602342 zhongjinrong 20120224 end >*/
 	static hw_ds_type board_ds = HW_NODS;
 #endif
-/* DTS2011122703714 duanfei 20111227 end >*/
 static void set_red_brightness(struct led_classdev *led_cdev,
 					enum led_brightness value)
 {
 	int ret = 0;
 
 	RGB_PRINT("%s: value = %d\n",__func__, value);
-    /*< DTS2011122703714 duanfei 20111227 begin */
-/*< DTS2012021602342 zhongjinrong 20120224 begin */
 #ifdef CONFIG_ARCH_MSM7X27A
-/* DTS2012021602342 zhongjinrong 20120224 end >*/
     if (HW_DS == board_ds)
     {
-		/*< DTS2012021602342 zhongjinrong 20120224 begin */
-    	/* <DTS2012020906039 liguosheng 20120218 begin */
 		/*ap side control the gpio*/
     	gpio_tlmm_config(GPIO_CFG(GPIO_LED_RED, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-		/* DTS2012020906039 liguosheng 20120218 end> */
-		/* DTS2012021602342 zhongjinrong 20120224 end >*/
         ret = gpio_direction_output(GPIO_LED_RED,(!!value) ? LED_ON : LED_OFF);
     }
     else
@@ -70,7 +56,6 @@ static void set_red_brightness(struct led_classdev *led_cdev,
             (!!value) ? PM_MPP__I_SINK__SWITCH_ENA : PM_MPP__I_SINK__SWITCH_DIS);
     }
 #else
-    /* DTS2011122703714 duanfei 20111227 end >*/
 	ret = pmic_set_low_current_led_intensity(PM_LOW_CURRENT_LED_DRV0, (!!value)? LEVEL : 0);
 #endif
 	if(ret)
@@ -88,18 +73,11 @@ static void set_green_brightness(struct led_classdev *led_cdev,
 	int ret = 0;
 	
 	RGB_PRINT("%s: value = %d\n",__func__, value);	
-    /*< DTS2011122703714 duanfei 20111227 begin */
-/*< DTS2012021602342 zhongjinrong 20120224 begin */
 #ifdef CONFIG_ARCH_MSM7X27A
-/* DTS2012021602342 zhongjinrong 20120224 end >*/
     if (HW_DS == board_ds)
     {
-		/*< DTS2012021602342 zhongjinrong 20120224 begin */
-    	/* <DTS2012020906039 liguosheng 20120218 begin */
 		/*ap side control the gpio*/
     	gpio_tlmm_config(GPIO_CFG(GPIO_LED_GREEN, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-		/* DTS2012020906039 liguosheng 20120218 end> */
-		/* DTS2012021602342 zhongjinrong 20120224 end >*/
         ret = gpio_direction_output(GPIO_LED_GREEN,(!!value) ? LED_ON : LED_OFF);
     }
     else
@@ -107,7 +85,6 @@ static void set_green_brightness(struct led_classdev *led_cdev,
 	    ret = pmic_secure_mpp_config_i_sink(PM_MPP_5, PM_MPP__I_SINK__LEVEL_5mA, \
 			(!!value) ? PM_MPP__I_SINK__SWITCH_ENA : PM_MPP__I_SINK__SWITCH_DIS);
     }
-    /* DTS2011122703714 duanfei 20111227 end >*/
 #else
 	ret = pmic_set_low_current_led_intensity(PM_LOW_CURRENT_LED_DRV1, (!!value)? LEVEL : 0);
 #endif
@@ -127,9 +104,7 @@ static void set_blue_brightness(struct led_classdev *led_cdev,
 	int ret = 0;
 	
 	RGB_PRINT("%s: value = %d\n",__func__, value);
-/*< DTS2012021602342 zhongjinrong 20120224 begin */
 #ifdef CONFIG_ARCH_MSM7X27A
-/* DTS2012021602342 zhongjinrong 20120224 end >*/
 	ret = pmic_secure_mpp_config_i_sink(PM_MPP_8, PM_MPP__I_SINK__LEVEL_5mA, \
 			(!!value) ? PM_MPP__I_SINK__SWITCH_ENA : PM_MPP__I_SINK__SWITCH_DIS);
 #else
@@ -190,10 +165,7 @@ static int rgb_leds_probe(struct platform_device *pdev)
 		printk(KERN_ERR "rbg blue: led_classdev_register failed\n");
 		goto err_led2_classdev_register_failed;
 	}
-    /*< DTS2011122703714 duanfei 20111227 begin */
-/*< DTS2012021602342 zhongjinrong 20120224 begin */
 #ifdef CONFIG_ARCH_MSM7X27A
-/* DTS2012021602342 zhongjinrong 20120224 end >*/
     board_ds = get_hw_ds_type();
     
     /*double sim card phone use gpio to control red led and green led*/
@@ -206,7 +178,6 @@ static int rgb_leds_probe(struct platform_device *pdev)
         gpio_tlmm_config(GPIO_CFG(GPIO_LED_GREEN, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 	    
     }
-    /* DTS2011122703714 duanfei 20111227 end >*/
 #endif
 	RGB_PRINT("led_classdev_register sucess\n");
 	
@@ -243,5 +214,4 @@ static void __exit rgb_leds_exit(void)
 
 module_init(rgb_leds_init);
 module_exit(rgb_leds_exit);
-/* DTS2012020306500 lijianzhao 20120204 end >*/
 

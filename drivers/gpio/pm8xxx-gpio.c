@@ -1,7 +1,7 @@
 /*
  * Qualcomm PMIC8XXX GPIO driver
  *
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,7 @@
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
+#include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/mfd/pm8xxx/core.h>
@@ -302,7 +303,7 @@ static int __devinit pm_gpio_probe(struct platform_device *pdev)
 	pm_gpio_chip->gpio_chip.set = pm_gpio_write;
 	pm_gpio_chip->gpio_chip.dbg_show = pm_gpio_dbg_show;
 	pm_gpio_chip->gpio_chip.ngpio = pdata->gpio_cdata.ngpios;
-	pm_gpio_chip->gpio_chip.can_sleep = 1;
+	pm_gpio_chip->gpio_chip.can_sleep = 0;
 	pm_gpio_chip->gpio_chip.dev = &pdev->dev;
 	pm_gpio_chip->gpio_chip.base = pdata->gpio_base;
 	pm_gpio_chip->irq_base = platform_get_irq(pdev, 0);
@@ -433,32 +434,6 @@ int pm8xxx_gpio_config(int gpio, struct pm_gpio *param)
 	return rc;
 }
 EXPORT_SYMBOL(pm8xxx_gpio_config);
-/* <DTS2012041003722 sibingsong 20120410 begin */
-/* < DTS2011102201769 zhangyu 20111025 begin */
-/* Add function pm_gpio_set_value to configure pm gpio */
-void pm8xxx_gpio_set_value( unsigned gpio, int value) 
-{ 
-	int	pm_gpio = -EINVAL; 
-    struct pm_gpio_chip *pm_gpio_chip;
-    struct gpio_chip *gpio_chip;
-
-	mutex_lock(&pm_gpio_chips_lock); 
-    list_for_each_entry(pm_gpio_chip, &pm_gpio_chips, link) {
-		gpio_chip = &pm_gpio_chip->gpio_chip;
-		if (gpio >= gpio_chip->base
-			&& gpio < gpio_chip->base + gpio_chip->ngpio) {
-			pm_gpio = gpio - gpio_chip->base;
-			break;
-		}
-	}
-
-	pm_gpio_write(&pm_gpio_chip->gpio_chip, gpio, value); 
-	mutex_unlock(&pm_gpio_chips_lock); 
-} 
-
-EXPORT_SYMBOL(pm8xxx_gpio_set_value);
-/* DTS2011102201769 zhangyu 20111025 end > */
-/* DTS2012041003722 sibingsong 20120410 end> */
 
 static struct platform_driver pm_gpio_driver = {
 	.probe		= pm_gpio_probe,

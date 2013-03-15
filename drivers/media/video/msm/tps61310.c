@@ -1,5 +1,3 @@
-/* <DTS2012041003722 sibingsong 20120410 begin */
-/*< DTS2011092805375   yuguangcai 20110928 begin */
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/earlysuspend.h>
@@ -13,35 +11,23 @@
 #include <linux/io.h>
 #include <linux/miscdevice.h>
 #include <asm/gpio.h>
+#include <linux/gpio.h>
 #include <linux/types.h>
-#include <linux/platform_device.h>
+#include <linux/platform_device.h> 
 #include <mach/camera.h>
 #include <asm/mach-types.h>
-/* < DTS2012022004193 yangyang 20120220 begin */ 
-#include <linux/hardware_self_adapt.h>
-#include <linux/gpio.h>
-#include <mach/pmic.h>
-#include <linux/gpio.h>
-#include <linux/mfd/pmic8058.h>
+#include <linux/hardware_self_adapt.h> 
 
-//#define tps61310_nreset	27
-/* DTS2012022004193 yangyang 20120220 end >*/
-#define tps61310_strb1	125
+#ifdef CONFIG_HUAWEI_HW_DEV_DCT
+#include <linux/hw_dev_dec.h>
+#endif
+
 #define tps61310_strb0	117
-/*< DTS2011122006722   songxiaoming 20120207 begin */
-#define PMIC_GPIO_FLASH_EN 22    /*  PMIC GPIO NUMBER 23   */
-#define PMIC_GPIO_TORCH_FLASH 23    /*  PMIC GPIO NUMBER 24   */
 #define FLASH_REFRESHED_TIME 10 /*10s*/
 static struct hrtimer flash_timer;
 static struct work_struct flash_work;
 static bool timer_is_run = false;
-/* DTS2011122006722  songxiaoming 20120207 end > */
-/* < DTS2012022004193 yangyang 20120220 begin */ 
-static unsigned tps61310_nreset = 0;
-/* DTS2012022004193 yangyang 20120220 end >*/
-//if use flash mode
-//#define FLASH_MODE
-//if use video mode  
+static unsigned tps61310_nreset = 127;
 
 struct i2c_client *tps61310_client;
 
@@ -80,7 +66,6 @@ static int tps61310_i2c_read(struct i2c_client *client,uint8_t reg)
 		
 	return val;
 }
-/*< DTS2011122006722   songxiaoming 20120207 begin */
 static enum hrtimer_restart flash_timer_func(struct hrtimer *timer)
 {
     schedule_work(&flash_work);
@@ -100,31 +85,24 @@ static void flash_on(struct work_struct *work)
     /* Restart timer ,so it can be recurrent */
     hrtimer_start(&flash_timer, ktime_set(FLASH_REFRESHED_TIME, 0), HRTIMER_MODE_REL);
 }
-/* DTS2011122006722  songxiaoming 20120207 end > */
-
 /*different handlings of different flash's states*/
 int tps61310_set_flash(unsigned led_state)
 {
     int rc = 0;
-
+    hw_camera_flash_number led_num = get_hw_camera_flash_number();
     printk("tps61310_set_flash: led_state = %d\n", led_state);
-    /*< DTS2011122006722   songxiaoming 20120207 begin */
     /* timer should be cancel,when Led_state possible changed */
     if(timer_is_run)
     {
         hrtimer_cancel(&flash_timer);
         timer_is_run = false;        
     }
-    /* DTS2011111606482 zhouqiwei 20111215 end > */
 
     switch (led_state)
     {
     case MSM_CAMERA_LED_LOW:
-#ifdef CONFIG_ARCH_MSM7X30        
-        pm8xxx_gpio_set_value(PMIC_GPIO_FLASH_EN, 1);
-        pm8xxx_gpio_set_value(PMIC_GPIO_TORCH_FLASH, 1);
-        mdelay(1);
-#endif        
+    case MSM_CAMERA_LED_TORCH:
+    case MSM_CAMERA_LED_TORCH_MIDDLE: //use for flashlight
         tps61310_i2c_write( tps61310_client,0x00, 0x0A );
         tps61310_i2c_write( tps61310_client,0x05, 0x6F );
         tps61310_i2c_write( tps61310_client,0x01, 0x40 );
@@ -139,30 +117,38 @@ int tps61310_set_flash(unsigned led_state)
         break;
 
     case MSM_CAMERA_LED_HIGH:
-        /* < DTS2012030604199 tangying 20120306 begin */
-#ifdef CONFIG_ARCH_MSM7X27A        
         gpio_set_value(tps61310_strb0, 1);
-#else
-        pm8xxx_gpio_set_value(PMIC_GPIO_FLASH_EN, 1);
-        pm8xxx_gpio_set_value(PMIC_GPIO_TORCH_FLASH, 1);
-        mdelay(1);
-#endif
+
         tps61310_i2c_write( tps61310_client, 0x03, 0xE7 );
         tps61310_i2c_write( tps61310_client, 0x05, 0x6F );
-        tps61310_i2c_write( tps61310_client, 0x01, 0x88 );
-        tps61310_i2c_write( tps61310_client, 0x02, 0x88 );
-        /* DTS2012030604199 tangying 20120306 end > */
+        if(CAMERA_FLASH_LED_DOUBLE == led_num)
+        {
+            tps61310_i2c_write( tps61310_client, 0x01, 0x94 );
+            tps61310_i2c_write( tps61310_client, 0x02, 0x8a );
+        }
+        else
+        {
+            tps61310_i2c_write( tps61310_client, 0x01, 0x88 );
+            tps61310_i2c_write( tps61310_client, 0x02, 0x88 );
+        }
+        break;
 
+    case MSM_CAMERA_LED_TORCH_HIGH: //use for flashlight
+        tps61310_i2c_write( tps61310_client, 0x00, 0x12 );
+        tps61310_i2c_write( tps61310_client, 0x05, 0x6F );
+        tps61310_i2c_write( tps61310_client, 0x01, 0x40 );
+        tps61310_i2c_write( tps61310_client, 0x02, 0x40 );
+
+        INIT_WORK(&flash_work, flash_on);
+        hrtimer_init(&flash_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+        flash_timer.function= flash_timer_func;
+        timer_is_run = true;
+        hrtimer_start(&flash_timer, ktime_set(FLASH_REFRESHED_TIME, 0), HRTIMER_MODE_REL);
         break;
 
 
-    case MSM_CAMERA_LED_TORCH:
-#ifdef CONFIG_ARCH_MSM7X30        
-        pm8xxx_gpio_set_value(PMIC_GPIO_FLASH_EN, 1);
-        pm8xxx_gpio_set_value(PMIC_GPIO_TORCH_FLASH, 1);
-        mdelay(1);
-#endif        
-        tps61310_i2c_write( tps61310_client,0x00, 0x0A );
+    case MSM_CAMERA_LED_TORCH_LOW: //use for flashlight
+        tps61310_i2c_write( tps61310_client,0x00, 0x08);
         tps61310_i2c_write( tps61310_client,0x05, 0x6F );
         tps61310_i2c_write( tps61310_client,0x01, 0x40 );
         tps61310_i2c_write( tps61310_client,0x02, 0x40 );
@@ -172,32 +158,38 @@ int tps61310_set_flash(unsigned led_state)
         timer_is_run = true;
         hrtimer_start(&flash_timer, ktime_set(FLASH_REFRESHED_TIME, 0), HRTIMER_MODE_REL);
         break;
-    /* DTS2011122006722  songxiaoming 20120207 end > */
 
     case MSM_CAMERA_LED_OFF:
         tps61310_i2c_write( tps61310_client, 0x00, 0x80 );
-        /* < DTS2012030604199 tangying 20120306 begin */
-#ifdef CONFIG_ARCH_MSM7X27A                
         gpio_set_value(tps61310_strb0, 0);
-#else
-        /* DTS2012030604199 tangying 20120306 end > */
-        mdelay(1);
-        pm8xxx_gpio_set_value(PMIC_GPIO_FLASH_EN, 0);
-        pm8xxx_gpio_set_value(PMIC_GPIO_TORCH_FLASH, 0);
-#endif        
         break;
+    case MSM_CAMERA_LED_FIRST_MMI:
+	 printk("MSM_CAMERA_LED_FIRST_MMI\n");
+         tps61310_i2c_write( tps61310_client,0x00, 0x08 );/*turn on led and then delay*/
+         tps61310_i2c_write( tps61310_client,0x05, 0x6F );
+         tps61310_i2c_write( tps61310_client,0x01, 0x40 );
+         tps61310_i2c_write( tps61310_client,0x02, 0x40 );
+         usleep(1000*200);
+         
+         tps61310_i2c_write( tps61310_client, 0x00, 0x80 );/*turn off*/
+         gpio_set_value(tps61310_strb0, 0);
+         break;
+        
+    case MSM_CAMERA_LED_SECOND_MMI:
+       	 printk("MSM_CAMERA_LED_SECOND_MMI\n");
+         tps61310_i2c_write( tps61310_client,0x00, 0x02 );/*switch to the other led*/
+         tps61310_i2c_write( tps61310_client,0x05, 0x6F );
+         tps61310_i2c_write( tps61310_client,0x01, 0x40 );
+         tps61310_i2c_write( tps61310_client,0x02, 0x40 );
+         usleep(1000*200);
+         
+         tps61310_i2c_write( tps61310_client, 0x00, 0x80 );/*turn off*/
+         gpio_set_value(tps61310_strb0, 0);
+         break;
 
     default:
         tps61310_i2c_write( tps61310_client, 0x00, 0x80 );
-        /* < DTS2012030604199 tangying 20120306 begin */
-#ifdef CONFIG_ARCH_MSM7X27A                
         gpio_set_value(tps61310_strb0, 0);
-#else
-        /* DTS2012030604199 tangying 20120306 end > */
-        mdelay(1);
-        pm8xxx_gpio_set_value(PMIC_GPIO_FLASH_EN, 0);
-        pm8xxx_gpio_set_value(PMIC_GPIO_TORCH_FLASH, 0);
-#endif        
         break;
     }
 
@@ -209,7 +201,6 @@ static int tps61310_device_init(void)
 	
 	int err = 0;
 	int gpio_config;
-	/* < DTS2012030604199 tangying 20120306 begin */
 	err = gpio_request(tps61310_strb0, "tps61310_strb0");
 	if(err)
 	{
@@ -222,7 +213,6 @@ static int tps61310_device_init(void)
 	{
 		printk(KERN_ERR "%s: gpio_tlmm_config(#%d)=%d\n", __func__, tps61310_strb0, err);
 	}
-	/* DTS2012030604199 tangying 20120306 end > */
 
 	/*config the tps61310_nreset gpio to output state*/
 	gpio_config = GPIO_CFG(tps61310_nreset, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA);
@@ -250,7 +240,6 @@ static int tps61310_probe(struct i2c_client *client,
 	printk("tps61310_probe start!\n");
 
 	tps61310_client = client;
-	/* DTS2012022004193 yangyang 20120220 end >*/
 	/* GPIO 27 used by BT of some products, we use GPIO 83 instead. */
 	if(HW_BT_WAKEUP_GPIO_IS_27 == get_hw_bt_wakeup_gpio_type())
 	{
@@ -260,13 +249,11 @@ static int tps61310_probe(struct i2c_client *client,
 	{
 		tps61310_nreset = 27;
 	}
-	/* DTS2012022004193 yangyang 20120220 end >*/
 	/*device init of gpio init*/
-#ifdef CONFIG_ARCH_MSM7X27A    
 	if ( tps61310_device_init()){
 		printk("tps61310_device_init error!\n");	
 	}
-#endif	
+	
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		ret = -ENODEV;
 	}
@@ -281,8 +268,14 @@ static int tps61310_probe(struct i2c_client *client,
 		printk("tps61310 read chip id ok!\n");
 	} else {
 		printk("tps61310 read chip id error!\n");
+		return -ENODEV;
 	}
-	
+
+#ifdef CONFIG_HUAWEI_HW_DEV_DCT
+	/* detect current device successful, set the flag as present */
+	set_hw_dev_flag(DEV_I2C_FLASH);
+#endif
+
 	printk("tps61310_probe end!\n");
 	return 0;
 }
@@ -329,5 +322,3 @@ module_exit(tps61310_exit);
 
 MODULE_DESCRIPTION("tps61310 light driver");
 MODULE_LICENSE("GPL");
-/* DTS2011092805375   yuguangcai 20110928 end > */
-/* DTS2012041003722 sibingsong 20120410 end> */

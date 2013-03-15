@@ -1,5 +1,3 @@
-/* < DTS2011042602168 caomingxing 20110426 begin */
-/* < DTS2011011904316 genghua 20110121 begin */
 /* This file is imported by genghua in order to 
  * support temp nfc test before the HAL and the Up-level code
  * is added to our project.
@@ -151,7 +149,6 @@ SINGLE_CMD_LINE RFSWITCHON_ARRAY[] =
 	{0,0,"I82250300", ""},
 	{3, 0, "", ""},
 };
-/* < DTS2011012604950 genghua 20110126 begin */
 //case 17
 SINGLE_CMD_LINE CLOCKSET_ARRAY[] = 
 {
@@ -181,7 +178,6 @@ SINGLE_CMD_LINE CLOCKSET_ARRAY[] =
 	{0,0,"I823F009EAA01", ""}, // set to 01: standby mode
 	{3, 0, "", ""},
 };
-/* DTS2011012604950 genghua 20110126 end >*/
 
 //case 18
 SINGLE_CMD_LINE CLEARSWPCFG_ARRAY[] = 
@@ -515,7 +511,6 @@ SINGLE_CMD_LINE TICCONFIG_ARRAY[]=
 	{0,0,"I823F009C1300", ""},
 	{3, 0, "", ""},
 };
-/* < DTS2011012604950 genghua 20110126 begin */
 //case 24
 SINGLE_CMD_LINE STANDBY_ARRAY[] = 
 {
@@ -529,6 +524,3 @@ SINGLE_CMD_LINE STANDBY_ARRAY[] =
 	{0,0,"I823F009EAA01", ""}, // set to 01: standby mode
 	{3, 0, "", ""},
 };
-/* DTS2011012604950 genghua 20110126 end >*/
-/* DTS2011011904316 genghua 20110121 end >*/
-/* DTS2011042602168 caomingxing 20110426 end > */

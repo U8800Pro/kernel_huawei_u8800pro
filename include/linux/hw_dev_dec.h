@@ -1,5 +1,3 @@
-/* < DTS2011052606009 jiaxianghong 20110527 begin */
-/* <DTS2011032104626 shenjinming 20110321 begin */
 /* ====*====*====*====*====*====*====*====*====*====*====*====*====*====*====*
  * 
  *                           I2C device detect driver
@@ -90,23 +88,23 @@
 
 /* hw device list */
 enum hw_device_type {
-    DEV_I2C_TOUCH_PANEL,
-    DEV_I2C_COMPASS,
-    DEV_I2C_G_SENSOR,
-    DEV_I2C_CAMERA_MAIN,
-    DEV_I2C_CAMERA_SLAVE,
-    DEV_I2C_KEYPAD,
-    DEV_I2C_APS,
-    DEV_I2C_NFC,
-    DEV_I2C_DC_DC,
-    DEV_I2C_SPEAKER,
-    DEV_FM,	
-    DEV_I2C_OFN,
-    /* < DTS2011052803160 shenjinming 20110611 begin */
-    /* add gyroscope */
-    DEV_I2C_GYROSCOPE,  
-    /* DTS2011052803160 shenjinming 201106011 end > */    
-    DEV_MAX,    
+	DEV_I2C_TOUCH_PANEL,
+	DEV_I2C_COMPASS,
+	DEV_I2C_G_SENSOR,
+	DEV_I2C_CAMERA_MAIN,
+	DEV_I2C_CAMERA_SLAVE,
+	DEV_I2C_KEYPAD,
+	DEV_I2C_APS,
+	DEV_I2C_NFC,
+	DEV_I2C_DC_DC,
+	DEV_I2C_SPEAKER,
+	DEV_I2C_FM,
+	DEV_I2C_OFN,
+	/* add gyroscope */
+	DEV_I2C_GYROSCOPE,  
+	DEV_I2C_FLASH,
+	DEV_I2C_MHL,
+	DEV_MAX,
 };
 
 /* set a device flag as true */
@@ -114,5 +112,3 @@ int set_hw_dev_flag( int dev_id );
 
 #endif
 
-/* <DTS2011032104626 shenjinming 20110321 end> */
-/* < DTS2011052606009 jiaxianghong 20110527 end */

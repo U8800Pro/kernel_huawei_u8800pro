@@ -1,4 +1,3 @@
-/*< DTS2011090203258 fengwei 20110903 begin */
 /* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -19,7 +18,6 @@
 
 static lcd_panel_type lcd_panel_wvga = LCD_NONE;
 
-/*< DTS2011110706222 qitongliang 20111201 begin */
 /*mipi dsi register setting , help qualcomm to set.*/
 static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db = 
 {
@@ -38,12 +36,10 @@ static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db =
 	0x01, 0x0f, 0x07, 
 	0x05, 0x14, 0x03, 0x0, 0x0, 0x0, 0x20, 0x0, 0x02, 0x0}, 
 };
-/* DTS2011110706222 qitongliang 20111201 end >*/
 
 static struct dsi_buf rsp61408_tx_buf;
 static struct sequence * rsp61408_lcd_init_table_debug = NULL;
 
-/*< DTS2011110302555 qitongliang 20111103 begin */
 /*LCD init code*/
 static const struct sequence rsp61408_wvga_standby_enter_table[]= 
 {
@@ -52,16 +48,13 @@ static const struct sequence rsp61408_wvga_standby_enter_table[]=
 	{0x00000,TYPE_PARAMETER,0},
 	{0x00028,MIPI_DCS_COMMAND,0}, //28h
 	{0x00000,TYPE_PARAMETER,0},
-	/*< DTS2012021601331 duanfei 20120216 begin */
 	/*delay time is not very correctly right*/
 	{0x0010,MIPI_DCS_COMMAND,20},
 	{0x0000,TYPE_PARAMETER,0},
 	{0x00029,MIPI_TYPE_END,150}, // add new command for 
-	/* DTS2012021601331 duanfei 20120216 end >*/
 };
 static const struct sequence rsp61408_wvga_standby_exit_table[]= 
 {
-    /* <DTS2012030706470 liguosheng 20120313 begin */
 	/* solve losing control of the backlight */
 	{0x00011,MIPI_DCS_COMMAND,0}, //29h
 	{0x00000,TYPE_PARAMETER,0},
@@ -71,9 +64,200 @@ static const struct sequence rsp61408_wvga_standby_exit_table[]=
 	{0x00029,MIPI_DCS_COMMAND,0},
 	{0x00000,TYPE_PARAMETER,0},
 	{0x00029,MIPI_TYPE_END,0}, // add new command for 
-    /* DTS2012030706470 liguosheng 20120313 end> */
 };
-/* DTS2011110302555 qitongliang 20111103 end >*/
+
+#ifdef CONFIG_FB_DYNAMIC_GAMMA
+static const struct sequence rsp61408_gamma_25[]= 
+{
+	{0x000C8,MIPI_GEN_COMMAND,0}, //C8h
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00039,TYPE_PARAMETER,0}, 
+    {0x00054,TYPE_PARAMETER,0}, 
+    {0x00030,TYPE_PARAMETER,0}, 
+    {0x00020,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x00013,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00039,TYPE_PARAMETER,0}, 
+    {0x00054,TYPE_PARAMETER,0}, 
+    {0x00030,TYPE_PARAMETER,0}, 
+    {0x00020,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x00013,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0},
+    
+    {0x000C9,MIPI_GEN_COMMAND,0}, //C9h
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0},
+    {0x0001D,TYPE_PARAMETER,0},  
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00039,TYPE_PARAMETER,0}, 
+    {0x00054,TYPE_PARAMETER,0}, 
+    {0x00030,TYPE_PARAMETER,0}, 
+    {0x00020,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x00013,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00039,TYPE_PARAMETER,0}, 
+    {0x00054,TYPE_PARAMETER,0}, 
+    {0x00030,TYPE_PARAMETER,0}, 
+    {0x00020,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x00013,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0},
+    
+    {0x000CA,MIPI_GEN_COMMAND,0}, //CAh
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00039,TYPE_PARAMETER,0}, 
+    {0x00054,TYPE_PARAMETER,0}, 
+    {0x00030,TYPE_PARAMETER,0}, 
+    {0x00020,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x00013,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00039,TYPE_PARAMETER,0}, 
+    {0x00054,TYPE_PARAMETER,0}, 
+    {0x00030,TYPE_PARAMETER,0}, 
+    {0x00020,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x00013,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0xFFFFF,MIPI_TYPE_END,0},
+
+};
+
+
+static const struct sequence rsp61408_gamma_22[]= 
+{
+	{0x000C8,MIPI_GEN_COMMAND,0}, //C8h
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00036,TYPE_PARAMETER,0}, 
+    {0x00050,TYPE_PARAMETER,0}, 
+    {0x00033,TYPE_PARAMETER,0}, 
+    {0x00021,TYPE_PARAMETER,0}, 
+    {0x00016,TYPE_PARAMETER,0}, 
+    {0x00011,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00036,TYPE_PARAMETER,0}, 
+    {0x00050,TYPE_PARAMETER,0}, 
+    {0x00033,TYPE_PARAMETER,0}, 
+    {0x00021,TYPE_PARAMETER,0}, 
+    {0x00016,TYPE_PARAMETER,0}, 
+    {0x00011,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0},
+    
+    {0x000C9,MIPI_GEN_COMMAND,0}, //C9h
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0},
+    {0x0001D,TYPE_PARAMETER,0},  
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00036,TYPE_PARAMETER,0}, 
+    {0x00050,TYPE_PARAMETER,0}, 
+    {0x00033,TYPE_PARAMETER,0}, 
+    {0x00021,TYPE_PARAMETER,0}, 
+    {0x00016,TYPE_PARAMETER,0}, 
+    {0x00011,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00039,TYPE_PARAMETER,0}, 
+    {0x00054,TYPE_PARAMETER,0}, 
+    {0x00030,TYPE_PARAMETER,0}, 
+    {0x00020,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x00013,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0},
+    
+    {0x000CA,MIPI_GEN_COMMAND,0}, //CAh
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00036,TYPE_PARAMETER,0}, 
+    {0x00050,TYPE_PARAMETER,0}, 
+    {0x00033,TYPE_PARAMETER,0}, 
+    {0x00021,TYPE_PARAMETER,0}, 
+    {0x00016,TYPE_PARAMETER,0}, 
+    {0x00011,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0x00017,TYPE_PARAMETER,0}, 
+    {0x0001D,TYPE_PARAMETER,0}, 
+    {0x00029,TYPE_PARAMETER,0}, 
+    {0x00036,TYPE_PARAMETER,0}, 
+    {0x00050,TYPE_PARAMETER,0}, 
+    {0x00033,TYPE_PARAMETER,0}, 
+    {0x00021,TYPE_PARAMETER,0}, 
+    {0x00016,TYPE_PARAMETER,0}, 
+    {0x00011,TYPE_PARAMETER,0}, 
+    {0x00008,TYPE_PARAMETER,0}, 
+    {0x00002,TYPE_PARAMETER,0}, 
+    {0xFFFFF,MIPI_TYPE_END,0},
+
+};
+
+int mipi_rsp61408_set_dynamic_gamma(enum danymic_gamma_mode  gamma_mode,struct msm_fb_data_type *mfd)
+{
+    int ret = 0;
+
+    switch(gamma_mode)
+    {
+        case GAMMA25:
+            process_mipi_table(mfd,&rsp61408_tx_buf,(struct sequence*)&rsp61408_gamma_25,
+                        ARRAY_SIZE(rsp61408_gamma_25), lcd_panel_wvga);
+            break ;
+        case GAMMA22:
+            process_mipi_table(mfd,&rsp61408_tx_buf,(struct sequence*)&rsp61408_gamma_22,
+                        ARRAY_SIZE(rsp61408_gamma_22), lcd_panel_wvga);
+            break;
+        default:
+			LCD_DEBUG("%s: invalid dynamic_gamma: %d\n", __func__,gamma_mode);
+	        ret = -EINVAL;
+            break;
+    }
+    LCD_DEBUG("%s: change gamma mode to %d\n",__func__,gamma_mode);
+    return ret;
+}
+
+#endif
 
 /*lcd resume function*/
 static int mipi_rsp61408_lcd_on(struct platform_device *pdev)
@@ -129,6 +313,77 @@ static int mipi_rsp61408_lcd_off(struct platform_device *pdev)
 	pr_info("leave mipi_rsp61408_lcd_off \n");
 	return 0;
 }
+#ifdef CONFIG_FB_AUTO_CABC
+static struct sequence rsp61408_auto_cabc_set_table[] =
+{
+	{0x000B8,MIPI_GEN_COMMAND,0 }, 
+	{0x00000,TYPE_PARAMETER,0},
+	
+	{0x000B8,MIPI_GEN_COMMAND,0 }, 
+	{0x00001,TYPE_PARAMETER,0},
+	{0x00001,TYPE_PARAMETER,0},
+	{0x0000d,TYPE_PARAMETER,0},
+	{0x000FF,TYPE_PARAMETER,0},
+	{0x000FF,TYPE_PARAMETER,0},
+	/* change the low brightness */
+	{0x000F9,TYPE_PARAMETER,0},
+	{0x000d0,TYPE_PARAMETER,0},
+	{0x0000f,TYPE_PARAMETER,0},
+	{0x00018,TYPE_PARAMETER,0},
+	{0x00008,TYPE_PARAMETER,0},
+	{0x00005,TYPE_PARAMETER,0},
+	{0x00037,TYPE_PARAMETER,0},
+	{0x0005A,TYPE_PARAMETER,0},
+	{0x00087,TYPE_PARAMETER,0},
+	{0x000B9,TYPE_PARAMETER,0},
+	{0x000FF,TYPE_PARAMETER,0},
+	{0x00000,TYPE_PARAMETER,0},
+	{0x00000,TYPE_PARAMETER,0},
+	{0x00000,TYPE_PARAMETER,0},
+	{0x00000,TYPE_PARAMETER,0},
+	
+	{0xFFFFF,MIPI_TYPE_END,0}, //the end flag,it don't sent to driver IC
+};
+
+
+/***************************************************************
+Function: rsp61408_config_cabc
+Description: Set CABC configuration
+Parameters:
+    struct msmfb_cabc_config cabc_cfg: CABC configuration struct
+Return:
+    0: success
+***************************************************************/
+static int rsp61408_config_auto_cabc(struct msmfb_cabc_config cabc_cfg,struct msm_fb_data_type *mfd)
+{
+    int ret = 0;
+
+	switch(cabc_cfg.mode)
+	{
+		case CABC_MODE_UI:
+			rsp61408_auto_cabc_set_table[3].reg=0x00001;
+			rsp61408_auto_cabc_set_table[5].reg=0x0000d;
+			break;
+		case CABC_MODE_MOVING:
+		case CABC_MODE_STILL:
+			rsp61408_auto_cabc_set_table[3].reg=0x00003;
+			rsp61408_auto_cabc_set_table[5].reg=0x00019;
+			break;
+		default:
+			LCD_DEBUG("%s: invalid cabc mode: %d\n", __func__, cabc_cfg.mode);
+	        ret = -EINVAL;
+			break;
+	}
+	if(likely(0 == ret))
+	{
+		process_mipi_table(mfd,&rsp61408_tx_buf,(struct sequence*)&rsp61408_auto_cabc_set_table,
+			 ARRAY_SIZE(rsp61408_auto_cabc_set_table), lcd_panel_wvga);
+	}
+
+    LCD_DEBUG("%s: change cabc mode to %d\n",__func__,cabc_cfg.mode);
+    return ret;
+}
+#endif // CONFIG_FB_AUTO_CABC
 
 static int __devinit mipi_rsp61408_lcd_probe(struct platform_device *pdev)
 {
@@ -136,10 +391,8 @@ static int __devinit mipi_rsp61408_lcd_probe(struct platform_device *pdev)
 
 	return 0;
 }
-/*< DTS2011122306018 fengwei 20111224 begin */
 static struct sequence rsp61408_wvga_write_cabc_brightness_table[]= 
 {
-    /* <DTS2012030706470 liguosheng 20120313 begin */
 	/* solve losing control of the backlight */
 	{0x000B9,MIPI_GEN_COMMAND,0},
 	{0x00001,TYPE_PARAMETER,0},
@@ -147,7 +400,6 @@ static struct sequence rsp61408_wvga_write_cabc_brightness_table[]=
     {0x00002,TYPE_PARAMETER,0},
     {0x00018,TYPE_PARAMETER,0},
 	{0x00,MIPI_TYPE_END,0},
-    /* DTS2012030706470 liguosheng 20120313 end> */
 };
 /*lcd cabc control function*/
 void rsp61408_set_cabc_backlight(struct msm_fb_data_type *mfd,uint32 bl_level)
@@ -157,7 +409,6 @@ void rsp61408_set_cabc_backlight(struct msm_fb_data_type *mfd,uint32 bl_level)
 	process_mipi_table(mfd,&rsp61408_tx_buf,(struct sequence*)&rsp61408_wvga_write_cabc_brightness_table,
 		 ARRAY_SIZE(rsp61408_wvga_write_cabc_brightness_table), lcd_panel_wvga);
 }
-/* DTS2011122306018 fengwei 20111224 end >*/
 
 static struct platform_driver this_driver = {
 	.probe  = mipi_rsp61408_lcd_probe,
@@ -168,12 +419,15 @@ static struct platform_driver this_driver = {
 static struct msm_fb_panel_data rsp61408_panel_data = {
 	.on		= mipi_rsp61408_lcd_on,
 	.off	= mipi_rsp61408_lcd_off,
-/*< DTS2011122306018 fengwei 20111224 begin */
 	.set_backlight = pwm_set_backlight,
 	/*add cabc control backlight*/
 	.set_cabc_brightness = rsp61408_set_cabc_backlight,
-/* DTS2011122306018 fengwei 20111224 end >*/
-
+#ifdef CONFIG_FB_AUTO_CABC
+    .config_cabc = rsp61408_config_auto_cabc,
+#endif
+#ifdef CONFIG_FB_DYNAMIC_GAMMA
+    .set_dynamic_gamma = mipi_rsp61408_set_dynamic_gamma,
+#endif
 };
 static struct platform_device this_device = {
 	.name   = LCD_DEVICE_NAME,
@@ -188,16 +442,12 @@ static int __init mipi_cmd_rsp61408_wvga_init(void)
 	int ret = 0;
 	struct msm_panel_info *pinfo = NULL;
 
-	/*< DTS2011122306018 fengwei 20111224 begin */
 	lcd_panel_wvga = get_lcd_panel_type();
-	/* DTS2011122306018 fengwei 20111224 end >*/
-	/* <DTS2012022501992 liguosheng 20120229 begin */
-	if ((MIPI_RSP61408_CHIMEI_WVGA!= lcd_panel_wvga )&&(MIPI_RSP61408_BYD_WVGA!= lcd_panel_wvga )
-		&&(MIPI_RSP61408_TRULY_WVGA!= lcd_panel_wvga))
+	if ((MIPI_CMD_RSP61408_CHIMEI_WVGA!= lcd_panel_wvga )&&(MIPI_CMD_RSP61408_BYD_WVGA!= lcd_panel_wvga )
+		&&(MIPI_CMD_RSP61408_TRULY_WVGA!= lcd_panel_wvga))
 	{
 		return 0;
 	}
-	/* DTS2012022501992 liguosheng 20120229 end> */
 	pr_info("enter mipi_cmd_rsp61408_wvga_init \n");
 	mipi_dsi_buf_alloc(&rsp61408_tx_buf, DSI_BUF_SIZE);
 
@@ -211,14 +461,10 @@ static int __init mipi_cmd_rsp61408_wvga_init(void)
 		pinfo->pdest = DISPLAY_1;
 		pinfo->wait_cycle = 0;
 		pinfo->bpp = 24;		
-		/*< DTS2011111100746 fengwei 20111111 begin */
 		pinfo->bl_max = 255;
 		pinfo->bl_min = 30;		
-		/* DTS2011111100746 fengwei 20111111 end >*/
 		pinfo->fb_num = 2;
-		/*< DTS2011110706222 qitongliang 20111201 begin */
         pinfo->clk_rate = 300000000;
-		/* DTS2011110706222 qitongliang 20111201 end >*/
 		pinfo->lcd.refx100 = 6000; /* adjust refx100 to prevent tearing */
 
 		pinfo->mipi.mode = DSI_CMD_MODE;
@@ -232,11 +478,9 @@ static int __init mipi_cmd_rsp61408_wvga_init(void)
 		pinfo->mipi.stream = 0; /* dma_p */
 		pinfo->mipi.mdp_trigger = DSI_CMD_TRIGGER_SW;
 		pinfo->mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
-		/*< DTS2011110801827 fengwei 20111207 begin */
 		/*set hw te sync*/
 		pinfo->lcd.hw_vsync_mode = TRUE;
 		pinfo->lcd.vsync_enable = TRUE;
-		/* DTS2011110801827 fengwei 20111207 end >*/
 		pinfo->mipi.te_sel = 1; /* TE from vsync gpio */
 		pinfo->mipi.interleave_max = 1;
 		pinfo->mipi.insert_dcs_cmd = TRUE;
@@ -257,4 +501,3 @@ static int __init mipi_cmd_rsp61408_wvga_init(void)
 }
 
 module_init(mipi_cmd_rsp61408_wvga_init);
-/* DTS2011090203258 fengwei 20110903 end >*/

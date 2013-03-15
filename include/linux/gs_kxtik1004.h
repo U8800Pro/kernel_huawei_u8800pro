@@ -1,4 +1,3 @@
-/* < DTS2012022405847 zhangmin 20120224 begin */
 /* include/linux/input/gs_kxtik1004.h*/
 /*
  * Copyright (C) 2012 HUAWEI, Inc.
@@ -76,4 +75,3 @@ u8 g_range;
 #define RESUME_ENTRIES		3
 
 #endif  /* __KXTIK_H__ */
-/* DTS2012022405847 zhangmin 20120224 end > */

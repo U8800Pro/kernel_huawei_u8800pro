@@ -1,5 +1,3 @@
-/*< DTS2012020706029 liuyuntao 20120207 begin */
-/*< DTS2011082902761 zhongjinrong 20110829 begin */
 /* drivers/i2c/chips/adp5587.c - adp5587 keyboard driver
  *
  * Copyright (C) 2007-2009 Huawei.
@@ -34,7 +32,7 @@
 #include <linux/miscdevice.h>
 #include "huawei_qwerty.h"
 #include <asm/gpio.h>
-
+#include <linux/module.h>
 
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
@@ -125,12 +123,8 @@ module_param(adp5587_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 #define ADP5587_INT_GPIO			40
 
 #define ADP5587_I2C_NAME			"adp5587"
-/*< DTS2012021602342 zhongjinrong 20120224 begin */
-/* <DTS2012022006879 sunkai 20120220 begin */
 /* Full keyboard support */
 extern bool mmi_keystate[255];
-/* DTS2012022006879 sunkai 20120220 end> */
-/* DTS2012021602342 zhongjinrong 20120224 end >*/
 
 struct adp5587_data {
 	struct i2c_client *client;
@@ -243,12 +237,8 @@ static void adp5587_report_key(struct adp5587_data *client_data, unsigned char k
 
 	pressed = (int)(key_event & KEY_RELEASED);
 	input_report_key(client_data->input_dev, keycode, pressed);
-	/*< DTS2012021602342 zhongjinrong 20120224 begin */
-	/* <DTS2012022006879 sunkai 20120220 begin */
 	/* Used to save the key state */    
 	mmi_keystate[keycode] = (pressed)? MMI_KEY_DOWN :MMI_KEY_UP;
-	/* DTS2012022006879 sunkai 20120220 end> */
-	/* DTS2012021602342 zhongjinrong 20120224 end >*/
 	return;
 }
 
@@ -560,5 +550,3 @@ module_exit(adp5587_exit);
 MODULE_AUTHOR("Liang YUAN <yuanliang@huawei.com>");
 MODULE_DESCRIPTION("ADP5587 keyboard driver");
 MODULE_LICENSE("GPL");
-/*DTS2011082902761 zhongjinrong 20110829 end> */
-/*DTS2012020706029 liuyuntao 20120207 end> */

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,36 +11,29 @@
  *
  */
 
+#include <linux/kernel.h>
+#include <linux/regulator/consumer.h>
+#include <linux/gpio.h>
 #include <asm/mach-types.h>
 #include <asm/mach/mmc.h>
-#include <linux/regulator/consumer.h>
-#include <mach/gpio.h>
 #include <mach/gpiomux.h>
 #include <mach/board.h>
-
 #include "devices.h"
-/* < DTS2012042302547 chendeng 20120428 begin */
 #include "pm.h"
-/* DTS2012042302547 chendeng 20120428 end > */
 #include "board-msm7627a.h"
-/*< DTS2012041800928 yuanmingming 20120418 begin */
 #include <linux/hardware_self_adapt.h>
-/* DTS2012041800928  yuanmingming 20120418 end > */
 
-/* < DTS2012020402114 zhuwenying 20120206 begin */
-/* < DTS2011081902167 xuke 20110819 begin */
 #ifdef CONFIG_HUAWEI_WIFI_SDCC
 #include <linux/wifi_tiwlan.h>
 #include <linux/skbuff.h>
 #endif
-/* DTS2011081902167 xuke 20110819 end > */
-/* DTS2012020402114 zhuwenying 20120206 end > */
 
 #if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC3_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC4_SUPPORT))
 
+#define MAX_SDCC_CONTROLLER 4
 static unsigned long vreg_sts, gpio_sts;
 
 struct sdcc_gpio {
@@ -56,7 +49,6 @@ struct sdcc_gpio {
  * require higher value since it should handle bad signal quality due
  * to size of T-flash adapters.
  */
-/*< DTS2012052308313 chendeng 20120621 begin */
 /*
  * We have the external pull up on data and cmd lines.
  * Qualcomm requests to disable the internal pull up when have external pull up.
@@ -64,17 +56,18 @@ struct sdcc_gpio {
  */
 #ifdef CONFIG_HUAWEI_KERNEL
 static struct msm_gpio sdc1_cfg_data[] = {
-	{GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+    /* decrease sdcard drive current */
+	{GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_dat_3"},
-	{GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_dat_2"},
-	{GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_dat_1"},
-	{GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_dat_0"},
-	{GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_cmd"},
-	{GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_clk"},
 };
 #else
@@ -93,7 +86,6 @@ static struct msm_gpio sdc1_cfg_data[] = {
 								"sdc1_clk"},
 };
 #endif
-/* DTS2012052308313 chendeng 20120621 end>*/
 
 static struct msm_gpio sdc2_cfg_data[] = {
 	{GPIO_CFG(62, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
@@ -111,21 +103,20 @@ static struct msm_gpio sdc2_cfg_data[] = {
 };
 
 static struct msm_gpio sdc2_sleep_cfg_data[] = {
-	{GPIO_CFG(62, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	{GPIO_CFG(62, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 								"sdc2_clk"},
-	{GPIO_CFG(63, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	{GPIO_CFG(63, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 								"sdc2_cmd"},
-	{GPIO_CFG(64, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	{GPIO_CFG(64, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 								"sdc2_dat_3"},
-	{GPIO_CFG(65, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	{GPIO_CFG(65, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 								"sdc2_dat_2"},
-	{GPIO_CFG(66, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	{GPIO_CFG(66, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 								"sdc2_dat_1"},
-	{GPIO_CFG(67, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
+	{GPIO_CFG(67, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
 								"sdc2_dat_0"},
 };
 
-/*< DTS2012052308313 chendeng 20120621 begin */
 /*
  * We have the external pull up on data and cmd lines.
  * Qualcomm requests to disable the internal pull up when have external pull up.
@@ -182,7 +173,6 @@ static struct msm_gpio sdc3_cfg_data[] = {
 #endif
 };
 #endif
-/* DTS2012052308313 chendeng 20120621 end>*/
 
 static struct msm_gpio sdc4_cfg_data[] = {
 	{GPIO_CFG(19, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_10MA),
@@ -222,11 +212,14 @@ static struct sdcc_gpio sdcc_cfg_data[] = {
 static int gpio_sdc1_hw_det = 85;
 static void gpio_sdc1_config(void)
 {
-	if (machine_is_msm7627a_qrd1())
+	if (machine_is_msm7627a_qrd1() || machine_is_msm7627a_evb()
+					|| machine_is_msm8625_evb()
+					|| machine_is_msm7627a_qrd3()
+					|| machine_is_msm8625_qrd7())
 		gpio_sdc1_hw_det = 42;
 }
 
-static struct regulator *sdcc_vreg_data[ARRAY_SIZE(sdcc_cfg_data)];
+static struct regulator *sdcc_vreg_data[MAX_SDCC_CONTROLLER];
 static int msm_sdcc_setup_gpio(int dev_id, unsigned int enable)
 {
 	int rc = 0;
@@ -302,8 +295,7 @@ out:
 	return rc;
 }
 
-#if defined(CONFIG_MMC_MSM_SDC1_SUPPORT) \
-	&& defined(CONFIG_MMC_MSM_CARD_HW_DETECTION)
+#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 static unsigned int msm7627a_sdcc_slot_status(struct device *dev)
 {
 	int status;
@@ -322,9 +314,12 @@ static unsigned int msm7627a_sdcc_slot_status(struct device *dev)
 	} else {
 		status = gpio_direction_input(gpio_sdc1_hw_det);
 		if (!status) {
-            /*< DTS2012011906026 chendeng 20120120 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
-            if (machine_is_msm7x27a_U8185())
+            if (machine_is_msm7x27a_U8185() ||
+                    machine_is_msm8x25_U8951D() ||
+                    machine_is_msm8x25_U8951() ||
+                    machine_is_msm8x25_C8813()
+                    )
             {
                 //u8185 is different from other products.
                 status = gpio_get_value(gpio_sdc1_hw_det);
@@ -334,20 +329,21 @@ static unsigned int msm7627a_sdcc_slot_status(struct device *dev)
                 status = !gpio_get_value(gpio_sdc1_hw_det);
             }
 #else
-            if (machine_is_msm7627a_qrd1())
+			if (machine_is_msm7627a_qrd1() ||
+					machine_is_msm7627a_evb() ||
+					machine_is_msm8625_evb()  ||
+					machine_is_msm7627a_qrd3() ||
+					machine_is_msm8625_qrd7())
 				status = !gpio_get_value(gpio_sdc1_hw_det);
 			else
 				status = gpio_get_value(gpio_sdc1_hw_det);
 #endif
-            /* DTS2012011906026 chendeng 20120120 end >*/
 		}
 		gpio_free(gpio_sdc1_hw_det);
 	}
 	return status;
 }
-#endif
 
-#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 static struct mmc_platform_data sdc1_plat_data = {
 	.ocr_mask       = MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
@@ -355,15 +351,16 @@ static struct mmc_platform_data sdc1_plat_data = {
 	.msmsdcc_fmin   = 144000,
 	.msmsdcc_fmid   = 24576000,
 	.msmsdcc_fmax   = 49152000,
-#ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	.status      = msm7627a_sdcc_slot_status,
 	.irq_flags   = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+/*disable pm runtime of sd card*/
+#ifdef CONFIG_HUAWEI_KERNEL
+    .disable_runtime_pm = true
 #endif
 };
 #endif
 
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
-/*< DTS2012041800928 yuanmingming 20120418 begin */
 static struct mmc_platform_data sdc2_plat_data_ATH = {
 	/*
 	 * SDC2 supports only 1.8V, claim for 2.85V range is just
@@ -373,9 +370,10 @@ static struct mmc_platform_data sdc2_plat_data_ATH = {
 	.ocr_mask       = MMC_VDD_28_29 | MMC_VDD_165_195,
 	.translate_vdd  = msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
-	.sdiowakeup_irq = MSM_GPIO_TO_INT(66),
-#endif
+//#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
+/* ATH WIFI wake up Msm interrupt GPIO 66 */
+	.sdiowakeup_irq = MSM_GPIO_TO_INT(66), 
+//#endif
 	.msmsdcc_fmin   = 144000,
 	.msmsdcc_fmid   = 24576000,
 	.msmsdcc_fmax   = 49152000,
@@ -383,8 +381,6 @@ static struct mmc_platform_data sdc2_plat_data_ATH = {
 	.dummy52_required = 1,
 #endif
 };
-/* DTS2012041800928  yuanmingming 20120418 end > */
-
 static struct mmc_platform_data sdc2_plat_data = {
 	/*
 	 * SDC2 supports only 1.8V, claim for 2.85V range is just
@@ -395,11 +391,7 @@ static struct mmc_platform_data sdc2_plat_data = {
 	.translate_vdd  = msm_sdcc_setup_power,
 	.mmc_bus_width  = MMC_CAP_4_BIT_DATA,
 #ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
-/* < DTS2012020402114 zhuwenying 20120206 begin */
-/* < DTS2011081902167 xuke 20110819 begin */
 	/*.sdiowakeup_irq = MSM_GPIO_TO_INT(66),*/
-/* DTS2011081902167 xuke 20110819 end > */	
-/* DTS2012020402114 zhuwenying 20120206 end > */
 #endif
 	.msmsdcc_fmin   = 144000,
 	.msmsdcc_fmid   = 24576000,
@@ -423,6 +415,10 @@ static struct mmc_platform_data sdc3_plat_data = {
 	.msmsdcc_fmid   = 24576000,
 	.msmsdcc_fmax   = 49152000,
 	.nonremovable   = 1,
+	/*prevent emmc from stepping into pm runtime sleep*/
+#ifdef CONFIG_HUAWEI_KERNEL
+	.disable_runtime_pm = true,
+#endif
 };
 #endif
 
@@ -438,8 +434,6 @@ static struct mmc_platform_data sdc4_plat_data = {
 };
 #endif
 
-/* < DTS2012020402114 zhuwenying 20120206 begin */
-/* < DTS2011081902167 xuke 20110819 begin */
 #ifdef CONFIG_HUAWEI_WIFI_SDCC
 #define TAG_BCM			"BCM_4330"
 
@@ -469,9 +463,7 @@ static unsigned wlan_wakes_msm[] = {
 };
 
 static unsigned wifi_config_init[] = {
-/* < DTS2011122402005 wanghao 20111224 begin */
 	GPIO_CFG( WLAN_REG, WLAN_GPIO_FUNC_0 , GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL , GPIO_CFG_2MA ) 
-/* DTS2011122402005 wanghao 20111224 end > */
 };
 
 static struct sk_buff *wlan_static_skb[WLAN_SKB_BUF_NUM];
@@ -608,10 +600,8 @@ static struct platform_device bcm_wifi_device = {
         },
 };
 #endif
-/* DTS2011081902167 xuke 20110819 end > */
 
 extern int sdcc_wifi_slot;
-/* DTS2012020402114 zhuwenying 20120206 end > */
 
 
 static int __init mmc_regulator_init(int sdcc_no, const char *supply, int uV)
@@ -650,50 +640,37 @@ out:
 
 void __init msm7627a_init_mmc(void)
 {
-/*< DTS2012031305833 xiewen 20120313 begin */
-/* Rolled back the list of issues: DTS2012020906557*/
-/* eMMC slot */
+	/* eMMC slot */
 #ifdef CONFIG_MMC_MSM_SDC3_SUPPORT
-/*< DTS2012032102290 xiewen 20120321 begin */
+
+	/* There is no eMMC on SDC3 for QRD3 based devices */
+	if (!(machine_is_msm7627a_qrd3() || machine_is_msm8625_qrd7())) {
 /* "S3" is always on for emmc,so don't configure the "emmc" in the linux */
 #ifdef CONFIG_HUAWEI_KERNEL
     if (mmc_regulator_init(3, "smps3", 1800000))
         return;       
-    /* < DTS2012042302547 chendeng 20120428 begin */
-    /*
-     * From the qualcomm patch, the CR is 00823327.
-     * Fix sd card resuming fail issue.
-     */
-    sdc3_plat_data.swfi_latency = msm7627a_power_collapse_latency(
-			MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT);
-    /* DTS2012042302547 chendeng 20120428 end > */
 #else
 	if (mmc_regulator_init(3, "emmc", 3000000))
 		return;
 #endif	
-	msm_add_sdcc(3, &sdc3_plat_data);
-/* DTS2012031305833 xiewen 20120321 end >*/
+		msm_add_sdcc(3, &sdc3_plat_data);
+	}
 #endif
-/* DTS2012031305833 xiewn 20120313 end >*/
 	/* Micro-SD slot */
 #ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 	gpio_sdc1_config();
 	if (mmc_regulator_init(1, "mmc", 2850000))
 		return;
-	sdc1_plat_data.status_irq = MSM_GPIO_TO_INT(gpio_sdc1_hw_det);
-    /* < DTS2012042302547 chendeng 20120428 begin */
-    /*
-     * From the qualcomm patch, the CR is 00823327.
-     * Fix sd card resuming fail issue.
-     */
-	sdc1_plat_data.swfi_latency = msm7627a_power_collapse_latency(
-			MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT);
-    /* DTS2012042302547 chendeng 20120428 end > */
+	/* 8x25 EVT do not use hw detector */
+	if (!(machine_is_msm8625_evt()))
+		sdc1_plat_data.status_irq = MSM_GPIO_TO_INT(gpio_sdc1_hw_det);
+	if (machine_is_msm8625_evt())
+		sdc1_plat_data.status = NULL;
+
 	msm_add_sdcc(1, &sdc1_plat_data);
 #endif
 	/* SDIO WLAN slot */
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
-	/* < DTS2012032206118 hujun 201200328 begin */
 	/* WLAN use S3 as power supply but not mmc */
 #ifdef CONFIG_HUAWEI_KERNEL
 	if (mmc_regulator_init(2, "smps3", 1800000))
@@ -702,33 +679,28 @@ void __init msm7627a_init_mmc(void)
 	if (mmc_regulator_init(2, "mmc", 2850000))
 		return;
 #endif	
-	/* DTS2012032206118 hujun 201200328 end > */	
-/* < DTS2012020402114 zhuwenying 20120206 begin */
 	sdcc_wifi_slot = 2;
-		/*< DTS2012041800928 yuanmingming 20120418 begin */
-        if (WIFI_BROADCOM == get_hw_wifi_device_type())
-            msm_add_sdcc(2, &sdc2_plat_data);
-        else
-            msm_add_sdcc(2, &sdc2_plat_data_ATH);
-      	/* DTS2012041800928  yuanmingming 20120418 end > */
-	/* < DTS2011081902167 xuke 20110819 begin */
-	/*< DTS2012041800928 yuanmingming 20120418 begin */
+    if (WIFI_BROADCOM == get_hw_wifi_device_type())
+        msm_add_sdcc(2, &sdc2_plat_data);
+    else
+        msm_add_sdcc(2, &sdc2_plat_data_ATH);
+      
 	if (WIFI_BROADCOM == get_hw_wifi_device_type()){
 		#ifdef CONFIG_HUAWEI_WIFI_SDCC		
 		bcm_wifi_init_gpio_mem();
 		platform_device_register(&bcm_wifi_device);
 		#endif
 	}
-	/* DTS2012041800928  yuanmingming 20120418 end > */
-	/* DTS2011081902167 xuke 20110819 end > */    
-/* DTS2012020402114 zhuwenying 20120206 end > */
 #endif
 	/* Not Used */
 #if (defined(CONFIG_MMC_MSM_SDC4_SUPPORT)\
 		&& !defined(CONFIG_MMC_MSM_SDC3_8_BIT_SUPPORT))
-	if (mmc_regulator_init(4, "mmc", 2850000))
-		return;
-	msm_add_sdcc(4, &sdc4_plat_data);
+	/* There is no SDC4 for QRD3/7 based devices */
+	if (!(machine_is_msm7627a_qrd3() || machine_is_msm8625_qrd7())) {
+		if (mmc_regulator_init(4, "smps3", 1800000))
+			return;
+		msm_add_sdcc(4, &sdc4_plat_data);
+	}
 #endif
 }
 #endif

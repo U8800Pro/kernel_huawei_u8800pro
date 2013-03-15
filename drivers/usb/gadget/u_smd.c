@@ -51,7 +51,6 @@ struct smd_port_info smd_pi[SMD_N_PORTS] = {
 	{
 		.name = "DS",
 	},
-	/* < DTS2012022301786 yanzhijun 20120223 begin */
 	/* used DATA2 smd channel to support at command in pcui port */
 #ifndef CONFIG_HUAWEI_KERNEL
 	{
@@ -62,7 +61,6 @@ struct smd_port_info smd_pi[SMD_N_PORTS] = {
 		.name = "DATA2",
 	},
 #endif
-	/* DTS2012022301786 yanzhijun 20120223 end > */
 };
 
 struct gsmd_port {
@@ -218,6 +216,7 @@ start_rx_end:
 static void gsmd_rx_push(struct work_struct *w)
 {
 	struct gsmd_port *port = container_of(w, struct gsmd_port, push);
+	struct smd_port_info *pi = port->pi;
 	struct list_head *q;
 
 	pr_debug("%s: port:%p port#%d", __func__, port, port->port_num);
@@ -225,10 +224,9 @@ static void gsmd_rx_push(struct work_struct *w)
 	spin_lock_irq(&port->port_lock);
 
 	q = &port->read_queue;
-	while (!list_empty(q)) {
+	while (pi->ch && !list_empty(q)) {
 		struct usb_request *req;
 		int avail;
-		struct smd_port_info *pi = port->pi;
 
 		req = list_first_entry(q, struct usb_request, list);
 
@@ -254,7 +252,7 @@ static void gsmd_rx_push(struct work_struct *w)
 			char		*packet = req->buf;
 			unsigned	size = req->actual;
 			unsigned	n;
-			unsigned	count;
+			int		count;
 
 			n = port->n_read;
 			if (n) {
@@ -305,21 +303,24 @@ static void gsmd_tx_pull(struct work_struct *w)
 {
 	struct gsmd_port *port = container_of(w, struct gsmd_port, pull);
 	struct list_head *pool = &port->write_pool;
+	struct smd_port_info *pi = port->pi;
+	struct usb_ep *in;
 
 	pr_debug("%s: port:%p port#%d pool:%p\n", __func__,
 			port, port->port_num, pool);
 
+	spin_lock_irq(&port->port_lock);
+
 	if (!port->port_usb) {
 		pr_debug("%s: usb is disconnected\n", __func__);
+		spin_unlock_irq(&port->port_lock);
 		gsmd_read_pending(port);
 		return;
 	}
 
-	spin_lock_irq(&port->port_lock);
-	while (!list_empty(pool)) {
+	in = port->port_usb->in;
+	while (pi->ch && !list_empty(pool)) {
 		struct usb_request *req;
-		struct usb_ep *in = port->port_usb->in;
-		struct smd_port_info *pi = port->pi;
 		int avail;
 		int ret;
 
@@ -487,10 +488,22 @@ static unsigned int convert_acm_sigs_to_uart(unsigned acm_sig)
 	/* should this needs to be in calling functions ??? */
 	acm_sig &= (SMD_ACM_CTRL_DTR | SMD_ACM_CTRL_RTS);
 
+    /* set RTS signal forcedly enven if there is no RTS or DTR */
+    /* always set RTS signal automatically.
+     * If the host does not set RTS signal,
+     * Modem will not write data to share memory.
+     */
+#ifdef CONFIG_HUAWEI_KERNEL
+	if (acm_sig & SMD_ACM_CTRL_DTR)
+		uart_sig |= TIOCM_DTR;
+
+	uart_sig |= TIOCM_RTS;
+#else
 	if (acm_sig & SMD_ACM_CTRL_DTR)
 		uart_sig |= TIOCM_DTR;
 	if (acm_sig & SMD_ACM_CTRL_RTS)
 		uart_sig |= TIOCM_RTS;
+#endif		
 
 	return uart_sig;
 }
@@ -669,7 +682,7 @@ int gsmd_connect(struct gserial *gser, u8 portno)
 	port->nbytes_tolaptop = 0;
 	spin_unlock_irqrestore(&port->port_lock, flags);
 
-	ret = usb_ep_enable(gser->in, gser->in_desc);
+	ret = usb_ep_enable(gser->in);
 	if (ret) {
 		pr_err("%s: usb_ep_enable failed eptype:IN ep:%p",
 				__func__, gser->in);
@@ -678,7 +691,7 @@ int gsmd_connect(struct gserial *gser, u8 portno)
 	}
 	gser->in->driver_data = port;
 
-	ret = usb_ep_enable(gser->out, gser->out_desc);
+	ret = usb_ep_enable(gser->out);
 	if (ret) {
 		pr_err("%s: usb_ep_enable failed eptype:OUT ep:%p",
 				__func__, gser->out);

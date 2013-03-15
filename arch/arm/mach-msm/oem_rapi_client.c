@@ -15,6 +15,7 @@
  * OEM RAPI CLIENT Driver source file
  */
 
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -23,6 +24,7 @@
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
 #include <linux/delay.h>
+#include <linux/module.h>
 #include <mach/msm_rpcrouter.h>
 #include <mach/oem_rapi_client.h>
 
@@ -209,7 +211,6 @@ struct msm_rpc_client *oem_rapi_client_init(void)
 EXPORT_SYMBOL(oem_rapi_client_init);
 
 
-/*< DTS2012011801998 chenxi 20120203 begin */
 /* usb rpc to replace pcom mechanism for fix reset issue */
 #ifdef CONFIG_HUAWEI_KERNEL
 #define HUAWEI_OEM_RAPI_SET_NV 101
@@ -402,7 +403,6 @@ nv_stat_enum_type oem_rapi_read_nv(u16 nv, void *buf, u8 size)
 }
 
 #endif
-/* DTS2012011801998 chenxi 20120203 end >*/
 
 #if defined(CONFIG_DEBUG_FS)
 

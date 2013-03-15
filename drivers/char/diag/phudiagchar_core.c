@@ -75,7 +75,6 @@ MODULE_VERSION("1.0");
 struct phudiag_dev *phudriver;
 
 
-/* < DTS2011011300706 liuhongfei 20110113 begin */
 static int phudiag_open(struct inode *inode, struct file *file)
 {	
 	if (phudriver && file ) 
@@ -124,9 +123,7 @@ static int phudiag_open(struct inode *inode, struct file *file)
 	
 	return -ENOMEM;
 }
-/* DTS2011011300706 liuhongfei 20110113 end > */ 
 
-/* < DTS2011011300706 liuhongfei 20110113 begin */
 static int phudiag_close(struct inode *inode, struct file *file)
 {
 
@@ -144,7 +141,6 @@ static int phudiag_close(struct inode *inode, struct file *file)
 	}
 	return 0;
 }
-/* DTS2011011300706 liuhongfei 20110113 end > */ 
 
 /*
 static int phudiag_ioctl(struct inode *inode, struct file *filp,
@@ -186,7 +182,6 @@ static int phudiag_ioctl(struct inode *inode, struct file *filp,
 	}
 }
 */
-/* < DTS2011011300706 liuhongfei 20110113 begin */
 static int phudiag_read(struct file *file, char __user *buf, size_t count,
 			  loff_t *ppos)
 {	
@@ -202,7 +197,6 @@ static int phudiag_read(struct file *file, char __user *buf, size_t count,
 	return  ret;
 	
 }
-/* DTS2011011300706 liuhongfei 20110113 end > */ 
 
 static int phudiag_write(struct file *file, const char __user *buf,
 			      size_t count, loff_t *ppos)
@@ -274,7 +268,6 @@ static int phudiag_setup_cdev(dev_t devno)
 
 }
 
-/* < DTS2011011300706 liuhongfei 20110113 begin */
 static int phudiag_cleanup(void)
 {
 	#ifdef PHUDIAG_DEBUG
@@ -312,10 +305,8 @@ static int phudiag_cleanup(void)
 	}
 	return 0;
 }
-/* DTS2011011300706 liuhongfei 20110113 end > */ 
 
 
-/* < DTS2011011300706 liuhongfei 20110113 begin */
 //static int __init phudiag_init(void)
 int phudiag_init(void)
 {
@@ -394,7 +385,6 @@ fail:
 	return -1;
 
 }
-/* DTS2011011300706 liuhongfei 20110113 end > */ 
 
 //static void __exit phudiag_exit(void)
 void phudiag_exit(void)

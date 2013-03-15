@@ -21,13 +21,12 @@
 struct msm_psy_batt_pdata {
 	u32 voltage_max_design;
 	u32 voltage_min_design;
+	u32 voltage_fail_safe;
 	u32 avail_chg_sources;
 	u32 batt_technology;
 	u32 (*calculate_capacity)(u32 voltage);
 };
 
-/* <DTS2010081400556 shenjinming 20100814 begin */
-/*< DTS2010071902252 shenjinming 20100719 begin */
 #ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION 
 typedef enum {   
    EVENT_LCD_STATE = 0, /*LCD*/
@@ -60,6 +59,4 @@ typedef enum {
 /* notify modem sides to calculate consume */
 int huawei_rpc_current_consuem_notify(device_current_consume_type device_event, __u32 device_state);
 #endif
-/* DTS2010071902252 shenjinming 20100719 end >*/
-/* DTS2010081400556 shenjinming 20100814 end> */
 #endif

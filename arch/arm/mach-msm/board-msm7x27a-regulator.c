@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/kernel.h>
 #include "board-msm7x27a-regulator.h"
 
 #define VOLTAGE_RANGE(min_uV, max_uV, step_uV)	((max_uV - min_uV) / step_uV)
@@ -84,6 +85,8 @@ PCOM_VREG_CONSUMERS(smps2) = {
 PCOM_VREG_CONSUMERS(smps3) = {
 	REGULATOR_SUPPLY("smps3",	NULL),
 	REGULATOR_SUPPLY("msme1",	NULL),
+	REGULATOR_SUPPLY("vcc_i2c",	"1-004a"),
+	REGULATOR_SUPPLY("vcc_i2c",	"1-0038"),
 };
 
 PCOM_VREG_CONSUMERS(smps4) = {
@@ -158,6 +161,8 @@ PCOM_VREG_CONSUMERS(ldo11) = {
 PCOM_VREG_CONSUMERS(ldo12) = {
 	REGULATOR_SUPPLY("ldo12",	NULL),
 	REGULATOR_SUPPLY("gp2",		NULL),
+	REGULATOR_SUPPLY("vdd_ana",	"1-004a"),
+	REGULATOR_SUPPLY("vdd",		"1-0038"),
 };
 
 PCOM_VREG_CONSUMERS(ldo13) = {
@@ -194,9 +199,6 @@ PCOM_VREG_CONSUMERS(ldo19) = {
 	REGULATOR_SUPPLY("ldo19",	NULL),
 	REGULATOR_SUPPLY("wlan4",	NULL),
 };
-/*< DTS2012031305833 xiewen 20120313 begin */
-/* Rolled back the list of issues: DTS2012020906557,del 3 line */
-/* DTS2012031305833 xiewen 20120313 end >*/
 
 PCOM_VREG_CONSUMERS(ncp)   = {
 	REGULATOR_SUPPLY("ncp",		NULL),
@@ -216,7 +218,7 @@ static struct proccomm_regulator_info msm7x27a_pcom_vreg_info[] = {
 	PCOM_VREG_SMP(smps2,  4, NULL, 1100000, 1100000, 0, -1, 0, 0, 0, 0, s),
 	PCOM_VREG_SMP(smps3,  2, NULL, 1800000, 1800000, 0, -1, 0, 0, 0, 0, s),
 	PCOM_VREG_SMP(smps4, 24, NULL, 2100000, 2100000, 0, -1, 0, 0, 0, 0, s),
-	PCOM_VREG_LDO(ldo01, 12, NULL, 2100000, 2100000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo01, 12, NULL, 1800000, 2100000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo02, 13, NULL, 2850000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo03, 49, NULL, 1200000, 1200000, 0, -1, 0, 0, 0, 0, n),
 	PCOM_VREG_LDO(ldo04, 50, NULL, 1100000, 1100000, 0, -1, 0, 0, 0, 0, n),
@@ -232,12 +234,9 @@ static struct proccomm_regulator_info msm7x27a_pcom_vreg_info[] = {
 	PCOM_VREG_LDO(ldo14, 16, NULL, 3300000, 3300000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo15, 54, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo16, 19, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
-	PCOM_VREG_LDO(ldo17, 56, NULL, 2800000, 3300000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo17, 56, NULL,  2850000,  3300000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo18, 11, NULL, 2700000, 2700000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo19, 57, NULL, 1200000, 1800000, 0, -1, 0, 0, 0, 0, p),
-    /*< DTS2012031305833 xiewen 20120313 begin */
-    /* Rolled back the list of issues: DTS2012020906557,del 1 line */
-    /* DTS2012031305833 xiewen 20120313 end >*/
 	PCOM_VREG_NCP(ncp,   31, NULL, -1800000, -1800000, 0,     0, 0, 0, 0),
 };
 

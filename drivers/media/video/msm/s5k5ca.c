@@ -1,5 +1,3 @@
-/* <DTS2012041003722 sibingsong 20120410 begin */
-/*<  DTS2011101000840   yuguangcai 20111010 begin */
 
 /*
  * Copyright (c) 2008-2009 QUALCOMM USA, INC.
@@ -31,9 +29,7 @@
 #include "s5k5ca.h"
 #include "linux/hardware_self_adapt.h"
 
-/* < DTS2012010906170 zhouqiwei 20120110 begin */
 #include <asm/mach-types.h>
-/* DTS2012010906170 zhouqiwei 20120110 end > */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
  #include <linux/hw_dev_dec.h>
 #endif
@@ -121,17 +117,19 @@ struct s5k5ca_ctrl_t
     unsigned short imgaddr;
 };
 
-/*< DTS2011111900798 yuguangcai 20111130 begin */
 /*delete antibanding enum*/
-/* DTS2011111900798 yuguangcai 20111130 end > */
 const static char s5k5ca_supported_effect[] = "none,mono,negative,sepia,aqua";
 static bool CSI_CONFIG;
 #define MODEL_TRULY 0
 #define MODEL_SUNNY 1
+#define S5K5CA_IS_ON 1
 
 static uint16_t s5k5ca_model_id = MODEL_SUNNY;
 
 static uint8_t s5k5ca_init_flag = false;
+
+#define M660_SENSOR_PWD 32
+static int s5k5ca_pwd = 119; //pwd for camera
 static struct s5k5ca_i2c_reg_conf * p_s5k5ca_init_reg_config;
 static unsigned int reg_num;
 
@@ -311,7 +309,6 @@ int32_t s5k5ca_set_pict_exp_gain(uint16_t gain, uint32_t line)
     /* camera_timed_wait(snapshot_wait*exposure_ratio); */
     return rc;
 }
-/*< DTS2012013103283   songxiaoming 20120201 begin */ 
 /* Mirror from kernel space */ 
 static int32_t s5k5ca_set_mirror_mode(void)
 {
@@ -325,7 +322,6 @@ static int32_t s5k5ca_set_mirror_mode(void)
 
     return rc;
 }
-/* DTS2012013103283  songxiaoming 20120201 end > */
 int32_t s5k5ca_setting(enum s5k5ca_reg_update_t rupdate,
                        enum s5k5ca_setting_t    rt)
 {
@@ -372,17 +368,13 @@ int32_t s5k5ca_setting(enum s5k5ca_reg_update_t rupdate,
                                           s5k5ca_regs.s5k5ca_snapshot_reg_config_size);
         }
 
-        /* < DTS2011122405731 tangying 20111224 begin */
-        //set delay time to 50ms
+        /*increase the delay after register writing*/
         mdelay(50);
-        /* DTS2011122405731 tangying 20111224 end > */
         break;
 
     case REG_INIT:
 
-        /*< DTS2011121001804 yuguangcai 20111227 begin */
         /*delete one line*/
-        /* DTS2011121001804 yuguangcai 20111227 end > */
         CDBG("s5k5ca  model is %d : init sensor!\n", s5k5ca_model_id);
 
         /* Write init sensor register */
@@ -392,21 +384,17 @@ int32_t s5k5ca_setting(enum s5k5ca_reg_update_t rupdate,
         mdelay(100);
 
         rc = s5k5ca_i2c_write_w_table(p_s5k5ca_init_reg_config, reg_num);
-        /*< DTS2011111201369 yuguangcai 20111112 begin */
         /*add a 10ms delay between registers writing*/
         mdelay(10);
         rc = s5k5ca_i2c_write_w_table(s5k5ca_regs.s5k5ca_init_reg_config_sunny_2,  
                                 s5k5ca_regs.s5k5ca_init_reg_config_sunny_2_size);
-        /* DTS2011111201369 yuguangcai 20111112 end > */
         //           mdelay(100);
         CDBG("s5k5ca model is %d: init sensor done!\n", s5k5ca_model_id);
-		/*< DTS2012013103283   songxiaoming 20120201 begin */
         if(rc >= 0)
         {
             rc = s5k5ca_set_mirror_mode();
         } 
         break;
-        /* DTS2012013103283  songxiaoming 20120201 end > */
 
     default:
         rc = -EFAULT;
@@ -464,9 +452,7 @@ int32_t s5k5ca_snapshot_config(int mode)
 
     CDBG("s5k5ca_snapshot_config in\n");
     rc = s5k5ca_setting(UPDATE_PERIODIC, RES_CAPTURE);
-    /*< DTS2011122205086 yuguangcai 20120103 begin */
     /*delete one line*/
-    /* DTS2011122205086 yuguangcai 20120103 end > */
     if (rc < 0)
     {
         return rc;
@@ -502,8 +488,8 @@ static int s5k5ca_sensor_init_done(const struct msm_camera_sensor_info *data)
         gpio_free(data->sensor_reset);
     }
 
-    gpio_direction_output(data->sensor_pwd, 1);
-    gpio_free(data->sensor_pwd);
+    gpio_direction_output(s5k5ca_pwd, 1);
+    gpio_free(s5k5ca_pwd);
 
     if (false == s5k5ca_init_flag)
     {
@@ -513,7 +499,6 @@ static int s5k5ca_sensor_init_done(const struct msm_camera_sensor_info *data)
             data->vreg_disable_func(0);
         }
     }
-    /* DTS2012012901317 yuguangcai 20120131 end > */
 
     last_rupdate = -1;
     last_rt = -1;
@@ -526,10 +511,10 @@ static int s5k5ca_probe_init_sensor(const struct msm_camera_sensor_info *data)
     unsigned short chipid;
 
     /* pull down power down */
-    rc = gpio_request(data->sensor_pwd, "s5k5ca");
+    rc = gpio_request(s5k5ca_pwd, "s5k5ca");
     if (!rc || (rc == -EBUSY))
     {
-        rc = gpio_direction_output(data->sensor_pwd, 1);
+        gpio_direction_output(s5k5ca_pwd, 1);
     }
     else
     {
@@ -548,20 +533,18 @@ static int s5k5ca_probe_init_sensor(const struct msm_camera_sensor_info *data)
         {
             goto init_probe_fail;
         }
-        /*< DTS2012012901317 yuguangcai 20120131 begin */
         mdelay(10);
         /*enable the power*/
         if (data->vreg_enable_func)
         {
            data->vreg_enable_func(1);
         } 
-        /* DTS2012012901317 yuguangcai 20120131 end > */
     }
 
     mdelay(20);
 
     {
-        rc = gpio_direction_output(data->sensor_pwd, 0);
+        rc = gpio_direction_output(s5k5ca_pwd, 0);
         if (rc < 0)
         {
             goto init_probe_fail;
@@ -684,20 +667,11 @@ static int s5k5ca_probe_init_sensor(const struct msm_camera_sensor_info *data)
             switch (s5k5ca_model_id)
             {
             case MODEL_TRULY:
+
             case MODEL_SUNNY:
-                /*< DTS2012020307372 cuixuefeng 20120326 begin */
-                /*if  machine is msm7x27a_M660,set s5k5ca_init_reg_config_sunny_M660,else s5k5ca_init_reg_config_sunny */
-                if(machine_is_msm7x27a_M660())
-                {
-                    p_s5k5ca_init_reg_config = (struct s5k5ca_i2c_reg_conf *)(s5k5ca_regs.s5k5ca_init_reg_config_sunny_M660);
-                    reg_num = s5k5ca_regs.s5k5ca_init_reg_config_sunny_M660_size;
-                }
-                else
-                {
-                    p_s5k5ca_init_reg_config = (struct s5k5ca_i2c_reg_conf *)(s5k5ca_regs.s5k5ca_init_reg_config_sunny);
-                    reg_num = s5k5ca_regs.s5k5ca_init_reg_config_sunny_size;
-                }
-                /* DTS2012020307372 cuixuefeng 20120326 end > */
+                p_s5k5ca_init_reg_config = (struct s5k5ca_i2c_reg_conf *)(s5k5ca_regs.s5k5ca_init_reg_config_sunny);
+                reg_num = s5k5ca_regs.s5k5ca_init_reg_config_sunny_size;
+
                 //              strncpy((char *)data->sensor_name, "23060043SF-SAM-S", strlen("23060043SF-SAM-S"));
                 CDBG("s5k5ca probe is  MODEL_SUNNY.");
                 break;
@@ -755,10 +729,8 @@ int s5k5ca_sensor_open_init(const struct msm_camera_sensor_info *data)
     }
     else
     {
-        /*< DTS2011121001804 yuguangcai 20111227 begin */
         /*delete one line*/
         CSI_CONFIG = 0;
-        /* DTS2011121001804 yuguangcai 20111227 end > */
         CDBG("s5k5ca init succeed!!!!! rc = %d \n", rc);
         goto init_done;
     }
@@ -809,8 +781,6 @@ static long s5k5ca_set_effect(int mode, int effect)
     int num_of_items_in_table = 0;
     long rc = 0;
 
-    CDBG("%s : mode is %d , effect is %d \n", __func__, mode, effect);
-
     switch (effect)
     {
     case CAMERA_EFFECT_OFF:
@@ -838,6 +808,7 @@ static long s5k5ca_set_effect(int mode, int effect)
         num_of_items_in_table = s5k5ca_regs.s5k5ca_effect_aqua_reg_config_size;
         break;
 
+    /*the effect we need is solarize and posterize*/
     case CAMERA_EFFECT_SOLARIZE:
         reg_conf_tbl = s5k5ca_regs.s5k5ca_effect_solarize_reg_config;
         num_of_items_in_table = s5k5ca_regs.s5k5ca_effect_solarize_reg_config_size;
@@ -852,6 +823,7 @@ static long s5k5ca_set_effect(int mode, int effect)
         return 0;
     }
     rc = s5k5ca_i2c_write_w_table(reg_conf_tbl, num_of_items_in_table);
+
     return rc;
 }
 
@@ -870,19 +842,8 @@ static long s5k5ca_set_wb(int wb)
         break;
 
     case CAMERA_WB_INCANDESCENT:
-        /*< DTS2012020307372 cuixuefeng 20120326 begin */	
-        /*if  machine is msm7x27a_M660,set s5k5ca_wb_a_reg_config_sunny_M660,else s5k5ca_wb_a_reg_config */
-        if(machine_is_msm7x27a_M660())
-        {
-            reg_conf_tbl = s5k5ca_regs.s5k5ca_wb_a_reg_config_sunny_M660;
-            num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_a_reg_config_sunny_M660_size;
-        }
-        else
-        {
-            reg_conf_tbl = s5k5ca_regs.s5k5ca_wb_a_reg_config;
-            num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_a_reg_config_size;
-        }
-        /* DTS2012020307372 cuixuefeng 20120326 end > */
+        reg_conf_tbl = s5k5ca_regs.s5k5ca_wb_a_reg_config;
+        num_of_items_in_table = s5k5ca_regs.s5k5ca_wb_a_reg_config_size;
         break;
 
     case CAMERA_WB_CUSTOM:
@@ -915,15 +876,11 @@ static long s5k5ca_set_wb(int wb)
     default:
         return 0;
     }
-    /*< DTS2011111900798 yuguangcai 20111130 begin */
     rc = s5k5ca_i2c_write_w_table(reg_conf_tbl, num_of_items_in_table);
-    /* DTS2011111900798 yuguangcai 20111130 end > */
 
     return rc;
 }
-/*< DTS2011111900798 yuguangcai 20111130 begin */
 /*delete some lines*/
-/* DTS2011111900798 yuguangcai 20111130 end > */
 
 int s5k5ca_sensor_config(void __user *argp)
 {
@@ -1009,9 +966,7 @@ int s5k5ca_sensor_config(void __user *argp)
         break;
 
     case CFG_SET_ANTIBANDING:
-        /*< DTS2011111900798 yuguangcai 20111130 begin */
         /*delete antibanding handling*/
-        /* DTS2011111900798 yuguangcai 20111130 end > */
         break;
 
     case CFG_MAX:
@@ -1114,6 +1069,11 @@ static int s5k5ca_sensor_probe(const struct msm_camera_sensor_info *info,
     msm_camio_clk_rate_set(S5K5CA_DEFAULT_CLOCK_RATE);
     mdelay(20);
 
+    /*camera shutdown is GPIO32 for M660*/
+    if(machine_is_msm7x27a_M660())
+    {
+        s5k5ca_pwd = M660_SENSOR_PWD;
+    }
     rc = s5k5ca_probe_init_sensor(info);
     if (rc < 0)
     {
@@ -1123,9 +1083,8 @@ static int s5k5ca_sensor_probe(const struct msm_camera_sensor_info *info,
     }
     else
     {
-        /* < DTS2012031904303 zhouqiwei 20130319 begin */
-        strncpy((char *)info->sensor_name, "23060073FF-SAM-S", strlen("23060073FF-SAM-S"));
-        /* DTS2012031904303 zhouqiwei 20130319 end > */
+        /*s5k5ca probe succeed, use the func to sign power should always on*/
+        info->set_s5k5ca_is_on(S5K5CA_IS_ON);
         CDBG("s5k5ca probe succeed!!!!\n");
     }
     /*initialize the registers to save the time of open camera*/
@@ -1142,7 +1101,6 @@ static int s5k5ca_sensor_probe(const struct msm_camera_sensor_info *info,
         s5k5ca_init_flag = true;
         CDBG("s5k5ca init sensor succeed!!!!\n");
     }
-    /* DTS2011121001804 yuguangcai 20111227 end > */
 
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
     /* detect current device successful, set the flag as present */
@@ -1152,17 +1110,13 @@ static int s5k5ca_sensor_probe(const struct msm_camera_sensor_info *info,
     s->s_init = s5k5ca_sensor_open_init;
     s->s_release = s5k5ca_sensor_release;
     s->s_config = s5k5ca_sensor_config;
-#ifdef CONFIG_ARCH_MSM7X27A
+    /*set the s_mount_angle value of sensor*/
     s->s_mount_angle = info->sensor_platform_info->mount_angle;
-#else
-    s->s_mount_angle = 0;
-#endif
     s5k5ca_sensor_init_done(info);
 
     /* For go to sleep mode, follow the datasheet */
     msleep(150);
-
-    // set_camera_support(true);
+    set_camera_support(true);
 probe_done:
     return rc;
 }
@@ -1188,6 +1142,3 @@ static int __init s5k5ca_init(void)
 
 module_init(s5k5ca_init);
 
-
-/* DTS2011101000840   yuguangcai 20111010 end > */
-/* DTS2012041003722 sibingsong 20120410 end> */

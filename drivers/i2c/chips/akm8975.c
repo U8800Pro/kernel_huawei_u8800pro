@@ -1,4 +1,3 @@
-/*<DTS2010123100691 modified by yuxuesong on 2010-12-28 begin*/
 /* drivers/i2c/chips/akm8975.c - akm8975 and akm8962 compass driver
  *
  * Copyright (C) 2007-2008 HTC Corporation.
@@ -19,7 +18,7 @@
  * Revised by AKM 2010/11/15
  *
  */
-
+#include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
@@ -34,29 +33,21 @@
 #include <linux/akm8975.h>
 #include <linux/earlysuspend.h>
 #include <mach/vreg.h>
-
+#include <linux/sensors.h>
 #include "linux/hardware_self_adapt.h"
-/* < DTS2012022000736 zhangmin 20120220 begin */
 #include <linux/gpio_event.h>
-/* DTS2012022000736 zhangmin 20120220 end > */
-/* <DTS2011021804534 shenjinming 20110218 begin */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
 #endif
-/* DTS2011021804534 shenjinming 20110218 end> */
 
 #define AKM8975_DEBUG		1
 #define AKM8975_DEBUG_MSG	1
-/* < DTS2011043000257  liujinggang 20110503 begin */
 #define AKM8975_DEBUG_FUNC	0
 #define AKM8975_DEBUG_DATA	0
-/* DTS2011043000257  liujinggang 20110503 end > */
 #define MAX_FAILURE_COUNT	3
 #define AKM8975_RETRY_COUNT	10
 #define AKM8975_DEFAULT_DELAY	100
-/* < DTS2012013004920 zhangmin 20120130 begin */
 /*move it to hardware_self_adapt.h*/
-/* DTS2012013004920 zhangmin 20120130 end > */
 
 #if AKM8975_DEBUG_MSG
 #define AKMDBG(fmt, args...) printk(KERN_INFO "AKM8975 " fmt "\n", ##args)
@@ -72,7 +63,9 @@
 #endif
 
 #define AKM8962_I2C_NAME "akm8962"
-
+/* modify AKM chip name for chip identify */
+#define AKM8975C_ID  0x08
+#define AKM_MASK     0x78
 enum
 {
     CHIP_AKMD8975 = 0,
@@ -107,10 +100,8 @@ static atomic_t m_flag;
 static atomic_t a_flag;
 static atomic_t mv_flag;
 
-/* < DTS2011022604747  liujinggang 20110228 begin */
 /*save the value of auto-calibration*/
 static short calibration_value=0;
-/* DTS2011022604747  liujinggang 20110228 end > */
 
 static int failure_count;
 
@@ -118,9 +109,7 @@ static short akmd_delay = AKM8975_DEFAULT_DELAY;
 
 static atomic_t suspend_flag = ATOMIC_INIT(0);
 
-/* < DTS2011043000257  liujinggang 20110503 begin */
 /*delete one line*/
-/* DTS2011043000257  liujinggang 20110503 end > */
 
 static int AKI2C_RxData(char *rxData, int length)
 {
@@ -321,13 +310,18 @@ static int AKECS_CheckChipName(void)
 	if (ret < 0) {
 		return ret;
 	}
-	
-	/* Check read data , get D6 D5 D4 D3 bits */
-	akmd_chip_id = (buffer[0] & 0x78) >> 3;
-	
-	AKMDBG("%s: find device %s (%d)", __func__, \
-		(akmd_chip_id > CHIP_AKMD8975C) ? AKM8962_I2C_NAME : AKM8975_I2C_NAME, akmd_chip_id);
-
+	/* Check read data about akm8975 */
+	/* modify AKM chip name for chip identify */
+	if(AKM8975C_ID == ( buffer[0] & AKM_MASK ))
+	{
+		akmd_chip_id = CHIP_AKMD8975C ;
+		printk("My compass is AKM8975\n");
+	}
+	else
+	{
+		printk("It is not AKM8975\n");
+		return -ENXIO;
+	}
 	return ret;
 }
 
@@ -435,7 +429,6 @@ static void AKECS_CloseDone(void)
 static int akm_aot_open(struct inode *inode, struct file *file)
 {
 	int ret = -1;
-	/* < DTS2012022000736 zhangmin 20120220 begin */
 	/*
 	*int atomic_cmpxchg(atomic_t *v, int old, int new)
 	*{
@@ -451,7 +444,6 @@ static int akm_aot_open(struct inode *inode, struct file *file)
 	*	return ret;
 	*}
 	*/
-	/* DTS2012022000736 zhangmin 20120220 end > */
 
 	AKMFUNC("akm_aot_open");
 	if (atomic_cmpxchg(&open_count, 0, 1) == 0) {
@@ -501,7 +493,6 @@ akm_aot_ioctl(struct file *file,
 		break;
 	}
 
-	/* < DTS2011022604747  liujinggang 20110228 begin */
 	/*get the value of auto-calibration*/
 	switch (cmd) {
 	case ECS_IOCTL_APP_SET_MFLAG:
@@ -566,7 +557,6 @@ akm_aot_ioctl(struct file *file,
 	default:
 		break;
 	}
-	/* DTS2011022604747  liujinggang 20110228 end > */
 
 	return 0;
 }
@@ -599,12 +589,9 @@ akmd_ioctl(struct file *file, unsigned int cmd,
 	short delay;		/* for GET_DELAY */
 	int status;			/* for OPEN/CLOSE_STATUS */
 	int ret = -1;		/* Return value. */
-	/* < DTS2012022000736 zhangmin 20120220 begin */
 	int slide = 0;
-	/* DTS2012022000736 zhangmin 20120220 end > */
 	/*AKMDBG("%s (0x%08X).", __func__, cmd);*/
 
-	/* < DTS2011022604747  liujinggang 20110228 begin */
 	/*set the value of auto-calibration*/
 	switch (cmd) {
 	case ECS_IOCTL_WRITE:
@@ -649,7 +636,6 @@ akmd_ioctl(struct file *file, unsigned int cmd,
 		}
 		printk(KERN_INFO "ECS_IOCTL_SET_CAL   calibration_value=%d\n",calibration_value);
 		break;
-	/* < DTS2012022000736 zhangmin 20120220 begin */
 	/*add ioctl cmd*/
 	case ECS_IOCTL_APP_GET_SLIDE:
 		if (argp == NULL) {
@@ -657,7 +643,6 @@ akmd_ioctl(struct file *file, unsigned int cmd,
 			return -EINVAL;
 		}
 		break;
-	/* DTS2012022000736 zhangmin 20120220 end > */
 	default:
 		break;
 	}
@@ -716,19 +701,16 @@ akmd_ioctl(struct file *file, unsigned int cmd,
 		AKMFUNC("IOCTL_GET_DELAY");
 		delay = akmd_delay;
 		break;
-	/* < DTS2012022000736 zhangmin 20120220 begin */
 	/*add ioctl cmd*/
 	case ECS_IOCTL_APP_GET_SLIDE:  
 		slide = get_slide_pressed();
 		AKMFUNC("GET_SLIDE \n");
 		break;
-	/* DTS2012022000736 zhangmin 20120220 end > */
 	case ECS_IOCTL_SET_CAL:
 		break;
 	default:
 		return -ENOTTY;
 	}
-	/* DTS2011022604747  liujinggang 20110228 end > */
 
 	switch (cmd) {
 	case ECS_IOCTL_READ:
@@ -756,7 +738,6 @@ akmd_ioctl(struct file *file, unsigned int cmd,
 			return -EFAULT;
 		}
 		break;
-	/* < DTS2012022000736 zhangmin 20120220 begin */
 	/*add ioctl cmd*/
 	case ECS_IOCTL_APP_GET_SLIDE:  
 		if (copy_to_user(argp, &slide,sizeof(slide))) {
@@ -764,7 +745,6 @@ akmd_ioctl(struct file *file, unsigned int cmd,
 			return -EFAULT;
 		}
 		break;
-	/* DTS2012022000736 zhangmin 20120220 end > */
 	default:
 		break;
 	}
@@ -867,9 +847,7 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct akm8975_data *akm;
 	int err = 0;
 	int gpio_config;
-	/* < DTS2011043000257  liujinggang 20110503 begin */
 	struct compass_platform_data *pdata = NULL;
-	/* DTS2011043000257  liujinggang 20110503 end > */
 
 	AKMFUNC("akm8975_probe");
 
@@ -878,7 +856,6 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		err = -ENODEV;
 		goto exit_check_functionality_failed;
 	}
-/* < DTS2012013004920 zhangmin 20120130 begin */
 /*27A doesn't to mate power*/
 #ifdef CONFIG_ARCH_MSM7X27
     /*
@@ -897,7 +874,6 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
     }
 	pdata = client->dev.platform_data;
 #else
-	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/*turn on the power*/	
 	pdata = client->dev.platform_data;
 	if (pdata){
@@ -908,9 +884,7 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			}
 		}
 	}
-	/* DTS2011043000257  liujinggang 20110503 end > */
 #endif
-/* DTS2012013004920 zhangmin 20120130 end > */
 	/* Allocate memory for driver data */
 	akm = kzalloc(sizeof(struct akm8975_data), GFP_KERNEL);
 	if (!akm) {
@@ -929,9 +903,7 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	//	goto exit_check_platform_data;
 	//}
 	/* Copy to global variable */
-	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/* delete one line */
-	/* DTS2011043000257  liujinggang 20110503 end > */
 	this_client = client;
 
 	/* Check connection */
@@ -947,12 +919,10 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto exit_check_dev_id;
 	}
 
-    /* <DTS2011021804534 shenjinming 20110218 begin */
     #ifdef CONFIG_HUAWEI_HW_DEV_DCT
     /* detect current device successful, set the flag as present */
     set_hw_dev_flag(DEV_I2C_COMPASS);
     #endif
-    /* DTS2011021804534 shenjinming 20110218 end> */
 
 	/* IRQ */
 	gpio_config = GPIO_CFG(GPIO_COMPASS_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA);
@@ -997,12 +967,7 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	input_set_abs_params(akm->input_dev, ABS_RY, -11520, 11520, 0, 0);
 	/* roll (-90, 90) */
 	input_set_abs_params(akm->input_dev, ABS_RZ, -5760, 5760, 0, 0);
-	/* x-axis acceleration (720 x 8G) */
-	input_set_abs_params(akm->input_dev, ABS_X, -5760, 5760, 0, 0);
-	/* y-axis acceleration (720 x 8G) */
-	input_set_abs_params(akm->input_dev, ABS_Y, -5760, 5760, 0, 0);
-	/* z-axis acceleration (720 x 8G) */
-	input_set_abs_params(akm->input_dev, ABS_Z, -5760, 5760, 0, 0);
+	/* delete some lines, no need to set g-sensor parameters here */
 	/* temparature */
 	/*
 	input_set_abs_params(akm->input_dev, ABS_THROTTLE, -30, 85, 0, 0);
@@ -1049,20 +1014,23 @@ int akm8975_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	init_waitqueue_head(&open_wq);
 
 	/* As default, report all information */
-	/* < DTS2011021401328  liujinggang 20110214 begin */
 	/*modify the default values*/
 	atomic_set(&m_flag, 0);
 	atomic_set(&a_flag, 0);
 	atomic_set(&mv_flag, 0);
-	/* DTS2011021401328  liujinggang 20110214 end > */
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	akm->akm_early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	akm->akm_early_suspend.suspend = akm8975_early_suspend;
 	akm->akm_early_suspend.resume = akm8975_early_resume;
 	register_early_suspend(&akm->akm_early_suspend);
 #endif
-
+	err = set_sensor_input(AKM, akm->input_dev->dev.kobj.name);
+	if (err) {
+		dev_err(&client->dev, "%s set_sensor_input failed\n", __func__);
+		goto exit_akm_aot_device_register_failed;
+	}
 	printk(KERN_INFO "Compass akm8975 is successfully probed.");
+	set_sensors_list(M_SENSOR);
 	return 0;
 
 exit_akm_aot_device_register_failed:
@@ -1078,17 +1046,13 @@ exit_check_dev_id:
 //exit_check_platform_data:
 	kfree(akm);
 exit_alloc_data_failed:
-	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/* turn down the power */
-/* < DTS2012013004920 zhangmin 20120130 begin */
 #ifdef CONFIG_ARCH_MSM7X30
 	if(pdata->compass_power != NULL){
 		pdata->compass_power(IC_PM_OFF);
 	}
 #endif
-/* DTS2012013004920 zhangmin 20120130 end > */
 exit_check_functionality_failed:
-	/* DTS2011043000257  liujinggang 20110503 end > */
 	return err;
 }
 
@@ -1140,5 +1104,4 @@ module_exit(akm8975_exit);
 MODULE_AUTHOR("viral wang <viral_wang@htc.com>");
 MODULE_DESCRIPTION("AKM8975 compass driver");
 MODULE_LICENSE("GPL");
-/* DTS2010123100691 modified by yuxuesong on 2010-12-28 end>*/
 

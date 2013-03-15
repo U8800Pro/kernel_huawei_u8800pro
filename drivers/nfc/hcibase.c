@@ -1,5 +1,3 @@
-/* < DTS2011042602168 caomingxing 20110426 begin */
-/* < DTS2011011904316 genghua 20110121 begin */
 /* This file is imported by genghua in order to 
  * support temp nfc test before the HAL and the Up-level code
  * is added to our project.
@@ -16,7 +14,6 @@
 #include <linux/slab.h> 
 #include <linux/irq.h> 
 #include <linux/interrupt.h>
-/* < DTS2011012604950 genghua 20110126 begin */
 /* we add pn544_debug_control to let the 
  * driver can control the printk more easier.
  */
@@ -25,7 +22,6 @@
 	if (pn544_debug_mask && pn544_debug_control) \
 	printk(message, ## __VA_ARGS__); \
 	} while (0)
-/* DTS2011012604950 genghua 20110126 end >*/
 
 unsigned char llcSendBuf[34];
 int llcSendLen=0;
@@ -554,7 +550,6 @@ int pn544_hci_exec(char *buf)
 		case 23:
 			curCmdLineElement = TICCONFIG_ARRAY;
 			break;
-		/* < DTS2011012604950 genghua 20110126 begin */
 		/* we add the STANDBY_ARRAY to set the EEPORM
 		 * to config the PN544 can enter the standby mode 
 		 */
@@ -562,7 +557,6 @@ int pn544_hci_exec(char *buf)
 		case 24:
 			curCmdLineElement = STANDBY_ARRAY;
 			break;
-		/* DTS2011012604950 genghua 20110126 end >*/
 		default:
 			curCmdLineElement = ReaderMode_Array;
 			readmodeon=1;
@@ -596,5 +590,3 @@ int pn544_hci_exec(char *buf)
 }
 
 
-/* DTS2011011904316 genghua 20110121 end >*/
-/* DTS2011042602168 caomingxing 20110426 end > */

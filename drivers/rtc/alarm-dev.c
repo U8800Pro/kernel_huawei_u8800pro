@@ -13,7 +13,7 @@
  *
  */
 
-#include <asm/mach/time.h>
+#include <linux/module.h>
 #include <linux/android_alarm.h>
 #include <linux/device.h>
 #include <linux/miscdevice.h>
@@ -21,9 +21,10 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <linux/sysdev.h>
 #include <linux/uaccess.h>
 #include <linux/wakelock.h>
+
+#include <asm/mach/time.h>
 
 #define ANDROID_ALARM_PRINT_INFO (1U << 0)
 #define ANDROID_ALARM_PRINT_IO (1U << 1)
@@ -31,11 +32,9 @@
 
 static int debug_mask = ANDROID_ALARM_PRINT_INFO;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
-/*< DTS2011052803245  wangjiongfeng 20110531 begin */
 #ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
 extern int msmrtc_remote_rtc_set_alarm(struct timespec*);
 #endif /*CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM*/
-/* DTS2011052803245  wangjiongfeng 20110531 end >*/
 #define pr_alarm(debug_level_mask, args...) \
 	do { \
 		if (debug_mask & ANDROID_ALARM_PRINT_##debug_level_mask) { \
@@ -164,7 +163,6 @@ from_old_alarm_set:
 		if (rv < 0)
 			goto err1;
 		break;
-/*< DTS2011052803245  wangjiongfeng 20110531 begin */
 #ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
     /*set rtc alarm time ioctl case*/
 	case ANDROID_ALARM_SET_POWERUP_RTC:
@@ -177,7 +175,6 @@ from_old_alarm_set:
                 msmrtc_remote_rtc_set_alarm(&new_alarm_time);
 		break;
 #endif /*CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM*/
-/* DTS2011052803245  wangjiongfeng 20110531 end >*/
 	case ANDROID_ALARM_GET_TIME(0):
 		switch (alarm_type) {
 		case ANDROID_ALARM_RTC_WAKEUP:

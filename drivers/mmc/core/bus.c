@@ -11,9 +11,11 @@
  *  MMC card bus driver model
  */
 
+#include <linux/export.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/stat.h>
 #include <linux/pm_runtime.h>
 
 #include <linux/mmc/card.h>
@@ -23,11 +25,9 @@
 #include "sdio_cis.h"
 #include "bus.h"
 
-/* <DTS2010092002892 duangan 20100926 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 #include "hw_extern_sdcard.h"
 #endif
-/* DTS2010092002892 duangan 20100926 end> */
 #define to_mmc_driver(d)	container_of(d, struct mmc_driver, drv)
 
 static ssize_t mmc_type_show(struct device *dev,
@@ -125,6 +125,7 @@ static int mmc_bus_remove(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
 static int mmc_bus_suspend(struct device *dev)
 {
 	struct mmc_driver *drv = to_mmc_driver(dev->driver);
@@ -146,6 +147,10 @@ static int mmc_bus_resume(struct device *dev)
 		ret = drv->resume(card);
 	return ret;
 }
+#else
+#define mmc_bus_suspend NULL
+#define mmc_bus_resume NULL
+#endif
 
 #ifdef CONFIG_PM_RUNTIME
 
@@ -168,18 +173,12 @@ static int mmc_runtime_idle(struct device *dev)
 	return pm_runtime_suspend(dev);
 }
 
-#else /* !CONFIG_PM_RUNTIME */
-#define mmc_runtime_suspend	NULL
-#define mmc_runtime_resume	NULL
-#define mmc_runtime_idle	NULL
 #endif /* !CONFIG_PM_RUNTIME */
 
 static const struct dev_pm_ops mmc_bus_pm_ops = {
-	.runtime_suspend	= mmc_runtime_suspend,
-	.runtime_resume		= mmc_runtime_resume,
-	.runtime_idle		= mmc_runtime_idle,
-	.suspend		= mmc_bus_suspend,
-	.resume			= mmc_bus_resume,
+	SET_RUNTIME_PM_OPS(mmc_runtime_suspend, mmc_runtime_resume,
+			mmc_runtime_idle)
+	SET_SYSTEM_SLEEP_PM_OPS(mmc_bus_suspend, mmc_bus_resume)
 };
 
 static struct bus_type mmc_bus_type = {
@@ -258,6 +257,8 @@ struct mmc_card *mmc_alloc_card(struct mmc_host *host, struct device_type *type)
 	card->dev.release = mmc_release_card;
 	card->dev.type = type;
 
+	spin_lock_init(&card->wr_pack_stats.lock);
+
 	return card;
 }
 
@@ -268,11 +269,19 @@ int mmc_add_card(struct mmc_card *card)
 {
 	int ret;
 	const char *type;
-/* <DTS2010061000035 liyuping 20100610 begin*/
+	const char *uhs_bus_speed_mode = "";
+	static const char *const uhs_speeds[] = {
+		[UHS_SDR12_BUS_SPEED] = "SDR12 ",
+		[UHS_SDR25_BUS_SPEED] = "SDR25 ",
+		[UHS_SDR50_BUS_SPEED] = "SDR50 ",
+		[UHS_SDR104_BUS_SPEED] = "SDR104 ",
+		[UHS_DDR50_BUS_SPEED] = "DDR50 ",
+	};
+
+
 #ifdef CONFIG_HUAWEI_KERNEL
 	mdelay(100);
 #endif
-/*DTS2010061000035 liyuping 20100610 end > */
 	dev_set_name(&card->dev, "%s:%04x", mmc_hostname(card->host), card->rca);
 
 	switch (card->type) {
@@ -301,29 +310,32 @@ int mmc_add_card(struct mmc_card *card)
 		break;
 	}
 
+	if (mmc_sd_card_uhs(card) &&
+		(card->sd_bus_speed < ARRAY_SIZE(uhs_speeds)))
+		uhs_bus_speed_mode = uhs_speeds[card->sd_bus_speed];
+
 	if (mmc_host_is_spi(card->host)) {
-		printk(KERN_INFO "%s: new %s%s%s card on SPI\n",
+		pr_info("%s: new %s%s%s card on SPI\n",
 			mmc_hostname(card->host),
 			mmc_card_highspeed(card) ? "high speed " : "",
 			mmc_card_ddr_mode(card) ? "DDR " : "",
 			type);
 	} else {
-		printk(KERN_INFO "%s: new %s%s%s card at address %04x\n",
+		pr_info("%s: new %s%s%s%s%s card at address %04x\n",
 			mmc_hostname(card->host),
-			mmc_sd_card_uhs(card) ? "ultra high speed " :
+			mmc_card_uhs(card) ? "ultra high speed " :
 			(mmc_card_highspeed(card) ? "high speed " : ""),
+			(mmc_card_hs200(card) ? "HS200 " : ""),
 			mmc_card_ddr_mode(card) ? "DDR " : "",
-			type, card->rca);
+			uhs_bus_speed_mode, type, card->rca);
 	}
 
-/* <DTS2010092002892 duangan 20100926 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
     if(MMC_TYPE_SD  == card->type)
     {
         hw_extern_sdcard_insert();
     }
 #endif
-/* DTS2010092002892 duangan 20100926 end> */
 #ifdef CONFIG_DEBUG_FS
 	mmc_add_card_debugfs(card);
 #endif
@@ -349,24 +361,24 @@ void mmc_remove_card(struct mmc_card *card)
 
 	if (mmc_card_present(card)) {
 		if (mmc_host_is_spi(card->host)) {
-			printk(KERN_INFO "%s: SPI card removed\n",
+			pr_info("%s: SPI card removed\n",
 				mmc_hostname(card->host));
 		} else {
-			printk(KERN_INFO "%s: card %04x removed\n",
+			pr_info("%s: card %04x removed\n",
 				mmc_hostname(card->host), card->rca);
 		}
         
-        /* <DTS2010092002892 duangan 20100926 begin */
         #ifdef CONFIG_HUAWEI_KERNEL
         if(MMC_TYPE_SD  == card->type)
         {
             hw_extern_sdcard_remove();
         }
         #endif
-        /* DTS2010092002892 duangan 20100926 end> */
 
 		device_del(&card->dev);
 	}
+
+	kfree(card->wr_pack_stats.packing_events);
 
 	put_device(&card->dev);
 }

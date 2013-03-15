@@ -1,4 +1,4 @@
-/* < DTS2010061200552 zhangtao 20100612 begin */
+/* modify nonstandard code*/
 /*
  * include/linux/synaptics_i2c_rmi.h - platform data structure for f75375s sensor
  *
@@ -15,8 +15,21 @@
  *
  */
 
-#ifndef _LINUX_SYNAPTICS_I2C_RMI_H
-#define _LINUX_SYNAPTICS_I2C_RMI_H
+#ifndef _SYNPTICS_I2C_RMI_1564_H
+#define _SYNPTICS_I2C_RMI_1564_H
+
+#define BIT_IS_BOOTLOADER_MODE 0x40
+
+enum rmi_dev_status_code
+{
+    RMI_DEV_NO_ERROR        = 0x00,  //No Error
+    RMI_DEV_RESET_OCCURRED  = 0x01,  //Reset occurred
+    RMI_DEV_INVALID_CFG     = 0x02,  //Invalid Configuration
+    RMI_DEV_DEVICE_FAILURE  = 0x03,  //Device Failure
+    RMI_DEV_CFG_CRC_FAILURE = 0x04,  //Configuration CRC Failure
+    RMI_DEV_FW_CRC_FAILURE  = 0x05,  //Firmware CRC Failure
+    RMI_DEV_CRC_IN_PROGRESS = 0x06,  //CRC In Progress
+};
 
 #include <linux/interrupt.h>
 #include <linux/earlysuspend.h>
@@ -47,8 +60,6 @@ enum f11_finger_status {
 	f11_finger_accurate = 1,
 	f11_finger_inaccurate = 2,
 };
-/*< DTS2010071700383 haoqingtao 20100716 begin*/
-/* kernel29 -> kernel32 driver modify*/
 
 struct f11_finger_data {
 	enum f11_finger_status status;
@@ -90,14 +101,9 @@ struct synaptics_rmi4 {
 	bool hasEgrTapAndHold;
 	bool hasEgrSingleTap;
 	bool hasEgrPalmDetect;
-	/* < DTS2010090603538 zhangtao 20100913 begin */
     bool f11_has_Sensitivity_Adjust;
-	/* DTS2010090603538 zhangtao 20100913 end > */
-/* < DTS2010070200975 zhangtao 20100702 begin */
     bool is_support_multi_touch;
-/* DTS2010070200975 zhangtao 20100702 end > */
     struct f11_finger_data *f11_fingers;
-/* DTS2010071700383 haoqingtao 20100716 end> */
 	
 	int hasF19;
 	struct rmi_function_info f19;
@@ -111,6 +117,5 @@ struct synaptics_rmi4 {
 #endif
 };
 
-#endif /* _LINUX_SYNAPTICS_I2C_RMI_H */
-/* DTS2010061200552 zhangtao 20100612 end > */
+#endif /* _SYNPTICS_I2C_RMI_1564_H */
 

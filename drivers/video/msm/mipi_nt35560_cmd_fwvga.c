@@ -1,4 +1,3 @@
-/* < DTS2011082000924 fengwei 20110820 begin */
 /* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -111,15 +110,17 @@ static int mipi_nt35560_lcd_on(struct platform_device *pdev)
 		return -EINVAL; 
 
 	mipi_set_tx_power_mode(1);
-	mipi_dsi_cmds_tx(mfd, &nt35560_tx_buf, nt35560_sleep_out_cmds,
+    /* < lishubin update baseline change this begin */
+	mipi_dsi_cmds_tx( &nt35560_tx_buf, nt35560_sleep_out_cmds,
 			ARRAY_SIZE(nt35560_sleep_out_cmds));
 	
-	mipi_dsi_cmds_tx(mfd, &nt35560_tx_buf, nt35560_lcd_init_cmds,
+	mipi_dsi_cmds_tx( &nt35560_tx_buf, nt35560_lcd_init_cmds,
 			ARRAY_SIZE(nt35560_lcd_init_cmds));
-	mipi_dsi_cmds_tx(mfd, &nt35560_tx_buf, nt35560_lcd_cabc_cmds,
+	mipi_dsi_cmds_tx( &nt35560_tx_buf, nt35560_lcd_cabc_cmds,
 			ARRAY_SIZE(nt35560_lcd_cabc_cmds));
-	mipi_dsi_cmds_tx(mfd, &nt35560_tx_buf, nt35560_display_on_cmds,
+	mipi_dsi_cmds_tx( &nt35560_tx_buf, nt35560_display_on_cmds,
 			ARRAY_SIZE(nt35560_display_on_cmds));
+    /* lishubin update baseline change this end > */
 	mipi_set_tx_power_mode(0);
 
 	pr_info("leave mipi_nt35560_lcd_on \n");
@@ -137,10 +138,12 @@ static int mipi_nt35560_lcd_off(struct platform_device *pdev)
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
 
-	mipi_dsi_cmds_tx(mfd, &nt35560_tx_buf, nt35560_display_off_cmds,
+   /* < lishubin update baseline change this begin */
+	mipi_dsi_cmds_tx( &nt35560_tx_buf, nt35560_display_off_cmds,
 			ARRAY_SIZE(nt35560_display_off_cmds));
-	mipi_dsi_cmds_tx(mfd, &nt35560_tx_buf, nt35560_sleep_in_cmds,
+	mipi_dsi_cmds_tx( &nt35560_tx_buf, nt35560_sleep_in_cmds,
 			ARRAY_SIZE(nt35560_sleep_in_cmds));
+    /* lishubin update baseline change this end > */
 	pr_info("leave mipi_nt35560_lcd_off \n");
 	return 0;
 }
@@ -180,10 +183,8 @@ static int __init mipi_cmd_nt35560_fwvga_init(void)
 	int ret = 0;
 	struct msm_panel_info *pinfo = NULL;
 
-	/*< DTS2011122306018 fengwei 20111224 begin */
 	lcd_panel_hvga = get_lcd_panel_type();
-	/* DTS2011122306018 fengwei 20111224 end >*/
-	if(MIPI_NT35560_TOSHIBA_FWVGA != lcd_panel_hvga) 
+	if(MIPI_CMD_NT35560_TOSHIBA_FWVGA != lcd_panel_hvga) 
 	{
 		return 0;
 	}
@@ -238,4 +239,3 @@ static int __init mipi_cmd_nt35560_fwvga_init(void)
 }
 
 module_init(mipi_cmd_nt35560_fwvga_init);
-/* DTS2011082000924 fengwei 20110820 end > */

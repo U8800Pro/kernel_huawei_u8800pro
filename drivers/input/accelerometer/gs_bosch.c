@@ -1,4 +1,3 @@
-/*<DTS2010123100691 modified by yuxuesong on 2010-12-28 begin*/
 /* drivers/input/accelerometer/gs_bosch.c
  *
  * Copyright (C) 2010-2011  Huawei.
@@ -32,11 +31,9 @@
 #include <linux/slab.h>
 #include <mach/vreg.h>
 
-/* <DTS2011021804534 shenjinming 20110218 begin */
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
 #endif
-/* DTS2011021804534 shenjinming 20110218 end> */
 
 //#define GS_DEBUG
 //#undef GS_DEBUG 
@@ -172,9 +169,7 @@ static atomic_t a_flag;
 static void gs_early_suspend(struct early_suspend *h);
 static void gs_late_resume(struct early_suspend *h);
 #endif
-/* < DTS2011011905410   liujinggang 20110119 begin */
 static compass_gs_position_type  compass_gs_position=COMPASS_TOP_GS_TOP;
-/* DTS2011011905410   liujinggang 20110119 end > */
 /**************************************************************************************/
 static inline int reg_read(struct gs_data *gs , int reg)
 {
@@ -429,8 +424,6 @@ static void gs_work_func(struct work_struct *work)
 		y = (MG_PER_SAMPLE*40*(s16)y)/FILTER_SAMPLE_NUMBER/10;
 		z = (MG_PER_SAMPLE*40*(s16)z)/FILTER_SAMPLE_NUMBER/10;
 
-		/* < DTS2011011905410   liujinggang 20110119 begin */
-		/* < DTS2011030405439 weiheng 20110307 begin */
 		/*report different values by machines*/
 		if((compass_gs_position==COMPASS_TOP_GS_BOTTOM)||(compass_gs_position==COMPASS_BOTTOM_GS_BOTTOM)||(compass_gs_position==COMPASS_NONE_GS_BOTTOM))
 		{
@@ -455,8 +448,6 @@ static void gs_work_func(struct work_struct *work)
 		compass_sensor_data[0]= -x;
 		compass_sensor_data[1]= y;	
 		compass_sensor_data[2]= -z;	
-		/* DTS2011030405439 weiheng 20110307 end > */
-		/* DTS2011011905410   liujinggang 20110119 end > */
 
 	}
 	if (gs->use_irq)
@@ -520,9 +511,7 @@ static int gs_probe(
 	s32 result = 0;
 	struct gs_data *gs;
 	struct gs_platform_data *pdata = NULL;
-	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/*delete 19 lines*/
-	/* DTS2011043000257  liujinggang 20110503 end > */
 	
 	GS_DEBUG(KERN_ERR "gs_BMA250_probe init \n");
     
@@ -532,11 +521,9 @@ static int gs_probe(
 		goto err_check_functionality_failed;
 	}
 
-	/* < DTS2011043000257  liujinggang 20110503 begin */
 	/*turn on the power*/
 	pdata = client->dev.platform_data;
 	if (pdata){
-/* < DTS2012013004920 zhangmin 20120130 begin */
 #ifdef CONFIG_ARCH_MSM7X30
 		if(pdata->gs_power != NULL){
 			ret = pdata->gs_power(IC_PM_ON);
@@ -545,7 +532,6 @@ static int gs_probe(
 			}
 		}
 #endif
-/* DTS2012013004920 zhangmin 20120130 end > */
 		if(pdata->adapt_fn != NULL){
 			ret = pdata->adapt_fn();
 			if(ret > 0){
@@ -558,11 +544,9 @@ static int gs_probe(
 				}
 			}
 		}
-		/* < DTS2011011905410   liujinggang 20110119 begin */
 		if(pdata->get_compass_gs_position != NULL){
 			compass_gs_position=pdata->get_compass_gs_position();
 		}
-		/* DTS2011011905410   liujinggang 20110119 end > */	
 
 		if(pdata->init_flag != NULL){
 			if(*(pdata->init_flag)){
@@ -590,7 +574,6 @@ static int gs_probe(
 		goto err_power_failed;
 	}
 #endif
-	/* DTS2011043000257  liujinggang 20110503 end > */
 
 	gs = kzalloc(sizeof(*gs), GFP_KERNEL);
 	if (gs == NULL) {
@@ -625,12 +608,10 @@ static int gs_probe(
 		goto err_detect_failed;
 	}
 
-    /* <DTS2011021804534 shenjinming 20110218 begin */
     #ifdef CONFIG_HUAWEI_HW_DEV_DCT
     /* detect current device successful, set the flag as present */
     set_hw_dev_flag(DEV_I2C_G_SENSOR);
     #endif
-    /* DTS2011021804534 shenjinming 20110218 end> */  
 
 	if (sensor_dev == NULL)
 	{
@@ -731,18 +712,14 @@ err_alloc_data_failed:
 #ifndef   GS_POLLING 
 	gs_free_int();
 #endif
-/* < DTS2011043000257  liujinggang 20110503 begin */
 /*turn down the power*/
 err_power_failed:
-/* < DTS2012013004920 zhangmin 20120130 begin */
 #ifdef CONFIG_ARCH_MSM7X30
 	if(pdata->gs_power != NULL){
 		pdata->gs_power(IC_PM_OFF);
 	}
 #endif
-/* DTS2012013004920 zhangmin 20120130 end > */
 err_check_functionality_failed:
-/* DTS2011043000257  liujinggang 20110503 end > */
 	return ret;
 }
 
@@ -837,10 +814,10 @@ static void __exit gs_bma250_exit(void)
 		destroy_workqueue(gs_wq);
 }
 
-device_initcall_sync(gs_bma250_init);
+/* modify the order of init */
+module_init(gs_bma250_init);
 module_exit(gs_bma250_exit);
 
 MODULE_DESCRIPTION("gs_bma250 Driver");
 MODULE_LICENSE("GPL");
-/* DTS2010123100691 modified by yuxuesong on 2010-12-28 end>*/
 

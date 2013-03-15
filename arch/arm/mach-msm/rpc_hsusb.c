@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-msm/rpc_hsusb.c
  *
- * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
  * All source code in this file is licensed under the following license except
  * where indicated.
@@ -20,6 +20,7 @@
 
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <mach/rpc_hsusb.h>
 #include <asm/mach-types.h>
 
@@ -608,10 +609,8 @@ int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 		ret = msm_hsusb_is_serial_num_null(1);
 		if (ret)
 			return ret;
-		/*< DTS2011041700393 lijianzhao 20110417 begin */
 		/* fixup qcom bug by yanzhijun 20110420 */
 		return 0;
-		/* DTS2011041700393 lijianzhao 20110417 end >*/
 	}
 
 	ret = msm_hsusb_is_serial_num_null(0);
@@ -625,7 +624,7 @@ int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 }
 
 
-#ifdef CONFIG_USB_GADGET_MSM_72K
+#ifdef CONFIG_USB_MSM_72K
 /* charger api wrappers */
 int hsusb_chg_init(int connect)
 {

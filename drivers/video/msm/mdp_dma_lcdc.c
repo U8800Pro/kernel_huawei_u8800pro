@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2009, 2012 Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -28,11 +28,9 @@
 #include <linux/spinlock.h>
 
 #include <linux/fb.h>
-/* <DTS2012011400657 liguosheng 20120114 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 #include <linux/hardware_self_adapt.h>
 #endif
-/* DTS2012011400657 liguosheng 20120114 end> */
 #include "mdp.h"
 #include "msm_fb.h"
 #include "mdp4.h"
@@ -52,15 +50,35 @@ extern spinlock_t mdp_spin_lock;
 extern uint32 mdp_intr_mask;
 #endif
 
-/* <DTS2011121202745 sunkai 20111213 begin */
-/* Defined in mdp.c to indicate support appboot logo display */
-#ifdef CONFIG_HUAWEI_KERNEL
-extern unsigned long mdp_timer_duration;
-extern boolean mdp_continues_display;
-#endif
-/* DTS2011121202745 sunkai 20111213 end> */
 int first_pixel_start_x;
 int first_pixel_start_y;
+
+static ssize_t vsync_show_event(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+
+	if (atomic_read(&vsync_cntrl.suspend) > 0 ||
+		atomic_read(&vsync_cntrl.vsync_resume) == 0)
+		return 0;
+
+	INIT_COMPLETION(vsync_cntrl.vsync_wait);
+
+	wait_for_completion(&vsync_cntrl.vsync_wait);
+	ret = snprintf(buf, PAGE_SIZE, "VSYNC=%llu",
+	ktime_to_ns(vsync_cntrl.vsync_time));
+	buf[strlen(buf) + 1] = '\0';
+	return ret;
+}
+
+static DEVICE_ATTR(vsync_event, S_IRUGO, vsync_show_event, NULL);
+static struct attribute *vsync_fs_attrs[] = {
+	&dev_attr_vsync_event.attr,
+	NULL,
+};
+static struct attribute_group vsync_fs_attr_group = {
+	.attrs = vsync_fs_attrs,
+};
 
 int mdp_lcdc_on(struct platform_device *pdev)
 {
@@ -104,13 +122,12 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	uint32 timer_base = LCDC_BASE;
 	uint32 block = MDP_DMA2_BLOCK;
 	int ret;
+	uint32_t mask, curr;
 
-/* <DTS2012011400657 liguosheng 20120114 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 	lcd_panel_type lcdtype = LCD_NONE;
 	lcd_align_type lcd_align = LCD_PANEL_ALIGN_LSB;
 #endif
-/* DTS2012011400657 liguosheng 20120114 end> */
 	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
 
 	if (!mfd)
@@ -121,15 +138,17 @@ int mdp_lcdc_on(struct platform_device *pdev)
 
 	fbi = mfd->fbi;
 	var = &fbi->var;
+	vsync_cntrl.dev = mfd->fbi->dev;
+	atomic_set(&vsync_cntrl.suspend, 0);
 
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 
 	bpp = fbi->var.bits_per_pixel / 8;
 	buf = (uint8 *) fbi->fix.smem_start;
-	buf += fbi->var.xoffset * bpp + fbi->var.yoffset * fbi->fix.line_length;
 
-/* <DTS2012011400657 liguosheng 20120114 begin */
+	buf += calc_fb_offset(mfd, fbi, bpp);
+
 #ifdef CONFIG_HUAWEI_KERNEL
     lcd_align = get_lcd_align_type();
     if(lcd_align == LCD_PANEL_ALIGN_MSB)
@@ -143,7 +162,6 @@ int mdp_lcdc_on(struct platform_device *pdev)
 #else
     dma2_cfg_reg = DMA_PACK_ALIGN_LSB | DMA_OUT_SEL_LCDC;
 #endif
-/* DTS2012011400657 liguosheng 20120114 end> */
 
 	if (mfd->fb_imgType == MDP_BGR_565)
 		dma2_cfg_reg |= DMA_PACK_PATTERN_BGR;
@@ -200,6 +218,9 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	/* x/y coordinate = always 0 for lcdc */
 	MDP_OUTP(MDP_BASE + dma_base + 0x10, 0);
 	/* dma config */
+	curr = inpdw(MDP_BASE + DMA_P_BASE);
+	mask = 0x0FFFFFFF;
+	dma2_cfg_reg = (dma2_cfg_reg & mask) | (curr & ~mask);
 	MDP_OUTP(MDP_BASE + dma_base, dma2_cfg_reg);
 
 	/*
@@ -275,6 +296,12 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	ctrl_polarity =
 	    (data_en_polarity << 2) | (vsync_polarity << 1) | (hsync_polarity);
 
+	if (!(mfd->cont_splash_done)) {
+		mdp_pipe_ctrl(MDP_CMD_BLOCK,
+			MDP_BLOCK_POWER_OFF, FALSE);
+		MDP_OUTP(MDP_BASE + timer_base, 0);
+	}
+
 	MDP_OUTP(MDP_BASE + timer_base + 0x4, hsync_ctrl);
 	MDP_OUTP(MDP_BASE + timer_base + 0x8, vsync_period);
 	MDP_OUTP(MDP_BASE + timer_base + 0xc, vsync_pulse_width * hsync_period);
@@ -302,7 +329,6 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		MDP_OUTP(MDP_BASE + timer_base + 0x38, active_v_end);
 	}
 
-/* <DTS2012011400657 liguosheng 20120114 begin */
 #ifdef CONFIG_HUAWEI_KERNEL
 	ret = 0;
     lcdtype = get_lcd_panel_type();
@@ -313,7 +339,6 @@ int mdp_lcdc_on(struct platform_device *pdev)
 #else
 	ret = panel_next_on(pdev);
 #endif
-/* DTS2012011400657 liguosheng 20120114 end> */
 	if (ret == 0) {
 		/* enable LCDC block */
 		MDP_OUTP(MDP_BASE + timer_base, 1);
@@ -321,7 +346,7 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	}
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-/* <DTS2012011400657 liguosheng 20120114 begin */
+
 #ifdef CONFIG_HUAWEI_KERNEL
 	/*need to send 2 frame pclk data before sending sleep out command*/
 	if( (LCD_HX8357C_TIANMA_HVGA == lcdtype )||(LCD_HX8357B_TIANMA_HVGA == lcdtype ))
@@ -330,15 +355,22 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		ret = panel_next_on(pdev);
 	}
 #endif
-/* DTS2012011400657 liguosheng 20120114 end> */
-/* <DTS2011121202745 sunkai 20111213 begin */
-#ifdef CONFIG_HUAWEI_KERNEL
-	if(mdp_continues_display) {
-		mdp_continues_display = FALSE;
-		mdp_timer_duration = (HZ);
+/* delete some line */
+
+	if (!vsync_cntrl.sysfs_created) {
+		ret = sysfs_create_group(&vsync_cntrl.dev->kobj,
+			&vsync_fs_attr_group);
+		if (ret) {
+			pr_err("%s: sysfs creation failed, ret=%d\n",
+				__func__, ret);
+			return ret;
+		}
+
+		kobject_uevent(&vsync_cntrl.dev->kobj, KOBJ_ADD);
+		pr_debug("%s: kobject_uevent(KOBJ_ADD)\n", __func__);
+		vsync_cntrl.sysfs_created = 1;
 	}
-#endif
-/* DTS2011121202745 sunkai 20111213 end> */
+
 	return ret;
 }
 
@@ -358,11 +390,11 @@ int mdp_lcdc_off(struct platform_device *pdev)
 	}
 #endif
 
-/* <DTS2012011400657 liguosheng 20120114 begin */
 /*still need to send 2 frame data after sending sleep in command*/
 #ifdef CONFIG_HUAWEI_KERNEL
 	ret = panel_next_off(pdev);
 #endif
+    down(&mfd->dma->mutex);
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	MDP_OUTP(MDP_BASE + timer_base, 0);
@@ -372,11 +404,50 @@ int mdp_lcdc_off(struct platform_device *pdev)
 #ifndef CONFIG_HUAWEI_KERNEL
 	ret = panel_next_off(pdev);
 #endif
-/* DTS2012011400657 liguosheng 20120114 end> */
+	up(&mfd->dma->mutex);
+	atomic_set(&vsync_cntrl.suspend, 1);
+	atomic_set(&vsync_cntrl.vsync_resume, 0);
+	complete_all(&vsync_cntrl.vsync_wait);
+
 	/* delay to make sure the last frame finishes */
 	msleep(16);
 
 	return ret;
+}
+
+/* merge qcom patch to solve blue screen when power on */
+void mdp_dma_lcdc_vsync_ctrl(int enable)
+{
+	unsigned long flag;
+	int disabled_clocks;
+	if (vsync_cntrl.vsync_irq_enabled == enable)
+		return;
+
+	spin_lock_irqsave(&mdp_spin_lock, flag);
+	/* delete two lines */
+
+	vsync_cntrl.vsync_irq_enabled = enable;
+	if (!enable)
+		vsync_cntrl.disabled_clocks = 0;
+	disabled_clocks = vsync_cntrl.disabled_clocks;
+	spin_unlock_irqrestore(&mdp_spin_lock, flag);
+
+	if (enable && disabled_clocks) 
+		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+		
+	spin_lock_irqsave(&mdp_spin_lock, flag);
+	if (enable && vsync_cntrl.disabled_clocks) {
+		outp32(MDP_INTR_CLEAR, LCDC_FRAME_START);
+		mdp_intr_mask |= LCDC_FRAME_START;
+		outp32(MDP_INTR_ENABLE, mdp_intr_mask);
+		mdp_enable_irq(MDP_VSYNC_TERM);
+		vsync_cntrl.disabled_clocks = 0;
+	}
+	spin_unlock_irqrestore(&mdp_spin_lock, flag);
+
+	if (vsync_cntrl.vsync_irq_enabled &&
+		atomic_read(&vsync_cntrl.suspend) == 0)
+		atomic_set(&vsync_cntrl.vsync_resume, 1);
 }
 
 void mdp_lcdc_update(struct msm_fb_data_type *mfd)
@@ -394,11 +465,12 @@ void mdp_lcdc_update(struct msm_fb_data_type *mfd)
 	if (!mfd->panel_power_on)
 		return;
 
+	down(&mfd->dma->mutex);
 	/* no need to power on cmd block since it's lcdc mode */
 	bpp = fbi->var.bits_per_pixel / 8;
 	buf = (uint8 *) fbi->fix.smem_start;
-	buf += fbi->var.xoffset * bpp +
-		fbi->var.yoffset * fbi->fix.line_length;
+
+	buf += calc_fb_offset(mfd, fbi, bpp);
 
 	dma_base = DMA_P_BASE;
 
@@ -430,4 +502,5 @@ void mdp_lcdc_update(struct msm_fb_data_type *mfd)
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 	wait_for_completion_killable(&mfd->dma->comp);
 	mdp_disable_irq(irq_block);
+	up(&mfd->dma->mutex);
 }

@@ -36,17 +36,21 @@
 #include <linux/android_pmem.h>
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
+#include <linux/sched.h>
+
+/* fixme */
+#include <asm/tlbflush.h>
 #include <../../mm/mm.h>
 #include <linux/fmem.h>
 
-void *strongly_ordered_page;
-char strongly_ordered_mem[PAGE_SIZE*2-4];
+#if defined(CONFIG_ARCH_MSM7X27)
+static void *strongly_ordered_page;
+static char strongly_ordered_mem[PAGE_SIZE*2-4];
 
-void map_page_strongly_ordered(void)
+void __init map_page_strongly_ordered(void)
 {
-#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
 	long unsigned int phys;
-	struct map_desc map;
+	struct map_desc map[1];
 
 	if (strongly_ordered_page)
 		return;
@@ -54,99 +58,54 @@ void map_page_strongly_ordered(void)
 	strongly_ordered_page = (void*)PFN_ALIGN((int)&strongly_ordered_mem);
 	phys = __pa(strongly_ordered_page);
 
-	map.pfn = __phys_to_pfn(phys);
-	map.virtual = MSM_STRONGLY_ORDERED_PAGE;
-	map.length = PAGE_SIZE;
-	map.type = MT_DEVICE_STRONGLY_ORDERED;
-	create_mapping(&map);
+	map[0].pfn = __phys_to_pfn(phys);
+	map[0].virtual = MSM_STRONGLY_ORDERED_PAGE;
+	map[0].length = PAGE_SIZE;
+	map[0].type = MT_MEMORY_SO;
+	iotable_init(map, ARRAY_SIZE(map));
 
 	printk(KERN_ALERT "Initialized strongly ordered page successfully\n");
-#endif
 }
-EXPORT_SYMBOL(map_page_strongly_ordered);
+#else
+void map_page_strongly_ordered(void) { }
+#endif
 
+#if defined(CONFIG_ARCH_MSM7X27)
 void write_to_strongly_ordered_memory(void)
 {
-#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
-	if (!strongly_ordered_page) {
-		if (!in_interrupt())
-			map_page_strongly_ordered();
-		else {
-			printk(KERN_ALERT "Cannot map strongly ordered page in "
-				"Interrupt Context\n");
-			/* capture it here before the allocation fails later */
-			BUG();
-		}
-	}
 	*(int *)MSM_STRONGLY_ORDERED_PAGE = 0;
-#endif
 }
+#else
+void write_to_strongly_ordered_memory(void) { }
+#endif
 EXPORT_SYMBOL(write_to_strongly_ordered_memory);
 
-void flush_axi_bus_buffer(void)
-{
-#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
-				    : : "r" (0) : "memory");
-	write_to_strongly_ordered_memory();
-#endif
-}
-
-#define CACHE_LINE_SIZE 32
-
-/* These cache related routines make the assumption that the associated
- * physical memory is contiguous. They will operate on all (L1
- * and L2 if present) caches.
+/* These cache related routines make the assumption (if outer cache is
+ * available) that the associated physical memory is contiguous.
+ * They will operate on all (L1 and L2 if present) caches.
  */
 void clean_and_invalidate_caches(unsigned long vstart,
 	unsigned long length, unsigned long pstart)
 {
-	unsigned long vaddr;
-
-	for (vaddr = vstart; vaddr < vstart + length; vaddr += CACHE_LINE_SIZE)
-		asm ("mcr p15, 0, %0, c7, c14, 1" : : "r" (vaddr));
-#ifdef CONFIG_OUTER_CACHE
+	dmac_flush_range((void *)vstart, (void *) (vstart + length));
 	outer_flush_range(pstart, pstart + length);
-#endif
-	asm ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
-	asm ("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
-
-	flush_axi_bus_buffer();
 }
 
 void clean_caches(unsigned long vstart,
 	unsigned long length, unsigned long pstart)
 {
-	unsigned long vaddr;
-
-	for (vaddr = vstart; vaddr < vstart + length; vaddr += CACHE_LINE_SIZE)
-		asm ("mcr p15, 0, %0, c7, c10, 1" : : "r" (vaddr));
-#ifdef CONFIG_OUTER_CACHE
+	dmac_clean_range((void *)vstart, (void *) (vstart + length));
 	outer_clean_range(pstart, pstart + length);
-#endif
-	asm ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
-	asm ("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
-
-	flush_axi_bus_buffer();
 }
 
 void invalidate_caches(unsigned long vstart,
 	unsigned long length, unsigned long pstart)
 {
-	unsigned long vaddr;
-
-	for (vaddr = vstart; vaddr < vstart + length; vaddr += CACHE_LINE_SIZE)
-		asm ("mcr p15, 0, %0, c7, c6, 1" : : "r" (vaddr));
-#ifdef CONFIG_OUTER_CACHE
+	dmac_inv_range((void *)vstart, (void *) (vstart + length));
 	outer_inv_range(pstart, pstart + length);
-#endif
-	asm ("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
-	asm ("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
-
-	flush_axi_bus_buffer();
 }
 
-void *alloc_bootmem_aligned(unsigned long size, unsigned long alignment)
+void * __init alloc_bootmem_aligned(unsigned long size, unsigned long alignment)
 {
 	void *unused_addr = NULL;
 	unsigned long addr, tmp_size, unused_size;
@@ -283,6 +242,27 @@ static void __init adjust_reserve_sizes(void)
 	}
 }
 
+#ifdef CONFIG_SRECORDER_MSM
+static unsigned long s_mempools_pstart_addr = 0x0;
+
+/*
+ * Function:       unsigned long get_mempools_pstart_addr(void)
+ * Description:    return address of mempools start
+ * Calls:          No
+ * Called By:      msm8625_reserve
+ * Table Accessed: No
+ * Table Updated:  No
+ * Input:          No
+ * Output:         No
+ * Return:         s_mempools_pstart_addr: address of mempools start
+ * Others:         No
+ */
+unsigned long get_mempools_pstart_addr(void)
+{
+    return s_mempools_pstart_addr;
+}
+#endif /* CONFIG_SRECORDER_MSM */
+
 static void __init reserve_memory_for_mempools(void)
 {
 	int i, memtype, membank_type;
@@ -317,40 +297,23 @@ static void __init reserve_memory_for_mempools(void)
 			if (size >= mt->size) {
 				size = stable_size(mb,
 					reserve_info->low_unstable_address);
+				if (!size)
+					continue;
 				/* mt->size may be larger than size, all this
 				 * means is that we are carving the memory pool
 				 * out of multiple contiguous memory banks.
 				 */
 				mt->start = mb->start + (size - mt->size);
+#ifdef CONFIG_SRECORDER_MSM                
+                s_mempools_pstart_addr = mt->start;
+#endif /* CONFIG_SRECORDER_MSM */
+
 				ret = memblock_remove(mt->start, mt->size);
 				BUG_ON(ret);
 				break;
 			}
 		}
 	}
-}
-
-unsigned long __init reserve_memory_for_fmem(unsigned long fmem_size)
-{
-	struct membank *mb;
-	int ret;
-	unsigned long fmem_phys;
-
-	if (!fmem_size)
-		return 0;
-
-	mb = &meminfo.bank[meminfo.nr_banks - 1];
-	/*
-	 * Placing fmem at the top of memory causes multimedia issues.
-	 * Instead, place it 1 page below the top of memory to prevent
-	 * the issues from occurring.
-	 */
-	fmem_phys = mb->start + (mb->size - fmem_size) - PAGE_SIZE;
-	ret = memblock_remove(fmem_phys, fmem_size);
-	BUG_ON(ret);
-
-	pr_info("fmem start %lx size %lx\n", fmem_phys, fmem_size);
-	return fmem_phys;
 }
 
 static void __init initialize_mempools(void)
@@ -370,10 +333,24 @@ static void __init initialize_mempools(void)
 	}
 }
 
+#define  MAX_FIXED_AREA_SIZE 0x11000000
+
 void __init msm_reserve(void)
 {
+	unsigned long msm_fixed_area_size;
+	unsigned long msm_fixed_area_start;
+
 	memory_pool_init();
 	reserve_info->calculate_reserve_sizes();
+
+	msm_fixed_area_size = reserve_info->fixed_area_size;
+	msm_fixed_area_start = reserve_info->fixed_area_start;
+	if (msm_fixed_area_size)
+		if (msm_fixed_area_start > reserve_info->low_unstable_address
+			- MAX_FIXED_AREA_SIZE)
+			reserve_info->low_unstable_address =
+			msm_fixed_area_start;
+
 	calculate_reserve_limits();
 	adjust_reserve_sizes();
 	reserve_memory_for_mempools();
@@ -404,64 +381,6 @@ unsigned long allocate_contiguous_ebi_nomap(unsigned long size,
 }
 EXPORT_SYMBOL(allocate_contiguous_ebi_nomap);
 
-/* emulation of the deprecated pmem_kalloc and pmem_kfree */
-int32_t pmem_kalloc(const size_t size, const uint32_t flags)
-{
-	int pmem_memtype;
-	int memtype = MEMTYPE_NONE;
-	int ebi1_memtype = MEMTYPE_EBI1;
-	unsigned int align;
-	int32_t paddr;
-
-	switch (flags & PMEM_ALIGNMENT_MASK) {
-	case PMEM_ALIGNMENT_4K:
-		align = SZ_4K;
-		break;
-	case PMEM_ALIGNMENT_1M:
-		align = SZ_1M;
-		break;
-	default:
-		pr_alert("Invalid alignment %x\n",
-			(flags & PMEM_ALIGNMENT_MASK));
-		return -EINVAL;
-	}
-
-	/* on 7x30 and 8x55 "EBI1 kernel PMEM" is really on EBI0 */
-	if (cpu_is_msm7x30() || cpu_is_msm8x55())
-			ebi1_memtype = MEMTYPE_EBI0;
-
-	pmem_memtype = flags & PMEM_MEMTYPE_MASK;
-	if (pmem_memtype == PMEM_MEMTYPE_EBI1)
-		memtype = ebi1_memtype;
-	else if (pmem_memtype == PMEM_MEMTYPE_SMI)
-		memtype = MEMTYPE_SMI_KERNEL;
-	else {
-		pr_alert("Invalid memory type %x\n",
-			flags & PMEM_MEMTYPE_MASK);
-		return -EINVAL;
-	}
-
-	paddr = _allocate_contiguous_memory_nomap(size, memtype, align,
-		__builtin_return_address(0));
-
-	if (!paddr && pmem_memtype == PMEM_MEMTYPE_SMI)
-		paddr = _allocate_contiguous_memory_nomap(size,
-			ebi1_memtype, align, __builtin_return_address(0));
-
-	if (!paddr)
-		return -ENOMEM;
-	return paddr;
-}
-EXPORT_SYMBOL(pmem_kalloc);
-
-int pmem_kfree(const int32_t physaddr)
-{
-	free_contiguous_memory_by_paddr(physaddr);
-
-	return 0;
-}
-EXPORT_SYMBOL(pmem_kfree);
-
 unsigned int msm_ttbr0;
 
 void store_ttbr0(void)
@@ -479,4 +398,15 @@ int request_fmem_c_region(void *unused)
 int release_fmem_c_region(void *unused)
 {
 	return fmem_set_state(FMEM_T_STATE);
+}
+
+unsigned long get_ddr_size(void)
+{
+	unsigned int i;
+	unsigned long ret = 0;
+
+	for (i = 0; i < meminfo.nr_banks; i++)
+		ret += meminfo.bank[i].size;
+
+	return ret;
 }

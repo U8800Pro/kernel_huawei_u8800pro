@@ -1,4 +1,3 @@
-/*<DTS2011062400849 fengwei 20110624 begin*/
 /* ====*====*====*====*====*====*====*====*====*====*====*====*====*====*====*
  * 
  *                     TRULY R61529  LCD kernel driver
@@ -87,9 +86,7 @@
 #include <linux/delay.h>
 #include <mach/gpio.h>
 #include "msm_fb.h"
-/*< DTS2012020700924 lijianzhao 20120207 begin */
 #include "hw_lcd_common.h"
-/* DTS2012020700924 lijianzhao 20120207 end >*/
 #include <mach/gpio.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
@@ -235,9 +232,7 @@ static int truly_r61529_hvga_panel_off(struct platform_device *pdev)
 	return 0;
 }
 
-/*< DTS2011122306018 fengwei 20111224 begin */
 /*delete bl function*/
-/* DTS2011122306018 fengwei 20111224 end >*/
 
 static int __devinit truly_r61529_hvga_probe(struct platform_device *pdev)
 {
@@ -259,9 +254,7 @@ static struct platform_driver this_driver = {
 static struct msm_fb_panel_data truly_r61529_hvga_panel_data = {
 	.on = truly_r61529_hvga_panel_on,
 	.off = truly_r61529_hvga_panel_off,
-/*< DTS2011122306018 fengwei 20111224 begin */
     .set_backlight = pwm_set_backlight,
-/* DTS2011122306018 fengwei 20111224 end >*/
 };
 
 static struct platform_device this_device = {
@@ -277,9 +270,7 @@ static int __init truly_r61529_hvga_panel_init(void)
 	int ret;
 	struct msm_panel_info *pinfo;
 
-	/*< DTS2011122306018 fengwei 20111224 begin */
 	lcd_panel_hvga = get_lcd_panel_type();
-	/* DTS2011122306018 fengwei 20111224 end >*/
 	if((LCD_R61529_TRULY_HVGA != lcd_panel_hvga) &&  \
 	    (msm_fb_detect_client(lCD_DRIVER_NAME))  )
 	{
@@ -330,4 +321,3 @@ static int __init truly_r61529_hvga_panel_init(void)
 }
 
 module_init(truly_r61529_hvga_panel_init);
-/*DTS2011062400849 fengwei 20110624 end>*/

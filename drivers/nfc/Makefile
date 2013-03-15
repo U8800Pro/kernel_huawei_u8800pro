@@ -3,9 +3,9 @@
 #
 
 obj-$(CONFIG_PN544_NFC)		+= pn544.o
-# /* < DTS2011042602168 caomingxing 20110426 begin */
-# /*< DTS2011011904316 genghua 20110121 begin */
+obj-$(CONFIG_NFC_PN533)		+= pn533.o
+obj-$(CONFIG_NFC_WILINK)	+= nfcwilink.o
+
 obj-$(CONFIG_HUAWEI_NFC_PN544) += nfc_pn544.o
 nfc_pn544-$(CONFIG_HUAWEI_NFC_PN544) :=pn544.o hcibase.o pn544mmi.o scriptarrays.o commonutility.o
-# /* DTS2011011904316 genghua 20110121 end >*/
-# /* DTS2011042602168 caomingxing 20110426 end > */
+ccflags-$(CONFIG_NFC_DEBUG) := -DDEBUG

@@ -14,12 +14,10 @@
 #include <linux/typecheck.h>
 #include <asm/irqflags.h>
 
-/* <DTS2012021001488 yuanjintao 20120210 begin */
 /* merge qcom DEBUG_CODE for RPC crashes */
 #ifdef CONFIG_HUAWEI_RPC_CRASH_DEBUG
 extern int hw_debug_irq_disabled;
 #endif
-/* DTS2012021001488 yuanjintao 20120210 end> */
 
 #ifdef CONFIG_TRACE_IRQFLAGS
   extern void trace_softirqs_on(unsigned long ip);
@@ -93,7 +91,6 @@ extern int hw_debug_irq_disabled;
  * if !TRACE_IRQFLAGS.
  */
 #ifdef CONFIG_TRACE_IRQFLAGS_SUPPORT
-/* <DTS2012021001488 yuanjintao 20120210 begin */
 /* merge qcom DEBUG_CODE for RPC crashes */
 #ifndef CONFIG_HUAWEI_RPC_CRASH_DEBUG
 #define local_irq_enable() \
@@ -118,7 +115,6 @@ extern int hw_debug_irq_disabled;
 		trace_hardirqs_off(); \
 		} while (0)
 #endif
-/* DTS2012021001488 yuanjintao 20120210 end> */
 
 #define local_irq_save(flags)				\
 	do {						\

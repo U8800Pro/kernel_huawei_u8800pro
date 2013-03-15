@@ -52,16 +52,17 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 #include <net/bluetooth/l2cap.h>
+#include <linux/module.h>
 
 #define VERSION "2.14"
 
 #ifdef CONFIG_BT_L2CAP_EXT_FEATURES
-static int enable_ertm = 1;
+static bool enable_ertm = 1;
 #else
-static int enable_ertm = 0;
+static bool enable_ertm = 0;
 #endif
-static int max_transmit = L2CAP_DEFAULT_MAX_TX;
-static int tx_window = L2CAP_DEFAULT_TX_WINDOW;
+static uint max_transmit = L2CAP_DEFAULT_MAX_TX;
+static uint tx_window = L2CAP_DEFAULT_TX_WINDOW;
 
 static u32 l2cap_feat_mask = L2CAP_FEAT_FIXED_CHAN;
 static u8 l2cap_fixed_chan[8] = { 0x02, };
@@ -261,12 +262,9 @@ static void l2cap_chan_del(struct sock *sk, int err)
 	BT_DBG("sk %p, conn %p, err %d", sk, conn, err);
 
 	if (conn) {
-	    /* < DTS2011052606009 jiaxianghong 20110527 begin */
-		/* < DTS2011031104864 wuzhihui 20110323 begin */
 		if (sock_owned_by_user(sk)){
 			printk("L2CAP ERROR: unlink owned sk!\n");
 		}
-		/* DTS2011031104864 wuzhihui 20110323 end > */
 		/* Unlink from channel list */
 		l2cap_chan_unlink(&conn->chan_list, sk);
 		l2cap_pi(sk)->conn = NULL;
@@ -2958,7 +2956,6 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 		break;
 
 	default:
-		/* < DTS2011031104864 wuzhihui 20110323 begin */
 		/* sync kernel.org patch. commit a49184c229535ebedbb659214db2d4d1d77b7c07 */
 		/* don't delete l2cap channel if sk is owned by user */
 		if (sock_owned_by_user(sk)) {
@@ -2967,7 +2964,6 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 			l2cap_sock_set_timer(sk, HZ / 5);
 			break;
 		}
-		/* DTS2011031104864 wuzhihui 20110323 end > */
 
 		l2cap_chan_del(sk, ECONNREFUSED);
 		break;
@@ -3177,7 +3173,6 @@ static inline int l2cap_disconnect_req(struct l2cap_conn *conn, struct l2cap_cmd
 		del_timer(&l2cap_pi(sk)->ack_timer);
 	}
 
-	/* < DTS2011031104864 wuzhihui 20110323 begin */
 	/* sync kernel.org patch. commit a49184c229535ebedbb659214db2d4d1d77b7c07 */
 	/* don't delete l2cap channel if sk is owned by user */
 	if (sock_owned_by_user(sk)) {
@@ -3187,7 +3182,6 @@ static inline int l2cap_disconnect_req(struct l2cap_conn *conn, struct l2cap_cmd
 		bh_unlock_sock(sk);
 		return 0;
 	}
-	/* DTS2011031104864 wuzhihui 20110323 end > */
 
 	l2cap_chan_del(sk, ECONNRESET);
 	bh_unlock_sock(sk);
@@ -3221,7 +3215,6 @@ static inline int l2cap_disconnect_rsp(struct l2cap_conn *conn, struct l2cap_cmd
 		del_timer(&l2cap_pi(sk)->ack_timer);
 	}
 
-	/* < DTS2011031104864 wuzhihui 20110323 begin */
 	/* sync kernel.org patch. commit a49184c229535ebedbb659214db2d4d1d77b7c07 */
 	/* don't delete l2cap channel if sk is owned by user */
 	if (sock_owned_by_user(sk)) {
@@ -3231,8 +3224,6 @@ static inline int l2cap_disconnect_rsp(struct l2cap_conn *conn, struct l2cap_cmd
 		bh_unlock_sock(sk);
 		return 0;
 	}
-	/* DTS2011031104864 wuzhihui 20110323 end > */
-    /* < DTS2011052606009 jiaxianghong 20110527 end */
 	l2cap_chan_del(sk, 0);
 	bh_unlock_sock(sk);
 

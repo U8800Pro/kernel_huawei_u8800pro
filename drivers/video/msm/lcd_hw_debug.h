@@ -1,4 +1,3 @@
-/*< DTS2010122802758 lijianzhao 20101229 begin */
 /* kernel\drivers\video\msm\lcd_hw_debug.h
  * this file is used by the driver team to change the 
  * LCD init parameters by putting a config file in the mobile,
@@ -15,10 +14,8 @@
 #define __HW_LCD_DEBUG__
 
 #include <linux/syscalls.h>
-/*< DTS2011041700393 lijianzhao 20110417 begin */
 /* modify for 4125 baseline */
 #include <linux/slab.h>
-/* DTS2011041700393 lijianzhao 20110417 end >*/
 #ifndef TRUE
 #define TRUE 1
 #endif
@@ -32,7 +29,16 @@ struct sequence{
     uint32_t value;
     uint32_t time; //unit is ms
 };
- 
+#define LCD_HX8369A_TIANMA_ESD_SIGN		1
+#define LCD_OTM8009A_CMI_ESD_SIGN	1
+
+#if (LCD_HX8369A_TIANMA_ESD_SIGN || LCD_OTM8009A_CMI_ESD_SIGN)
+struct read_sequence{
+	uint32_t reg;  //register
+	uint32_t value; //register's type
+	uint32_t len; // length of read parameters
+};
+#endif
 #define HW_LCD_INIT_TEST_PARAM "/data/hw_lcd_init_param.txt"
 #define HW_LCD_CONFIG_TABLE_MAX_NUM 600
 #define HW_LCD_CONFIGLINE_MAX 100
@@ -42,4 +48,3 @@ bool lcd_debug_free_para(void *para_table);
 
 #endif 
 
-/* DTS2010122802758 lijianzhao 20101229 end >*/

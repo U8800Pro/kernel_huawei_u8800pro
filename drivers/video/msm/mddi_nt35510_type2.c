@@ -1,4 +1,3 @@
-/*< DTS2011060802925 jiaoshuangwei 20110608 begin */
 /* drivers\video\msm\mddi_nt35510_type2.c
  * NT35510 LCD driver for 7x30 platform
  *
@@ -160,9 +159,7 @@ static int __init nt35510_init_type2(void)
 	    pinfo->clk_min = 192000000;
 	    pinfo->clk_max = 192000000;
         pinfo->lcd.vsync_enable = TRUE;
-		/*< DTS2012021007223 lijianzhao 20120211 begin */
         pinfo->lcd.refx100 = 6000;
-		/* DTS2012021007223 lijianzhao 20120211 end >*/
 		pinfo->lcd.v_back_porch = 0;
 		pinfo->lcd.v_front_porch = 0;
 		pinfo->lcd.v_pulse_width = 22;
@@ -180,4 +177,3 @@ static int __init nt35510_init_type2(void)
 	return ret;
 }
 module_init(nt35510_init_type2);
-/* DTS2011060802925 jiaoshuangwei 20110608 end >*/
